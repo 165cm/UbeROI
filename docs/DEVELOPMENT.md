@@ -35,21 +35,41 @@ git worktree add ../<リポジトリ名>-codex  -b codex/<タスク名>  origin/
 
 ## テスト（このリポジトリ用）
 
-まだコードがないので、土台を作った時にコマンドを確定する。予定：
+最初に1回だけ `npm ci`（使う部品のインストール）。そのあと：
+
+```
+npm run typecheck
+```
 
 ```
 npm test
 ```
 
-- 計算ロジックは `docs/spec/fixtures/` と受入基準（`docs/spec/docs/07-acceptance.md`）の値でテストする
-- 画面を変えた時は、スマホ縦（390×844）・320px幅・横・パソコンで確認する（Playwright）
+```
+npm run build
+```
+
+- 計算ロジックのテストは `src/domain/domain.test.ts`。値は `docs/spec/fixtures/` と受入基準（`docs/spec/docs/07-acceptance.md`）から取る
+- PR を出すと GitHub Actions（`.github/workflows/ci.yml`）が同じ3つを自動で実行する
+- 画面を変えた時は、スマホ縦（390×844）・320px幅・横・パソコンで確認する
+
+## 手元で動かす
+
+```
+npm run dev
+```
+
+表示されたURL（`http://localhost:5173/UbeROI/`）をブラウザで開く。
 
 ## デプロイ（このリポジトリ用）
 
-予定：`main` にマージすると GitHub Pages に自動で出る（`.github/workflows/` に設定を置く）。設定したらここを更新する。
+`main` にマージすると GitHub Pages に自動で出る（`.github/workflows/pages.yml`）。公開URL：https://165cm.github.io/UbeROI/
+
+最初の1回だけ、GitHub の Settings → Pages → Build and deployment の Source を「GitHub Actions」にする。
 
 ## 変更の時に必ずやること（このリポジトリ用）
 
-- 計算式を変える時は、先に `docs/spec/docs/02-profitability.md` との食い違いがないか確かめ、計算の版（calculation_version）を上げる
+- 計算式を変える時は、先に `docs/spec/docs/02-profitability.md` との食い違いがないか確かめ、`src/domain/core.ts` の `CALCULATION_VERSION` を上げる
 - 保存データの形を変える時は、データの版（schema_version）を上げて移行処理を書く
+- 画面から計算式を書かない。必ず `src/domain/` の関数を使う
 - `docs/spec/` の原本は書き換えない。仕様を変える決めごとは `docs/CURRENT_TASK.md` に書く

@@ -10,19 +10,18 @@
 
 | 担当 | ブランチ | 内容 | 触るファイル |
 |---|---|---|---|
-| Claude | claude/gallant-bohr-c8bux9 | ひな形の適用と仕様書の取り込み | `AGENTS.md` `CLAUDE.md` `README.md` `.github/` `docs/` |
+| Claude | claude/gallant-bohr-c8bux9 | 土台と計算ロジック | `package.json` `src/` `.github/workflows/` `docs/` `README.md` |
 
 ## 次のタスク（上から優先）
 
-1. 土台：Vite + React + TypeScript、Vitest、GitHub Pages への自動公開（仕様 06 フェーズ0）
-2. 計算ロジック：料金・収益・投資配賦・回収を純粋関数で。受入 A01〜A15 をテスト（フェーズ1）
-3. 記録と装備：IndexedDB、初期設定、日次の簡易記録、装備プランと購入の分離（フェーズ2）
-4. ホームと分析：期間損益・配賦後時給・回収曲線（フェーズ3）
-5. 計画と GO/WAIT/STOP、クエスト進み具合（フェーズ4）
-6. JSONバックアップ・復元、CSV取込・出力、PWA、E2E（フェーズ5）
+1. 記録と装備：IndexedDB、初期設定、日次の簡易記録、装備プランと購入の分離（フェーズ2）
+2. ホームと分析：期間損益・配賦後時給・回収曲線（フェーズ3）
+3. 計画と GO/WAIT/STOP、クエスト進み具合（フェーズ4）
+4. JSONバックアップ・復元、CSV取込・出力、PWA、E2E（フェーズ5）
 
 ## 最近終わったこと（新しい順）
 
+- 2026-10-04 土台（Vite + React + TypeScript、CI、GitHub Pages 公開設定）と計算ロジック（料金・稼働収益・期間損益・投資配賦・回収）。受入 A01〜A15・A27・A30 をテスト済み。ホームに HELLO 料金チェック
 - 2026-10-04 ひな形 165cm/ai-dev-template を適用し、引き継ぎ仕様書と収益性レポートを `docs/spec/` に保存
 
 ## 大事な決めごと
@@ -30,7 +29,8 @@
 - アプリ名は「デリ勘」。リポジトリ名は UbeROI のまま
 - 公開は GitHub Pages。データは端末内（IndexedDB）だけに保存し、外部へ送らない
 - サーバーが必要になったら Google Cloud を使う（MVPはサーバーなし）
-- 技術：React + TypeScript + Vite + IndexedDB（Dexie）、テストは Vitest + Playwright
+- 技術：React + TypeScript + Vite + IndexedDB（Dexie）、テストは Vitest + Playwright。版は package.json と package-lock.json で固定
+- 期間損益で、稼働のない月の固定費・配賦は「期間がその月を丸ごと含む時」だけ入れる（週表示で同じ月額を何度も数えないため）
 - 仕様書に追加する提案（2026-10-04 合意）：
   1. 車両の料金モデルを「段階料金（HELLO）／時間パス（NOLL）／月額サブスク／購入」から選べるようにし、購入が得になる時期を分析に出す。装備の分類に「車両」を足す
   2. 記録にプラットフォーム（Uber Eats／出前館／ロケットナウ／その他）を持たせる

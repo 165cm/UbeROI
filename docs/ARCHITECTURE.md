@@ -10,21 +10,27 @@
    └ 書き出し：JSONバックアップ・CSV（手動）
 ```
 
-- 公開URL：（GitHub Pages を設定したら書く）
+- 公開URL：https://165cm.github.io/UbeROI/ （GitHub Pages）
 - サーバーはなし。将来、AI説明などでサーバーが必要になったら Google Cloud（Cloud Run 等）に置く
 - 詳しい技術仕様：`docs/spec/docs/04-architecture.md`
 
 ## ファイルの役割
 
-まだコードはありません。予定している構成（仕様 04 の推奨分割）：
-
 | ファイル・フォルダ | 役割 |
 |---|---|
-| `src/domain/` | 料金・収益・投資回収・計画の計算（ブラウザーに依存しない純粋関数） |
-| `src/storage/` | IndexedDB の読み書き、データの版の移行、バックアップ・取込 |
-| `src/features/` | 画面ごとのまとまり（ホーム・記録・分析・計画・設定） |
-| `src/adapters/` | 外部データ（シェアサイクルの空き情報・天気・AI）。MVP後 |
-| `src/components/` | 金額・時間・状態ラベル・フォームなど共通の部品 |
+| `src/domain/core.ts` | 金額の検査、0割りの扱い、区間の和集合、日本時間の日付・週・月、整数円の按分 |
+| `src/domain/tariff.ts` | レンタル料金（段階料金・時間パス・自前車両）と次の課金時刻 |
+| `src/domain/session.ts` | 稼働1回の売上・費用・営業純利益・各種時給 |
+| `src/domain/investment.ts` | 装備・車両の現金投資、月ごとの配賦、投資回収 |
+| `src/domain/period.ts` | 日・週・月などの期間損益（固定費・配賦を稼働へ配る） |
+| `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
+| `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
+| `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え） |
+| `src/features/` | 画面ごとのまとまり（今は HELLO 料金チェックのみ） |
+| `src/format.ts` | 円・時間の表示用の整形（計算はしない） |
+| `src/storage/` | （予定）IndexedDB の読み書き、データの版の移行、バックアップ・取込 |
+| `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
+| `.github/workflows/` | `ci.yml`＝PRのテスト、`pages.yml`＝main を GitHub Pages に公開 |
 | `docs/spec/` | 引き継ぎ仕様書の原本（`MANIFEST.sha256` で改変がないか確かめられる）と収益性レポート |
 
 ## データ

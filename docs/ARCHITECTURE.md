@@ -25,10 +25,20 @@
 | `src/domain/period.ts` | 日・週・月などの期間損益（固定費・配賦を稼働へ配る） |
 | `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
 | `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
-| `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え） |
-| `src/features/` | 画面ごとのまとまり（今はシェアサイクル料金チェックのみ） |
+| `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え）、デモ表示の帯 |
+| `src/features/Home.tsx` | ホーム：出発・レンタル開始／返却・帰宅して精算、今月の成績 |
+| `src/features/Records.tsx` `SessionForm.tsx` | 記録の一覧・追加・編集・削除（取り消しつき）、計算明細のプレビュー |
+| `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・データ（デモ切り替え・JSON書き出し） |
+| `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
+| `src/components/fields.tsx` | 入力欄（整数円・未設定の区別）、エラー表示、「元に戻す」つきのお知らせ |
 | `src/format.ts` | 円・時間の表示用の整形（計算はしない） |
-| `src/storage/` | （予定）IndexedDB の読み書き、データの版の移行、バックアップ・取込 |
+| `src/storage/db.ts` | IndexedDB（Dexie）の定義。実績 `deli-kan` とデモ `deli-kan-demo` を分ける |
+| `src/storage/schema.ts` | 保存データの形と表示名 |
+| `src/storage/repo.ts` | 保存前の検証（時間の重なり・稼働中は1件など）とまとめて書く操作 |
+| `src/storage/toDomain.ts` | 保存データ → 計算関数の入力（期間損益・投資回収） |
+| `src/storage/presets.ts` `demo.ts` | 料金・装備のプリセット（例）とデモの合成データ |
+| `src/storage/context.tsx` | 画面からデータベースを使う入口 |
+| `src/storage/storage.test.ts` | 保存・検証・装備と実績の分離のテスト |
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
 | `.github/workflows/` | `ci.yml`＝PRのテスト、`pages.yml`＝main を GitHub Pages に公開 |
 | `docs/spec/` | 仕様書（`MANIFEST.sha256` で中身を確かめられる）と、収益性の参考資料（全国版） |
@@ -36,7 +46,8 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ：設定、稼働記録（セッション）、レンタル、経費、装備プラン、購入済み資産、料金の版
+- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）
+- デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`
 

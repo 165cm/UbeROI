@@ -9,6 +9,7 @@ import type {
   RecurringExpenseRecord,
   SessionRecord,
   SettingsRecord,
+  SlotRecord,
   TariffRecord,
 } from './schema'
 
@@ -436,4 +437,26 @@ export async function deleteAsset(db: DeliKanDB, assetId: string): Promise<void>
       }
     }
   })
+}
+
+// ---- 計画の候補枠 ----
+
+export async function saveSlot(db: DeliKanDB, slot: SlotRecord): Promise<void> {
+  const problems: string[] = []
+  try {
+    if (parseInstant(slot.endsAt, '帰宅予定') <= parseInstant(slot.startsAt, '出発予定')) problems.push('帰宅予定は出発予定より後にしてください')
+  } catch (e) {
+    problems.push((e as Error).message)
+  }
+  for (const [label, v] of [
+    ['悲観の売上', slot.revenueYen.pessimistic],
+    ['標準の売上', slot.revenueYen.standard],
+    ['楽観の売上', slot.revenueYen.optimistic],
+    ['想定レンタル代', slot.rentalOverrideYen],
+  ] as const) {
+    if (v !== null && (!Number.isSafeInteger(v) || v < 0)) problems.push(`${label}は0以上の整数円で入力してください`)
+  }
+  if (!Number.isSafeInteger(slot.expenseYen) || slot.expenseYen < 0) problems.push('経費は0以上の整数円で入力してください')
+  if (problems.length) throw new ValidationError(problems)
+  await db.slots.put(stamp(slot))
 }

@@ -1,0 +1,212 @@
+// 週の計画（仕様 S05・§5）：候補枠ごとの見込み利益と、週の時間内で利益が最大になる組み合わせ
+import { divide, parseInstant } from './core'
+import { MIN_SAMPLE, timeSlotOf, type TimeSlot } from './analytics'
+
+export type Scenario = 'pessimistic' | 'standard' | 'optimistic'
+export const SCENARIOS: Scenario[] = ['pessimistic', 'standard', 'optimistic']
+export const SCENARIO_LABELS: Record<Scenario, string> = { pessimistic: '悲観', standard: '標準', optimistic: '楽観' }
+
+/** 手動の幅（統計的な信頼区間ではない）。標準の売上に掛ける */
+export const SCENARIO_FACTORS: Record<Scenario, number> = { pessimistic: 0.8, standard: 1, optimistic: 1.2 }
+
+/**
+ * 参考資料（docs/spec/delivery-profitability-reference-2026-10.md）の推計倍率。
+ * 「ピーク帯・普通の天気の日」を 1.00 とした目安で、実績ではない。
+ */
+export const REFERENCE_HOURLY_REVENUE_YEN = 1400
+export const TIME_SLOT_FACTORS: Record<TimeSlot, number> = {
+  early: 0.55,
+  lunch: 1.1,
+  idle: 0.65,
+  dinner: 1.2,
+  late: 0.85,
+  night: 0.55,
+}
+export const MONTH_FACTORS = [1.1, 0.9, 1.0, 0.9, 0.95, 1.05, 1.1, 1.1, 1.05, 0.95, 0.9, 1.15] as const
+
+export interface RevenueEstimate {
+  /** 標準シナリオの売上見込み（整数円） */
+  revenueYen: number
+  source: 'personal_slot' | 'personal' | 'reference'
+  sampleSize: number
+  note: string
+}
+
+export interface PastSession {
+  departedAt: string
+  hours: number
+  revenueYen: number
+}
+
+/**
+ * 候補枠の売上見込み。本人の実績が10回以上ある時は本人の平均（同じ時間帯が10回以上ならその平均）、
+ * それ未満は参考資料の推計を使い、どちらを使ったかを返す。
+ */
+export function estimateRevenue(startsAt: string, endsAt: string, past: readonly PastSession[]): RevenueEstimate {
+  const hours = (parseInstant(endsAt) - parseInstant(startsAt)) / 3_600_000
+  if (hours <= 0) return { revenueYen: 0, source: 'reference', sampleSize: 0, note: '時間が0以下です' }
+  const slot = timeSlotOf(startsAt)
+  const perHour = (rows: readonly PastSession[]) =>
+    divide(rows.reduce((a, r) => a + r.revenueYen, 0), rows.reduce((a, r) => a + r.hours, 0))
+  const sameSlot = past.filter((p) => timeSlotOf(p.departedAt) === slot)
+  const slotRate = sameSlot.length >= MIN_SAMPLE ? perHour(sameSlot) : null
+  if (slotRate !== null) {
+    return { revenueYen: Math.round(slotRate * hours), source: 'personal_slot', sampleSize: sameSlot.length, note: `同じ時間帯の自分の実績${sameSlot.length}回の平均` }
+  }
+  const allRate = past.length >= MIN_SAMPLE ? perHour(past) : null
+  if (allRate !== null) {
+    return { revenueYen: Math.round(allRate * hours), source: 'personal', sampleSize: past.length, note: `自分の実績${past.length}回の平均（時間帯は区別していません）` }
+  }
+  // 1時間ごとに時間帯の倍率を足し合わせる（枠が時間帯をまたいでもよいように）
+  const startMs = parseInstant(startsAt)
+  const endMs = parseInstant(endsAt)
+  let weighted = 0
+  for (let t = startMs; t < endMs; t += 3_600_000) {
+    const span = Math.min(3_600_000, endMs - t) / 3_600_000
+    weighted += TIME_SLOT_FACTORS[timeSlotOf(new Date(t).toISOString())] * span
+  }
+  const month = new Date(startMs + 9 * 3_600_000).getUTCMonth()
+  const revenueYen = Math.round(REFERENCE_HOURLY_REVENUE_YEN * weighted * MONTH_FACTORS[month]!)
+  return {
+    revenueYen,
+    source: 'reference',
+    sampleSize: past.length,
+    note: past.length < MIN_SAMPLE ? `推計（自分の実績が${past.length}回で10回未満のため参考資料を使用）` : '推計（参考資料）',
+  }
+}
+
+export interface SlotInput {
+  id: string
+  startsAt: string
+  /** 帰宅予定（拘束時間の終わり） */
+  endsAt: string
+  /** シナリオごとの売上見込み。null は未入力 */
+  revenueYen: Record<Scenario, number | null>
+  /** 想定レンタル代。null は算出不可（料金の対象外など） */
+  rentalYen: number | null
+  expenseYen: number
+  /** 帰宅締切（日本時間 HH:mm）。過ぎる枠は選ばない */
+  homeDeadline?: string | null
+}
+
+export type SlotIssue = 'invalid_time' | 'past_deadline' | 'missing_estimate' | 'not_profitable'
+
+export interface SlotEvaluation {
+  id: string
+  hours: number
+  profitYen: Record<Scenario, number | null>
+  hourlyYen: Record<Scenario, number | null>
+  issues: SlotIssue[]
+}
+
+/** 帰宅が締切（出発日の日本時間 HH:mm）を過ぎるか。日をまたぐ帰宅は締切を過ぎた扱い */
+function pastDeadline(startsAt: string, endsAt: string, deadline: string): boolean {
+  const startJst = new Date(parseInstant(startsAt) + 9 * 3_600_000)
+  const [h, m] = deadline.split(':').map(Number) as [number, number]
+  const deadlineJst = Date.UTC(startJst.getUTCFullYear(), startJst.getUTCMonth(), startJst.getUTCDate(), h, m)
+  return parseInstant(endsAt) + 9 * 3_600_000 > deadlineJst
+}
+
+export function evaluateSlot(slot: SlotInput, scenario: Scenario = 'standard'): SlotEvaluation {
+  const issues: SlotIssue[] = []
+  const startMs = parseInstant(slot.startsAt)
+  const endMs = parseInstant(slot.endsAt)
+  const hours = Math.max(0, (endMs - startMs) / 3_600_000)
+  if (endMs <= startMs) issues.push('invalid_time')
+  if (slot.homeDeadline && endMs > startMs && pastDeadline(slot.startsAt, slot.endsAt, slot.homeDeadline)) issues.push('past_deadline')
+  const profitYen = {} as Record<Scenario, number | null>
+  const hourlyYen = {} as Record<Scenario, number | null>
+  for (const s of ['pessimistic', 'standard', 'optimistic'] as const) {
+    const revenue = slot.revenueYen[s]
+    profitYen[s] = revenue === null || slot.rentalYen === null ? null : revenue - slot.rentalYen - slot.expenseYen
+    hourlyYen[s] = profitYen[s] === null ? null : divide(profitYen[s]!, hours)
+  }
+  if (profitYen[scenario] === null) issues.push('missing_estimate')
+  else if (profitYen[scenario]! <= 0) issues.push('not_profitable')
+  return { id: slot.id, hours, profitYen, hourlyYen, issues }
+}
+
+export interface WeekPlan {
+  scenario: Scenario
+  chosenIds: string[]
+  /** 選ばなかった理由（重なり・時間の上限は組み合わせの結果） */
+  skipped: { id: string; reason: SlotIssue | 'overlap_or_budget' }[]
+  totalHours: number
+  profitYen: Record<Scenario, number | null>
+  hourlyYen: Record<Scenario, number | null>
+}
+
+/**
+ * 重ならない候補枠から、帰宅までの時間の合計が週の上限以内で、見込み利益の合計が最大になる組み合わせを選ぶ。
+ * 区間スケジューリング＋時間の上限（分単位）の動的計画法で厳密に解く。時給の高い順に選ぶだけでは最適にならない。
+ */
+export function planWeek(slots: readonly SlotInput[], budgetMinutes: number | null, scenario: Scenario = 'standard'): WeekPlan {
+  const evaluations = new Map(slots.map((s) => [s.id, evaluateSlot(s, scenario)]))
+  const candidates = slots
+    .filter((s) => evaluations.get(s.id)!.issues.length === 0)
+    .map((s) => ({
+      id: s.id,
+      start: parseInstant(s.startsAt),
+      end: parseInstant(s.endsAt),
+      minutes: Math.ceil((parseInstant(s.endsAt) - parseInstant(s.startsAt)) / 60_000),
+      value: evaluations.get(s.id)!.profitYen[scenario]!,
+    }))
+    .sort((a, b) => a.end - b.end || a.start - b.start)
+
+  const budget = budgetMinutes === null ? candidates.reduce((a, c) => a + c.minutes, 0) : Math.max(0, Math.floor(budgetMinutes))
+  // prev[i]：i番目の枠より前に終わる最後の枠（重ならない）
+  const prev = candidates.map((c, i) => {
+    for (let j = i - 1; j >= 0; j--) if (candidates[j]!.end <= c.start) return j
+    return -1
+  })
+  // dp[i][b]：先頭 i 個の枠から、合計 b 分以内で選んだ時の最大利益
+  const n = candidates.length
+  const dp: Float64Array[] = Array.from({ length: n + 1 }, () => new Float64Array(budget + 1))
+  for (let i = 1; i <= n; i++) {
+    const c = candidates[i - 1]!
+    const p = prev[i - 1]! + 1
+    for (let b = 0; b <= budget; b++) {
+      const skip = dp[i - 1]![b]!
+      const take = c.minutes <= b ? dp[p]![b - c.minutes]! + c.value : -Infinity
+      dp[i]![b] = Math.max(skip, take)
+    }
+  }
+  const chosen: string[] = []
+  let i = n
+  let b = budget
+  while (i > 0) {
+    const c = candidates[i - 1]!
+    if (dp[i]![b] === dp[i - 1]![b]) {
+      i -= 1
+    } else {
+      chosen.push(c.id)
+      b -= c.minutes
+      i = prev[i - 1]! + 1
+    }
+  }
+  chosen.reverse()
+
+  const chosenSet = new Set(chosen)
+  const skipped = slots
+    .filter((s) => !chosenSet.has(s.id))
+    .map((s) => {
+      const issues = evaluations.get(s.id)!.issues
+      return { id: s.id, reason: issues[0] ?? ('overlap_or_budget' as const) }
+    })
+  const totalHours = chosen.reduce((a, id) => a + evaluations.get(id)!.hours, 0)
+  const profitYen = {} as Record<Scenario, number | null>
+  const hourlyYen = {} as Record<Scenario, number | null>
+  for (const s of ['pessimistic', 'standard', 'optimistic'] as const) {
+    const values = chosen.map((id) => evaluations.get(id)!.profitYen[s])
+    profitYen[s] = values.some((v) => v === null) ? null : values.reduce<number>((a, v) => a + (v ?? 0), 0)
+    hourlyYen[s] = profitYen[s] === null ? null : divide(profitYen[s]!, totalHours)
+  }
+  return { scenario, chosenIds: chosen, skipped, totalHours, profitYen, hourlyYen }
+}
+
+/** 装備の必要現金を、計画した週の見込み利益で割った回収の目安（週）。利益が0以下なら null */
+export function weeksToRecover(cashNeededYen: number, weeklyProfitYen: number | null): number | null {
+  if (cashNeededYen === 0) return 0
+  if (weeklyProfitYen === null || weeklyProfitYen <= 0) return null
+  return cashNeededYen / weeklyProfitYen
+}

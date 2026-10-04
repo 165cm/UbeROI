@@ -146,6 +146,21 @@ describe('レビュー指摘：保存時と同じ制約で検証する', () => {
   })
 })
 
+describe('データの版の移行', () => {
+  it('版1（計画の候補枠がない頃）のバックアップも、候補枠を空として復元できる', async () => {
+    await seed()
+    const v2 = await createBackup(db, 'real')
+    const { slots: _omit, ...v1Datasets } = v2.datasets
+    const v1 = { ...v2, schema_version: 1, datasets: v1Datasets }
+    const parsed = parseBackup(JSON.stringify(v1))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.counts.slots).toBe(0)
+    await restoreBackup(db, parsed.backup)
+    expect(await db.sessions.count()).toBe(1)
+  })
+})
+
 describe('最終バックアップ日時', () => {
   it('書き出した日時を設定に残し、バックアップにも含めて復元できる', async () => {
     await markBackedUp(db, '2026-10-05T01:00:00Z')

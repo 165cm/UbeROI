@@ -1,0 +1,8 @@
+{
+  "source_conversation_id": "6ac25e86-3c20-83ee-8a98-637bdf67c6e1",
+  "checked_on": "2026-10-05",
+  "accessible_image_count": 0,
+  "images": [],
+  "status": "source_images_unavailable",
+  "reason": "All available turns read; attachments empty; subsequent image-generation responses not returned."
+}

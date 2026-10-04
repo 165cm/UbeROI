@@ -1,0 +1,2 @@
+external_id,departed_at,returned_at,online_minutes,completed_count,base_yen,tips_yen,bonus_yen,rental_yen,direct_expense_yen,area_label
+synthetic-001,2026-10-04T18:00:00+09:00,2026-10-04T21:00:00+09:00,150,10,6600,180,400,1760,200,千歳烏山駅周辺

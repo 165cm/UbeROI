@@ -57,6 +57,10 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
   const selectedTariff =
     data.tariffs.find((t) => t.id === tariffId) ?? pickDefaultTariff(data.tariffs, data.settings)
   const target = data.settings?.targetHourlyYen ?? null
+  // 確定した記録があるのに、7日以上バックアップしていなければ声をかける
+  const lastBackup = data.settings?.lastBackupAt
+  const backupAgeDays = lastBackup ? Math.floor((Date.parse(now) - Date.parse(lastBackup)) / 86_400_000) : null
+  const needsBackup = data.sessions.some((s) => s.status === 'completed') && (backupAgeDays === null || backupAgeDays >= 7)
 
   const status = active
     ? '🟢 稼働中'
@@ -119,6 +123,18 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         )}
         <Problems items={problems} />
       </section>
+
+      {needsBackup && (
+        <section className="card notice-card" role="status">
+          <strong>💾 バックアップしましょう</strong>
+          <p className="hint">
+            {data.settings?.lastBackupAt
+              ? `最後のバックアップから${backupAgeDays}日たちました。`
+              : 'まだ一度もバックアップしていません。'}
+            記録はこの端末の中だけにあります。「設定 → データ」から書き出してください。
+          </p>
+        </section>
+      )}
 
       <section className="card" aria-labelledby="month-title">
         <h3 id="month-title">📅 今月（{today.slice(5, 7).replace(/^0/, '')}月）の成績（税引前）</h3>

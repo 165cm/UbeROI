@@ -578,3 +578,11 @@ tr.low-sample td {
 tr.low-sample .tag {
   margin-left: 4px;
 }
+
+.notice-card {
+  border: 2px solid var(--warn);
+}
+
+.notice-card p {
+  margin: 4px 0 0;
+}

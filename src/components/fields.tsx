@@ -170,6 +170,12 @@ export function Notice({ message, onUndo, onClose }: { message: string; onUndo?:
 }
 
 export function errorMessages(e: unknown): string[] {
+  // 端末の保存容量が足りない時（Dexie は内側のエラーを inner に持つ）
+  const name = (e as { name?: string; inner?: { name?: string } } | null)?.name
+  const innerName = (e as { inner?: { name?: string } } | null)?.inner?.name
+  if (name === 'QuotaExceededError' || innerName === 'QuotaExceededError') {
+    return ['端末の保存容量が足りないため保存できませんでした。バックアップを書き出し、不要な写真やアプリを消してから、もう一度試してください']
+  }
   if (e && typeof e === 'object' && 'problems' in e && Array.isArray((e as { problems: unknown }).problems)) {
     return (e as { problems: string[] }).problems
   }

@@ -29,7 +29,8 @@
 | `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え）、デモ表示の帯 |
 | `src/features/Home.tsx` | ホーム：出発・レンタル開始／返却・帰宅して精算、今月の成績 |
 | `src/features/Records.tsx` `SessionForm.tsx` | 記録の一覧・追加・編集・削除（取り消しつき）、計算明細のプレビュー |
-| `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・データ（デモ切り替え・JSON書き出し） |
+| `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・装備と投資・データ |
+| `src/features/DataSettings.tsx` | データ：デモ切り替え、バックアップの書き出し・復元、全削除 |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
 | `src/features/Analytics.tsx` | 分析：期間の成績、売上→利益の内訳、回収の推移、買うか借りるか、所得の目安、内訳表、CSV |
 | `src/components/charts.tsx` | 折れ線（なぞると値が出る）と横棒の部品 |
@@ -40,8 +41,9 @@
 | `src/storage/repo.ts` | 保存前の検証（時間の重なり・稼働中は1件など）とまとめて書く操作 |
 | `src/storage/toDomain.ts` | 保存データ → 計算関数の入力（期間損益・投資回収） |
 | `src/storage/presets.ts` `demo.ts` | 料金・装備のプリセット（例）とデモの合成データ |
+| `src/storage/backup.ts` | バックアップの書き出し・検証・復元（全体置き換え）・全削除 |
 | `src/storage/context.tsx` | 画面からデータベースを使う入口 |
-| `src/storage/storage.test.ts` | 保存・検証・装備と実績の分離のテスト |
+| `src/storage/storage.test.ts` `backup.test.ts` | 保存・検証・装備と実績の分離、バックアップと復元のテスト |
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
 | `.github/workflows/` | `ci.yml`＝PRのテスト、`pages.yml`＝main を GitHub Pages に公開 |
 | `docs/spec/` | 仕様書（`MANIFEST.sha256` で中身を確かめられる）と、収益性の参考資料（全国版） |

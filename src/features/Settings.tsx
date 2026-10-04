@@ -6,7 +6,8 @@ import { IntInput, Notice, Problems, Select, TextInput, errorMessages, localToda
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { listTariffs, newId, saveRecurringExpense, saveSettings, saveTariff } from '../storage/repo'
-import { SCHEMA_VERSION, type RecurringExpenseRecord, type SettingsRecord, type TariffRecord } from '../storage/schema'
+import type { RecurringExpenseRecord, SettingsRecord, TariffRecord } from '../storage/schema'
+import { DataSettings } from './DataSettings'
 import { Equipment } from './Equipment'
 
 const SECTIONS = [
@@ -298,52 +299,6 @@ function FixedCosts() {
         <Problems items={problems} />
         <button type="submit" className="primary">💾 保存</button>
       </form>
-    </div>
-  )
-}
-
-function DataSettings() {
-  const { db, mode, setMode } = useData()
-  const [problems, setProblems] = useState<string[]>([])
-
-  const exportJson = async () => {
-    try {
-      const datasets = {
-        settings: await db.settings.toArray(),
-        tariffs: await db.tariffs.toArray(),
-        sessions: await db.sessions.toArray(),
-        recurringExpenses: await db.recurringExpenses.toArray(),
-        plans: await db.plans.toArray(),
-        assets: await db.assets.toArray(),
-      }
-      const body = JSON.stringify({ schema_version: SCHEMA_VERSION, exported_at: new Date().toISOString(), app_version: '0.1.0', mode, datasets }, null, 2)
-      const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `deli-kan-${mode === 'demo' ? 'demo-' : ''}${localToday()}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      setProblems(errorMessages(e))
-    }
-  }
-
-  return (
-    <div className="stack">
-      <section className="card stack">
-        <h3>🧪 表示するデータ</h3>
-        <p className="hint">デモは合成データで、実績とは別の場所に保存されます。切り替えても実績は消えません。</p>
-        <div className="segmented" role="radiogroup" aria-label="表示するデータ">
-          <button type="button" role="radio" aria-checked={mode === 'real'} onClick={() => setMode('real')}>📒 自分の実績</button>
-          <button type="button" role="radio" aria-checked={mode === 'demo'} onClick={() => setMode('demo')}>🧪 デモ</button>
-        </div>
-      </section>
-      <section className="card stack">
-        <h3>💾 バックアップ</h3>
-        <p className="hint">データはこの端末のブラウザーの中だけにあります（外部へは送りません。暗号化はしていません）。端末の初期化やブラウザーのデータ削除で消えるので、ときどき書き出してください。復元機能は次の更新で追加します。</p>
-        <button type="button" onClick={() => void exportJson()}>⬇️ JSONで書き出す</button>
-        <Problems items={problems} />
-      </section>
     </div>
   )
 }

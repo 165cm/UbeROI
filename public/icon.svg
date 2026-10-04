@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0f766e"/>
+  <!-- 中身は中央80%（マスク可能アイコンの安全域）に収める -->
+  <g fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="166" cy="330" r="62"/>
+    <circle cx="346" cy="330" r="62"/>
+    <path d="M166 330 L222 238 L310 238 L346 330 M222 238 L256 330 L310 238 M200 206 L246 206 M300 238 L292 196 L322 196"/>
+  </g>
+  <g fill="none" stroke="#fde68a" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M226 78 L256 118 L286 78 M256 118 L256 154 M234 126 L278 126 M234 144 L278 144"/>
+  </g>
+</svg>

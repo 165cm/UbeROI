@@ -72,4 +72,6 @@ npm run dev
 - 計算式を変える時は、先に `docs/spec/docs/02-profitability.md` との食い違いがないか確かめ、`src/domain/core.ts` の `CALCULATION_VERSION` を上げる
 - 保存データの形を変える時は、データの版（schema_version）を上げて移行処理を書く
 - 画面から計算式を書かない。必ず `src/domain/` の関数を使う
+- Service Worker は本番ビルドだけで動く（`npm run dev` では登録しない）。版は自動で変わるので手で上げなくてよい
+- `public/icon.svg` を変えたら、PNG アイコン（192・512・apple-touch-icon 180）も作り直す
 - `docs/spec/` を変えたら `MANIFEST.sha256` を作り直す（`docs/spec` で `sha256sum $(awk '{print $2}' MANIFEST.sha256) > MANIFEST.sha256`）。変えた理由は `docs/CURRENT_TASK.md` の決めごとに書く

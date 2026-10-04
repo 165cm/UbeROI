@@ -4,6 +4,7 @@ import { Analytics } from './features/Analytics'
 import { Home } from './features/Home'
 import { Records } from './features/Records'
 import { Settings } from './features/Settings'
+import { applyUpdate, useOnline, usePwa } from './pwa'
 
 const TABS = [
   { id: 'home', label: 'ホーム', icon: '🏠' },
@@ -34,6 +35,8 @@ export function App() {
 
 function Shell() {
   const { mode } = useData()
+  const online = useOnline()
+  const { updateReady } = usePwa()
   const [tab, setTab] = useState<TabId>(currentTab)
   const [editId, setEditId] = useState<string | null>(null)
 
@@ -49,7 +52,21 @@ function Shell() {
     <div className="app">
       <header className="app-header">
         <h1>デリ勘</h1>
+        {!online && (
+          <span className="tag" role="status">
+            📴 オフライン
+          </span>
+        )}
       </header>
+      {!online && <p className="offline-note">電波がなくても記録できます（端末に保存されます）。</p>}
+      {updateReady && (
+        <div className="update-banner" role="status">
+          <span>🔄 新しい版があります。入力中の内容を保存してから更新してください。</span>
+          <button type="button" className="primary" onClick={applyUpdate}>
+            更新する
+          </button>
+        </div>
+      )}
       {mode === 'demo' && (
         <p className="demo-banner" role="status">
           🧪 デモ表示中（合成データ・実績ではありません）

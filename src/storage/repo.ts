@@ -29,46 +29,43 @@ function stamp<T extends { createdAt?: string; updatedAt?: string; revision?: nu
   return { ...record, createdAt: record.createdAt || now, updatedAt: now, revision: (record.revision ?? 0) + 1 }
 }
 
-/** 初回に、料金プリセット・空の設定・装備の3プランを用意する（既にあれば何もしない） */
+/** 初期データ（料金プリセット・空の設定・装備の3プラン）。復元・全削除でも同じものを使う */
+export function initialRecords(): { settings: SettingsRecord; tariffs: TariffRecord[]; plans: EquipmentPlanRecord[] } {
+  // 一覧の並びがプリセットの順になるよう、作成日時を1ミリ秒ずつずらす
+  const base = Date.now()
+  return {
+    settings: stamp({
+      id: 'settings',
+      originLabel: null,
+      targetHourlyYen: null,
+      weeklyBudgetMinutes: null,
+      homeDeadline: null,
+      defaultTariffId: null,
+    } as SettingsRecord),
+    tariffs: TARIFF_PRESETS.map((p, i) =>
+      stamp({
+        createdAt: new Date(base + i).toISOString(),
+        id: newId(),
+        name: p.name,
+        tariff: p.tariff,
+        sourceUrl: p.sourceUrl,
+        verifiedAt: p.verifiedAt,
+        archived: false,
+      } as TariffRecord),
+    ),
+    plans: (['beginner', 'intermediate', 'advanced'] as const).map((tier) =>
+      stamp({ id: newId(), name: EQUIPMENT_PRESETS[tier].name, tier, items: EQUIPMENT_PRESETS[tier].items.map(planItemFromPreset) } as EquipmentPlanRecord),
+    ),
+  }
+}
+
+/** 初回に初期データを用意する（既にあれば何もしない） */
 export async function ensureInitialData(db: DeliKanDB): Promise<void> {
   await db.transaction('rw', [db.settings, db.tariffs, db.plans], async () => {
-    if ((await db.tariffs.count()) === 0) {
-      // 一覧の並びがプリセットの順になるよう、作成日時を1ミリ秒ずつずらす
-      const base = Date.now()
-      await db.tariffs.bulkAdd(
-        TARIFF_PRESETS.map((p, i) =>
-          stamp({
-            createdAt: new Date(base + i).toISOString(),
-            id: newId(),
-            name: p.name,
-            tariff: p.tariff,
-            sourceUrl: p.sourceUrl,
-            verifiedAt: p.verifiedAt,
-            archived: false,
-          } as TariffRecord),
-        ),
-      )
-    }
-    if (!(await db.settings.get('settings'))) {
-      await db.settings.add(
-        stamp({
-          id: 'settings',
-          originLabel: null,
-          targetHourlyYen: null,
-          weeklyBudgetMinutes: null,
-          homeDeadline: null,
-          defaultTariffId: null,
-        } as SettingsRecord),
-      )
-    }
-    if ((await db.plans.count()) === 0) {
-      for (const tier of ['beginner', 'intermediate', 'advanced'] as const) {
-        const preset = EQUIPMENT_PRESETS[tier]
-        await db.plans.add(
-          stamp({ id: newId(), name: preset.name, tier, items: preset.items.map(planItemFromPreset) } as EquipmentPlanRecord),
-        )
-      }
-    }
+    const initial = initialRecords()
+    if ((await db.tariffs.count()) === 0) await db.tariffs.bulkAdd(initial.tariffs)
+    if (!(await db.settings.get('settings'))) await db.settings.add(initial.settings)
+    if ((await db.plans.count()) === 0) await db.plans.bulkAdd(initial.plans)
   })
 }
 
@@ -157,8 +154,8 @@ function sessionEndMs(s: SessionRecord): number {
   return s.returnedAt ? parseInstant(s.returnedAt) : s.status === 'active' ? Date.now() : parseInstant(s.departedAt)
 }
 
-/** 保存前の検証。帰宅＞出発、確定には帰宅が必要、稼働中は1件まで、他の記録と時間が重ならない */
-export async function validateSession(db: DeliKanDB, s: SessionRecord): Promise<string[]> {
+/** 1件の記録だけで分かる問題（時刻の順序・確定の条件・金額）。保存時と復元時の両方で使う */
+export function sessionRecordProblems(s: SessionRecord): string[] {
   const problems: string[] = []
   let departedMs: number
   try {
@@ -201,7 +198,32 @@ export async function validateSession(db: DeliKanDB, s: SessionRecord): Promise<
       problems.push((e as Error).message)
     }
   }
+  return problems
+}
+
+/** 記録どうしの問題（稼働中は1件まで・時間の重なり）。開始時刻順に並べて隣どうしを比べる */
+export function sessionSetProblems(sessions: readonly SessionRecord[]): string[] {
+  const problems: string[] = []
+  if (sessions.filter((s) => s.status === 'active').length > 1) problems.push('稼働中の記録が2件以上あります')
+  const spans = sessions
+    .map((s) => ({ start: parseInstant(s.departedAt), end: sessionEndMs(s) }))
+    .sort((a, b) => a.start - b.start)
+  let maxEnd = -Infinity
+  for (const span of spans) {
+    if (span.start < maxEnd) {
+      problems.push('時間が重なっている記録があります')
+      break
+    }
+    maxEnd = Math.max(maxEnd, span.end)
+  }
+  return problems
+}
+
+/** 保存前の検証。帰宅＞出発、確定には帰宅が必要、稼働中は1件まで、他の記録と時間が重ならない */
+export async function validateSession(db: DeliKanDB, s: SessionRecord): Promise<string[]> {
+  const problems = sessionRecordProblems(s)
   if (problems.length) return problems
+  const departedMs = parseInstant(s.departedAt)
 
   const others = (await db.sessions.toArray()).filter((o) => o.id !== s.id)
   if (s.status === 'active' && others.some((o) => o.status === 'active')) problems.push('稼働中の記録はすでに1件あります')

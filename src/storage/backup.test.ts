@@ -102,6 +102,50 @@ describe('A20 書き出し → 全削除 → 復元', () => {
   })
 })
 
+describe('レビュー指摘：保存時と同じ制約で検証する', () => {
+  it('存在しない日時（2月30日）は拒否する', async () => {
+    await seed()
+    const b = await createBackup(db, 'real')
+    ;(b.datasets.sessions[0] as { departedAt: string }).departedAt = '2026-02-30T00:00:00Z'
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
+
+  it('時間が重なる記録・帰宅＜出発・帰宅のない確定記録は拒否する', async () => {
+    await seed()
+    const good = await createBackup(db, 'real')
+    const overlap = structuredClone(good)
+    overlap.datasets.sessions.push({ ...(structuredClone(good.datasets.sessions[0]) as object), id: 'other' })
+    const r = parseBackup(JSON.stringify(overlap))
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.problems.join()).toContain('重なって')
+
+    const reversed = structuredClone(good)
+    ;(reversed.datasets.sessions[0] as { returnedAt: string }).returnedAt = '2026-10-04T08:00:00Z'
+    expect(parseBackup(JSON.stringify(reversed)).ok).toBe(false)
+
+    const noReturn = structuredClone(good)
+    ;(noReturn.datasets.sessions[0] as { returnedAt: string | null }).returnedAt = null
+    expect(parseBackup(JSON.stringify(noReturn)).ok).toBe(false)
+  })
+
+  it('設定・料金・プランが空のバックアップでも、初期データを同じ書き込みで用意する', async () => {
+    await seed()
+    const b = await createBackup(db, 'real')
+    b.datasets.settings = []
+    b.datasets.tariffs = []
+    b.datasets.plans = []
+    b.datasets.assets = []
+    const parsed = parseBackup(JSON.stringify(b))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    await restoreBackup(db, parsed.backup)
+    expect(await db.settings.count()).toBe(1)
+    expect(await db.tariffs.count()).toBe(3)
+    expect(await db.plans.count()).toBe(3)
+    expect(await db.sessions.count()).toBe(1)
+  })
+})
+
 describe('最終バックアップ日時', () => {
   it('書き出した日時を設定に残し、バックアップにも含めて復元できる', async () => {
     await markBackedUp(db, '2026-10-05T01:00:00Z')

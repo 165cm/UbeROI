@@ -1,8 +1,9 @@
 // バックアップ（JSON）の書き出し・検証・復元。復元は全体の置き換えのみ（マージしない）
 import type { Tariff } from '../domain'
 import type { DeliKanDB, DataMode } from './db'
-import { ensureInitialData } from './repo'
-import { SCHEMA_VERSION } from './schema'
+import { parseInstant } from '../domain'
+import { initialRecords, sessionRecordProblems, sessionSetProblems } from './repo'
+import { SCHEMA_VERSION, type SessionRecord } from './schema'
 
 export const APP_VERSION = '0.1.0'
 
@@ -70,7 +71,13 @@ class Checker {
   instant(o: Record<string, unknown>, key: string, path: string, { nullable = false } = {}) {
     const v = o[key]
     if (nullable && v === null) return
-    if (typeof v !== 'string' || !/(Z|[+-]\d{2}:\d{2})$/.test(v) || Number.isNaN(Date.parse(v))) this.add(`${path}.${key}`, '日時が正しくありません')
+    // 画面の計算と同じ厳密な検査（2月30日などを別の日に読み替えない）
+    try {
+      if (typeof v !== 'string') throw new Error()
+      parseInstant(v)
+    } catch {
+      this.add(`${path}.${key}`, '日時が正しくありません')
+    }
   }
   month(o: Record<string, unknown>, key: string, path: string, { nullable = false } = {}) {
     const v = o[key]
@@ -259,8 +266,11 @@ export function parseBackup(text: string): ParseResult {
     })
   }
   if ((counts.settings ?? 0) > 1) c.add('設定', '2件以上あります')
-  const sessions = (datasets.sessions as Record<string, unknown>[] | undefined) ?? []
-  if (sessions.filter((s) => s?.status === 'active').length > 1) c.add('稼働の記録', '稼働中が2件以上あります')
+  if (c.problems.length) return { ok: false, problems: c.problems }
+  // 形が正しければ、保存時と同じ制約（時刻の順序・確定の条件・時間の重なり）も確かめる
+  const sessions = datasets.sessions as SessionRecord[]
+  sessions.forEach((s, i) => sessionRecordProblems(s).forEach((p) => c.add(`${TABLE_LABELS.sessions}[${i + 1}]`, p)))
+  sessionSetProblems(sessions).forEach((p) => c.add(TABLE_LABELS.sessions, p))
   if (c.problems.length) return { ok: false, problems: c.problems }
   return { ok: true, backup: raw as unknown as Backup, counts }
 }
@@ -269,19 +279,28 @@ export function parseBackup(text: string): ParseResult {
  * 全体を置き換える。1つのトランザクションで行うので、途中で失敗したら元のデータのまま残る。
  */
 export async function restoreBackup(db: DeliKanDB, backup: Backup): Promise<void> {
+  // 設定・料金・プランが空なら初期データで補い、置き換えと同じ1回の書き込みに含める
+  const initial = initialRecords()
+  const datasets: Record<TableName, unknown[]> = {
+    ...backup.datasets,
+    settings: backup.datasets.settings.length ? backup.datasets.settings : [initial.settings],
+    tariffs: backup.datasets.tariffs.length ? backup.datasets.tariffs : initial.tariffs,
+    plans: backup.datasets.plans.length ? backup.datasets.plans : initial.plans,
+  }
+  await replaceAll(db, datasets)
+}
+
+async function replaceAll(db: DeliKanDB, datasets: Record<TableName, unknown[]>): Promise<void> {
   await db.transaction('rw', TABLES.map((t) => db.table(t)), async () => {
     for (const t of TABLES) await db.table(t).clear()
-    for (const t of TABLES) await db.table(t).bulkAdd(backup.datasets[t])
+    for (const t of TABLES) await db.table(t).bulkAdd(datasets[t])
   })
-  await ensureInitialData(db)
 }
 
 /** すべて消して、初期状態（料金プリセット・空の設定・3プラン）に戻す */
 export async function deleteAllData(db: DeliKanDB): Promise<void> {
-  await db.transaction('rw', TABLES.map((t) => db.table(t)), async () => {
-    for (const t of TABLES) await db.table(t).clear()
-  })
-  await ensureInitialData(db)
+  const initial = initialRecords()
+  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [] })
 }
 
 /** バックアップを書き出した日時を設定に残す（ホームでの声かけに使う） */

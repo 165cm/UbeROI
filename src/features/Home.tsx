@@ -6,7 +6,8 @@ import { Problems, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
 import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, startRental } from '../storage/repo'
-import { periodFor } from '../storage/toDomain'
+import { pastSessionsFor, periodFor } from '../storage/toDomain'
+import { ContinueCard } from './ContinueCard'
 
 function useNow(active: boolean): string {
   const [now, setNow] = useState(() => new Date().toISOString())
@@ -123,6 +124,17 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         )}
         <Problems items={problems} />
       </section>
+
+      {active && (
+        <ContinueCard
+          now={now}
+          departedAt={active.departedAt}
+          rental={openRental && openRental.startAt ? { tariff: openRental.tariff, startAt: openRental.startAt } : null}
+          past={pastSessionsFor(data.sessions)}
+          targetHourlyYen={target}
+          homeDeadline={data.settings?.homeDeadline ?? null}
+        />
+      )}
 
       {needsBackup && (
         <section className="card notice-card" role="status">

@@ -5,7 +5,6 @@ import {
   SCENARIOS,
   SCENARIO_FACTORS,
   SCENARIO_LABELS,
-  calculateSession,
   estimateRevenue,
   evaluateSlot,
   feeFor,
@@ -26,7 +25,7 @@ import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
 import { listTariffs, newId, pickDefaultTariff, saveSlot } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
-import { expandRecurring, sessionToInput } from '../storage/toDomain'
+import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   invalid_time: '時間が正しくない',
@@ -76,16 +75,7 @@ export function Plan() {
 
   const computed = useMemo(() => {
     if (!data) return null
-    const past: PastSession[] = []
-    for (const s of data.sessions) {
-      if (s.status !== 'completed') continue
-      try {
-        const r = calculateSession(sessionToInput(s))
-        if (r.valid && r.hours) past.push({ departedAt: s.departedAt, hours: r.hours, revenueYen: r.revenueYen })
-      } catch {
-        // 読めない記録は見込みに使わない
-      }
-    }
+    const past = pastSessionsFor(data.sessions)
     const inWeek = data.slots.filter((s) => {
       const d = localParts(s.startsAt).date
       return d >= week.from && d <= week.to

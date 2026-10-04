@@ -9,6 +9,7 @@ import {
   type AssetInput,
   type CashEvent,
   type MonthlyExpenseInput,
+  type PastSession,
   type PeriodResult,
   type RecoveryResult,
   type SessionInput,
@@ -105,4 +106,19 @@ export function cashEventsFor(data: DataSnapshot, asOf: string): CashEvent[] {
   for (const a of data.assets) events.push(...assetCashEvents(assetToInput(a)))
   const cutoff = Date.parse(asOf)
   return events.filter((e) => Date.parse(e.at) <= cutoff)
+}
+
+/** 確定した記録の時間と売上（計画や「続けるか」の見込みに使う）。読めない記録は除く */
+export function pastSessionsFor(sessions: readonly SessionRecord[]): PastSession[] {
+  const past: PastSession[] = []
+  for (const s of sessions) {
+    if (s.status !== 'completed') continue
+    try {
+      const r = calculateSession(sessionToInput(s))
+      if (r.valid && r.hours) past.push({ departedAt: s.departedAt, hours: r.hours, revenueYen: r.revenueYen })
+    } catch {
+      // 読めない記録は見込みに使わない
+    }
+  }
+  return past
 }

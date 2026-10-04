@@ -328,6 +328,8 @@ select:focus-visible {
   border: none;
   background: transparent;
   white-space: nowrap;
+  min-width: 0;
+  padding-inline: 8px;
 }
 
 .segmented button[aria-selected='true'],
@@ -607,4 +609,40 @@ tr.low-sample .tag {
 ol.steps {
   margin: 0;
   padding-left: 20px;
+}
+
+/* ---- 続ける？帰る？ ---- */
+.decision {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  font-size: 1.125rem;
+}
+
+.decision-go {
+  border-color: var(--accent);
+}
+
+.decision-wait {
+  border-color: var(--warn);
+  border-style: dashed;
+}
+
+.decision-stop {
+  border-color: var(--danger);
+  border-width: 3px;
+}
+
+ul.reasons {
+  margin: 0;
+  padding-left: 20px;
+}
+
+details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent);
 }

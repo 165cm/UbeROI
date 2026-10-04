@@ -13,6 +13,7 @@ import {
   cashInvestmentYen,
   forecastRecoveryMonths,
   localDate,
+  parseInstant,
   passFee,
   summarizePlan,
   tieredFee,
@@ -339,5 +340,52 @@ describe('A27・A30 日跨ぎ・月跨ぎ・下書き', () => {
     const p = calculatePeriod({ from: '2026-10-01', to: '2026-10-31', sessions: [draft] })
     expect(p.rows).toHaveLength(0)
     expect(p.excludedDrafts).toBe(1)
+  })
+})
+
+describe('入力の検証（レビュー指摘）', () => {
+  const base: SessionInput = {
+    status: 'completed',
+    departedAt: '2026-10-04T09:00:00Z',
+    returnedAt: '2026-10-04T12:00:00Z',
+    revenueMode: 'summary',
+    baseYen: 1000,
+    tipsYen: 0,
+  }
+
+  it('存在しない暦日・時刻は正規化せず拒否する', () => {
+    expect(() => parseInstant('2026-02-30T00:00:00Z')).toThrow(RangeError)
+    expect(() => parseInstant('2026-10-04T24:30:00+09:00')).toThrow(RangeError)
+    expect(() => parseInstant('2026-10-04T09:00:00+25:00')).toThrow(RangeError)
+    expect(parseInstant('2026-10-04T18:00:00+09:00')).toBe(Date.parse('2026-10-04T09:00:00Z'))
+    expect(parseInstant('2026-10-04T09:00:00.500Z')).toBe(Date.parse('2026-10-04T09:00:00.500Z'))
+  })
+
+  it('負・非有限の集計オンライン時間はエラー', () => {
+    expect(calculateSession({ ...base, summaryOnlineSeconds: -100 }).valid).toBe(false)
+    expect(calculateSession({ ...base, summaryOnlineSeconds: Number.NaN }).valid).toBe(false)
+    expect(calculateSession({ ...base, summaryOnlineSeconds: 0 }).valid).toBe(true)
+  })
+
+  it('実請求があっても、終了が開始より前のレンタルはエラー（請求額は費用に残す）', () => {
+    const r = calculateSession({
+      ...base,
+      rentals: [{ tariff: HELLO_TOKYO_CITY, startAt: '2026-10-04T10:00:00Z', endAt: '2026-10-04T09:30:00Z', billedYen: 300 }],
+    })
+    expect(r.valid).toBe(false)
+    expect(r.rentalYen).toBe(300)
+  })
+
+  it('期間外の下書き・不正な記録は除外件数に数えない', () => {
+    const octDraft = { ...base, id: 'd', status: 'draft' as const, returnedAt: null, departedAt: '2026-10-10T09:00:00Z' }
+    const octInvalid = { ...base, id: 'i', baseYen: null }
+    expect(calculatePeriod({ from: '2026-11-01', to: '2026-11-30', sessions: [octDraft, octInvalid] })).toMatchObject({
+      excludedDrafts: 0,
+      excludedInvalid: 0,
+    })
+    expect(calculatePeriod({ from: '2026-10-01', to: '2026-10-31', sessions: [octDraft, octInvalid] })).toMatchObject({
+      excludedDrafts: 1,
+      excludedInvalid: 1,
+    })
   })
 })

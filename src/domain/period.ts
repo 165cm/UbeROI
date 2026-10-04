@@ -77,14 +77,17 @@ export function calculatePeriod(input: PeriodInput): PeriodResult {
   let excludedDrafts = 0
   let excludedInvalid = 0
   const candidates: { id: string; session: SessionInput; date: string; hours: number }[] = []
+  const inRange = (date: string) => input.from <= date && date <= input.to
   for (const s of input.sessions) {
+    // 除外件数は、この期間に属する記録だけを数える（帰宅日、未帰宅なら出発日）
+    const date = localDate(s.returnedAt ?? s.departedAt)
     if (s.status !== 'completed' || !s.returnedAt) {
-      excludedDrafts++
+      if (inRange(date)) excludedDrafts++
       continue
     }
     const base = calculateSession(s)
     if (!base.valid || base.hours === null) {
-      excludedInvalid++
+      if (inRange(date)) excludedInvalid++
       continue
     }
     candidates.push({ id: s.id, session: s, date: localDate(s.returnedAt), hours: base.hours })

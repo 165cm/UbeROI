@@ -157,8 +157,12 @@ export function calculateSession(session: SessionInput, context: SessionContext 
     }
     onlineSeconds = unionSeconds(onlineSpans)
   } else if (session.summaryOnlineSeconds != null) {
-    onlineSeconds = session.summaryOnlineSeconds
-    if (hours !== null && onlineSeconds > hours * 3600) errors.push('オンライン時間が拘束時間より長いです')
+    if (!Number.isFinite(session.summaryOnlineSeconds) || session.summaryOnlineSeconds < 0) {
+      errors.push('オンライン時間は0以上で入力してください')
+    } else {
+      onlineSeconds = session.summaryOnlineSeconds
+      if (hours !== null && onlineSeconds > hours * 3600) errors.push('オンライン時間が拘束時間より長いです')
+    }
   }
   let activeSeconds: number | null = null
   const deliverySpans = (session.deliveries ?? [])
@@ -174,10 +178,15 @@ export function calculateSession(session: SessionInput, context: SessionContext 
   // 費用 C
   let rentalYen: number | null = 0
   for (const rental of session.rentals ?? []) {
+    // 実請求額があっても、時刻の逆転は入力の誤りとして確定させない（請求額は費用に残す）
+    if (rental.startAt && rental.endAt && parseInstant(rental.endAt) < parseInstant(rental.startAt)) {
+      errors.push('レンタル終了が開始より前です')
+    }
     const r = calculateRental(rental, context.asOf)
     if (r.amountYen === null) {
       rentalYen = null
-      errors.push(r.reason ?? 'レンタル料金を算出できません。実請求額を入力してください')
+      const message = r.reason ?? 'レンタル料金を算出できません。実請求額を入力してください'
+      if (!errors.includes(message)) errors.push(message)
     } else if (rentalYen !== null) {
       rentalYen += r.amountYen
     }

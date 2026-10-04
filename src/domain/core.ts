@@ -19,14 +19,36 @@ export function divide(numerator: number, denominator: number): number | null {
   return numerator / denominator
 }
 
-/** ISO 8601 日時をミリ秒に。オフセットのない日時や不正な日時は拒否する */
+const ISO_INSTANT =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|([+-])(\d{2}):(\d{2}))$/
+
+/**
+ * ISO 8601 日時をミリ秒に。オフセットのない日時や不正な日時は拒否する。
+ * 2月30日のような存在しない暦日を、別の日に読み替えずに拒否する。
+ */
 export function parseInstant(iso: string, label = '日時'): number {
-  if (!/(Z|[+-]\d{2}:\d{2})$/.test(iso)) {
-    throw new RangeError(`${label} にタイムゾーンがありません（${iso}）`)
+  const m = ISO_INSTANT.exec(iso)
+  if (!m) {
+    const reason = /T\d{2}:\d{2}/.test(iso) && !/(Z|[+-]\d{2}:\d{2})$/.test(iso) ? 'タイムゾーンがありません' : '日時として読めません'
+    throw new RangeError(`${label} に${reason}（${iso}）`)
   }
-  const ms = Date.parse(iso)
-  if (Number.isNaN(ms)) throw new RangeError(`${label} が日時として読めません（${iso}）`)
-  return ms
+  const [year, month, day, hour, minute, second = 0] = [m[1], m[2], m[3], m[4], m[5], m[6]].map(Number) as number[]
+  const millis = m[7] ? Number(m[7].padEnd(3, '0')) : 0
+  const offsetHours = m[8] === 'Z' ? 0 : Number(m[10])
+  const offsetMinutes = m[8] === 'Z' ? 0 : Number(m[11])
+  const wall = new Date(Date.UTC(year!, month! - 1, day!, hour!, minute!, second, millis))
+  const isRealCalendarTime =
+    wall.getUTCFullYear() === year &&
+    wall.getUTCMonth() === month! - 1 &&
+    wall.getUTCDate() === day &&
+    hour! <= 23 &&
+    minute! <= 59 &&
+    second <= 59 &&
+    offsetHours <= 23 &&
+    offsetMinutes <= 59
+  if (!isRealCalendarTime) throw new RangeError(`${label} が存在しない日時です（${iso}）`)
+  const sign = m[9] === '-' ? -1 : 1
+  return wall.getTime() - sign * (offsetHours * 60 + offsetMinutes) * 60_000
 }
 
 export interface Span {

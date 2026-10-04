@@ -1,5 +1,5 @@
 // 週の計画（仕様 S05・§5）：候補枠ごとの見込み利益と、週の時間内で利益が最大になる組み合わせ
-import { divide, parseInstant } from './core'
+import { divide, monthRange, parseInstant } from './core'
 import { MIN_SAMPLE, timeSlotOf, type TimeSlot } from './analytics'
 
 export type Scenario = 'pessimistic' | 'standard' | 'optimistic'
@@ -57,13 +57,14 @@ export function estimateRevenue(startsAt: string, endsAt: string, past: readonly
   if (allRate !== null) {
     return { revenueYen: Math.round(allRate * hours), source: 'personal', sampleSize: past.length, note: `自分の実績${past.length}回の平均（時間帯は区別していません）` }
   }
-  // 1時間ごとに時間帯の倍率を足し合わせる（枠が時間帯をまたいでもよいように）
+  // 時間帯が切り替わる時刻で区切り、それぞれの長さ × 倍率を足し合わせる
   const startMs = parseInstant(startsAt)
   const endMs = parseInstant(endsAt)
   let weighted = 0
-  for (let t = startMs; t < endMs; t += 3_600_000) {
-    const span = Math.min(3_600_000, endMs - t) / 3_600_000
-    weighted += TIME_SLOT_FACTORS[timeSlotOf(new Date(t).toISOString())] * span
+  for (let t = startMs; t < endMs; ) {
+    const segmentEnd = Math.min(endMs, nextSlotBoundary(t))
+    weighted += TIME_SLOT_FACTORS[timeSlotOf(new Date(t).toISOString())] * ((segmentEnd - t) / 3_600_000)
+    t = segmentEnd
   }
   const month = new Date(startMs + 9 * 3_600_000).getUTCMonth()
   const revenueYen = Math.round(REFERENCE_HOURLY_REVENUE_YEN * weighted * MONTH_FACTORS[month]!)
@@ -73,6 +74,35 @@ export function estimateRevenue(startsAt: string, endsAt: string, past: readonly
     sampleSize: past.length,
     note: past.length < MIN_SAMPLE ? `推計（自分の実績が${past.length}回で10回未満のため参考資料を使用）` : '推計（参考資料）',
   }
+}
+
+/** 時間帯（日本時間 0・7・11・14・17・21時）が次に切り替わる時刻 */
+const SLOT_BOUNDARY_HOURS = [0, 7, 11, 14, 17, 21, 24]
+const JST_MS = 9 * 3_600_000
+function nextSlotBoundary(ms: number): number {
+  const jst = ms + JST_MS
+  const dayStart = Math.floor(jst / 86_400_000) * 86_400_000
+  const hoursIntoDay = (jst - dayStart) / 3_600_000
+  const next = SLOT_BOUNDARY_HOURS.find((h) => h > hoursIntoDay) ?? 24
+  return dayStart + next * 3_600_000 - JST_MS
+}
+
+/**
+ * 毎月の固定費を、期間（日本時間の日付・両端含む）の日数で按分した額。
+ * 計画は未来の予測なので、実績のような「稼働時間の比」ではなく日割りで見込む。
+ */
+export function weeklyFixedCostYen(monthly: readonly { month: string; amountYen: number }[], from: string, to: string): number {
+  let total = 0
+  for (const month of monthRange(from.slice(0, 7), to.slice(0, 7))) {
+    const amount = monthly.filter((m) => m.month === month).reduce((a, m) => a + m.amountYen, 0)
+    if (amount === 0) continue
+    const [y, m] = month.split('-').map(Number) as [number, number]
+    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate()
+    const first = from > `${month}-01` ? Number(from.slice(8, 10)) : 1
+    const last = to < `${month}-${String(daysInMonth).padStart(2, '0')}` ? Number(to.slice(8, 10)) : daysInMonth
+    total += (amount * (last - first + 1)) / daysInMonth
+  }
+  return Math.round(total)
 }
 
 export interface SlotInput {
@@ -99,12 +129,17 @@ export interface SlotEvaluation {
   issues: SlotIssue[]
 }
 
-/** 帰宅が締切（出発日の日本時間 HH:mm）を過ぎるか。日をまたぐ帰宅は締切を過ぎた扱い */
+/**
+ * 帰宅が締切（日本時間 HH:mm）を過ぎるか。締切は出発の後で最初に来るその時刻
+ * （出発20:00・締切01:00なら翌日の01:00）。
+ */
 function pastDeadline(startsAt: string, endsAt: string, deadline: string): boolean {
-  const startJst = new Date(parseInstant(startsAt) + 9 * 3_600_000)
+  const startJstMs = parseInstant(startsAt) + JST_MS
+  const startJst = new Date(startJstMs)
   const [h, m] = deadline.split(':').map(Number) as [number, number]
-  const deadlineJst = Date.UTC(startJst.getUTCFullYear(), startJst.getUTCMonth(), startJst.getUTCDate(), h, m)
-  return parseInstant(endsAt) + 9 * 3_600_000 > deadlineJst
+  let deadlineJst = Date.UTC(startJst.getUTCFullYear(), startJst.getUTCMonth(), startJst.getUTCDate(), h, m)
+  if (deadlineJst <= startJstMs) deadlineJst += 86_400_000
+  return parseInstant(endsAt) + JST_MS > deadlineJst
 }
 
 export function evaluateSlot(slot: SlotInput, scenario: Scenario = 'standard'): SlotEvaluation {
@@ -132,6 +167,8 @@ export interface WeekPlan {
   /** 選ばなかった理由（重なり・時間の上限は組み合わせの結果） */
   skipped: { id: string; reason: SlotIssue | 'overlap_or_budget' }[]
   totalHours: number
+  /** 週あたりに按分した毎月の固定費（利益から差し引き済み） */
+  fixedCostYen: number
   profitYen: Record<Scenario, number | null>
   hourlyYen: Record<Scenario, number | null>
 }
@@ -140,7 +177,12 @@ export interface WeekPlan {
  * 重ならない候補枠から、帰宅までの時間の合計が週の上限以内で、見込み利益の合計が最大になる組み合わせを選ぶ。
  * 区間スケジューリング＋時間の上限（分単位）の動的計画法で厳密に解く。時給の高い順に選ぶだけでは最適にならない。
  */
-export function planWeek(slots: readonly SlotInput[], budgetMinutes: number | null, scenario: Scenario = 'standard'): WeekPlan {
+export function planWeek(
+  slots: readonly SlotInput[],
+  budgetMinutes: number | null,
+  scenario: Scenario = 'standard',
+  fixedCostYen = 0,
+): WeekPlan {
   const evaluations = new Map(slots.map((s) => [s.id, evaluateSlot(s, scenario)]))
   const candidates = slots
     .filter((s) => evaluations.get(s.id)!.issues.length === 0)
@@ -198,10 +240,11 @@ export function planWeek(slots: readonly SlotInput[], budgetMinutes: number | nu
   const hourlyYen = {} as Record<Scenario, number | null>
   for (const s of ['pessimistic', 'standard', 'optimistic'] as const) {
     const values = chosen.map((id) => evaluations.get(id)!.profitYen[s])
-    profitYen[s] = values.some((v) => v === null) ? null : values.reduce<number>((a, v) => a + (v ?? 0), 0)
+    // 固定費は枠を選んでも選ばなくてもかかるので、選び方には影響させず合計からだけ引く
+    profitYen[s] = values.some((v) => v === null) ? null : values.reduce<number>((a, v) => a + (v ?? 0), 0) - fixedCostYen
     hourlyYen[s] = profitYen[s] === null ? null : divide(profitYen[s]!, totalHours)
   }
-  return { scenario, chosenIds: chosen, skipped, totalHours, profitYen, hourlyYen }
+  return { scenario, chosenIds: chosen, skipped, totalHours, fixedCostYen, profitYen, hourlyYen }
 }
 
 /** 装備の必要現金を、計画した週の見込み利益で割った回収の目安（週）。利益が0以下なら null */

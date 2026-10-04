@@ -13,6 +13,7 @@ import {
   planWeek,
   shiftPeriod,
   summarizePlan,
+  weeklyFixedCostYen,
   weeksToRecover,
   type PastSession,
   type Scenario,
@@ -25,7 +26,7 @@ import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
 import { listTariffs, newId, pickDefaultTariff, saveSlot } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
-import { sessionToInput } from '../storage/toDomain'
+import { expandRecurring, sessionToInput } from '../storage/toDomain'
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   invalid_time: '時間が正しくない',
@@ -60,6 +61,7 @@ export function Plan() {
   const { db } = useData()
   const data = useLiveQuery(async () => ({
     slots: await db.slots.orderBy('startsAt').toArray(),
+    recurringExpenses: await db.recurringExpenses.toArray(),
     sessions: await db.sessions.toArray(),
     plans: await db.plans.toArray(),
     tariffs: await listTariffs(db),
@@ -98,7 +100,8 @@ export function Plan() {
       expenseYen: s.expenseYen,
       homeDeadline: data.settings?.homeDeadline ?? null,
     }))
-    const plan = planWeek(inputs, data.settings?.weeklyBudgetMinutes ?? null, scenario)
+    const fixed = weeklyFixedCostYen(expandRecurring(data.recurringExpenses, week.from.slice(0, 7), week.to.slice(0, 7)), week.from, week.to)
+    const plan = planWeek(inputs, data.settings?.weeklyBudgetMinutes ?? null, scenario, fixed)
     return { past, inWeek, inputs, plan, tariffOf }
   }, [data, week.from, week.to, scenario])
 
@@ -174,6 +177,9 @@ export function Plan() {
             <dt>拘束時間</dt>
             <dd>{plan.totalHours.toFixed(1)}時間{budget !== null ? ` / 上限${(budget / 60).toFixed(1)}時間` : '（週の上限：未設定）'}</dd>
           </div>
+          {plan.fixedCostYen > 0 && (
+            <div><dt>毎月の固定費（この週の日数分）</dt><dd>−{formatYen(plan.fixedCostYen)}</dd></div>
+          )}
         </dl>
         <div className="table-scroll">
           <table className="breakdown">
@@ -191,7 +197,7 @@ export function Plan() {
             </tbody>
           </table>
         </div>
-        <p className="hint">悲観・楽観は標準の売上の 0.8倍・1.2倍の目安で、統計的な範囲ではありません。レンタル代は料金設定からの見積です。</p>
+        <p className="hint">営業利益は、選んだ枠の見込み利益から毎月の固定費（週の日数で按分）を引いた額です。悲観・楽観は標準の売上の 0.8倍・1.2倍の目安で、統計的な範囲ではありません。レンタル代は料金設定からの見積です。</p>
       </section>
 
       <button type="button" className="primary" onClick={() => setEditing(newSlot())}>＋ 候補枠を追加</button>

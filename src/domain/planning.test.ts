@@ -1,6 +1,6 @@
 // 計画（仕様 S05・§5、受入 A29）
 import { describe, expect, it } from 'vitest'
-import { estimateRevenue, evaluateSlot, planWeek, weeksToRecover, type SlotInput } from './index'
+import { estimateRevenue, evaluateSlot, planWeek, weeklyFixedCostYen, weeksToRecover, type SlotInput } from './index'
 
 const slot = (id: string, start: string, end: string, standard: number, extra: Partial<SlotInput> = {}): SlotInput => ({
   id,
@@ -84,5 +84,30 @@ describe('装備の回収の目安', () => {
     expect(weeksToRecover(0, 6000)).toBe(0)
     expect(weeksToRecover(18000, 0)).toBeNull()
     expect(evaluateSlot(slot('t', '2026-10-05T08:00:00Z', '2026-10-05T08:00:00Z', 1000)).issues).toContain('invalid_time')
+  })
+})
+
+describe('レビュー指摘', () => {
+  it('推計は時間帯の境界で区切って積算する（13:30〜14:30 は半分ランチ・半分昼下がり）', () => {
+    // 10月：1400 × (0.5h × 1.10 + 0.5h × 0.65) × 0.95
+    const e = estimateRevenue('2026-10-05T04:30:00Z', '2026-10-05T05:30:00Z', [])
+    expect(e.revenueYen).toBe(Math.round(1400 * (0.5 * 1.1 + 0.5 * 0.65) * 0.95))
+  })
+
+  it('締切が出発時刻より前の時刻なら翌日の締切として扱う（01:00締切・20:00〜翌0:30）', () => {
+    const ok = slot('n', '2026-10-05T11:00:00Z', '2026-10-05T15:30:00Z', 5000, { homeDeadline: '01:00' })
+    expect(evaluateSlot(ok).issues).not.toContain('past_deadline')
+    const late = slot('m', '2026-10-05T11:00:00Z', '2026-10-05T16:30:00Z', 5000, { homeDeadline: '01:00' })
+    expect(evaluateSlot(late).issues).toContain('past_deadline')
+  })
+
+  it('毎月の固定費を週の日数で按分し、計画の営業利益から差し引く', () => {
+    // 10月（31日）に月3,100円 → 1日100円 × 7日 = 700円
+    expect(weeklyFixedCostYen([{ month: '2026-10', amountYen: 3100 }], '2026-10-05', '2026-10-11')).toBe(700)
+    // 月またぎ：9/28〜10/4（9月30日・10月31日）
+    expect(weeklyFixedCostYen([{ month: '2026-09', amountYen: 3000 }, { month: '2026-10', amountYen: 3100 }], '2026-09-28', '2026-10-04')).toBe(300 + 400)
+    const plan = planWeek([slot('a', '2026-10-05T08:00:00Z', '2026-10-05T11:00:00Z', 5000)], null, 'standard', 700)
+    expect(plan.profitYen.standard).toBe(5000 - 700)
+    expect(plan.fixedCostYen).toBe(700)
   })
 })

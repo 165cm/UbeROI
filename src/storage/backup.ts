@@ -228,6 +228,9 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
   slots(c, r, path) {
     c.instant(r, 'startsAt', path)
     c.instant(r, 'endsAt', path)
+    if (typeof r.startsAt === 'string' && typeof r.endsAt === 'string' && Date.parse(r.endsAt) <= Date.parse(r.startsAt)) {
+      c.add(`${path}.endsAt`, '帰宅予定が出発予定より後になっていません')
+    }
     c.str(r, 'areaLabel', path)
     if (c.obj(r.revenueYen, `${path}.revenueYen`)) {
       for (const k of ['pessimistic', 'standard', 'optimistic']) c.int(r.revenueYen, k, `${path}.revenueYen`, { nullable: true })

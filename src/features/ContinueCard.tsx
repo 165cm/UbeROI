@@ -60,6 +60,8 @@ export function ContinueCard({
   const [prefs, setPrefs] = useState(loadPrefs)
   const [manualRevenue, setManualRevenue] = useState<number | null>(null)
   const [questGain, setQuestGain] = useState<number | null>(null)
+  const [extraExpense, setExtraExpense] = useState<number | null>(null)
+  const [returnFailureCost, setReturnFailureCost] = useState<number | null>(null)
   useEffect(() => savePrefs(prefs), [prefs])
 
   // 1分ごとに見直す（毎秒の計算はしない）
@@ -80,6 +82,8 @@ export function ContinueCard({
     extendMinutes,
     extraRevenueYen: revenue,
     questGainYen: questGain ?? 0,
+    extraExpenseYen: extraExpense ?? 0,
+    returnFailureCostYen: rental ? (returnFailureCost ?? 0) : 0,
     rental,
     minutesToReturnBike: rental ? prefs.minutesToReturnBike : 0,
     minutesToHome: prefs.minutesToHome,
@@ -93,7 +97,18 @@ export function ContinueCard({
       <p className="hint">止まっている時に確かめてください（走行中は操作しないでください）。</p>
       <div className="segmented" role="radiogroup" aria-label="延長する時間">
         {[30, 60, 90].map((m) => (
-          <button key={m} type="button" role="radio" aria-checked={extendMinutes === m} aria-label={`あと${m}分`} onClick={() => setExtendMinutes(m)}>
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={extendMinutes === m}
+            aria-label={`あと${m}分`}
+            onClick={() => {
+              // 手入力の売上は選んだ時間に対する額なので、時間を変えたら自動の見込みに戻す
+              if (m !== extendMinutes) setManualRevenue(null)
+              setExtendMinutes(m)
+            }}
+          >
             +{m}分
           </button>
         ))}
@@ -111,6 +126,9 @@ export function ContinueCard({
       <dl className="stats">
         <div><dt>延長した分の売上（標準）</dt><dd>{formatYen(standard)}{manualRevenue === null ? '（見込み）' : '（手入力）'}</dd></div>
         <div><dt>増えるレンタル代</dt><dd>{result.extraRentalYen === null ? '算出不可' : formatYen(result.extraRentalYen)}</dd></div>
+        {(extraExpense ?? 0) + (rental ? (returnFailureCost ?? 0) : 0) > 0 && (
+          <div><dt>そのほか差し引く額</dt><dd>{formatYen((extraExpense ?? 0) + (rental ? (returnFailureCost ?? 0) : 0))}</dd></div>
+        )}
         <div><dt>延長した場合の帰宅</dt><dd>{formatClock(result.arrivalIfExtended).slice(0, 5)}ごろ</dd></div>
       </dl>
       <div className="table-scroll">
@@ -136,6 +154,16 @@ export function ContinueCard({
         <div className="stack">
           <IntInput label={`あと${extendMinutes}分の売上の見込み（標準）`} unit="円" value={manualRevenue} onChange={setManualRevenue} placeholder={`自動：${estimate.revenueYen}`} hint="空欄なら自動の見込みを使います" />
           <IntInput label="クエストで増えそうな額（見込み）" unit="円" value={questGain} onChange={setQuestGain} hint="確定していない額は実績の売上には入りません" />
+          <IntInput label="延長中にかかる経費（駐輪代など）" unit="円" value={extraExpense} onChange={setExtraExpense} />
+          {rental && (
+            <IntInput
+              label="返却できないリスクの費用（見込み）"
+              unit="円"
+              value={returnFailureCost}
+              onChange={setReturnFailureCost}
+              hint="遅い時間に返す場所が満車になりやすい等で、追加料金がかかりそうな額 × その確率の目安"
+            />
+          )}
           <IntInput label="やめてから家に着くまで" unit="分" value={prefs.minutesToHome} onChange={(v) => setPrefs({ ...prefs, minutesToHome: v ?? 0 })} />
           {rental && (
             <IntInput label="やめてから自転車を返すまで" unit="分" value={prefs.minutesToReturnBike} onChange={(v) => setPrefs({ ...prefs, minutesToReturnBike: v ?? 0 })} />

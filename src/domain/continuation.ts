@@ -14,7 +14,10 @@ export interface ContinuationInput {
   extraRevenueYen: Record<Scenario, number | null>
   /** クエストの期待値の増分（確定したものではない。実績売上には入れない） */
   questGainYen?: number
+  /** 延長中にかかる追加の経費（駐輪代など） */
   extraExpenseYen?: number
+  /** 返却失敗の期待費用（返す場所が満車などで追加料金がかかる見込み × その確率） */
+  returnFailureCostYen?: number
   /** 稼働中のレンタル（なければ null） */
   rental: { tariff: Tariff; startAt: string } | null
   /** やめてからポートで返却するまでの時間（分） */
@@ -77,7 +80,9 @@ export function evaluateContinuation(input: ContinuationInput): ContinuationResu
   for (const s of SCENARIOS) {
     const revenue = input.extraRevenueYen[s]
     deltaProfitYen[s] =
-      revenue === null || extraRentalYen === null ? null : revenue + (input.questGainYen ?? 0) - extraRentalYen - (input.extraExpenseYen ?? 0)
+      revenue === null || extraRentalYen === null
+        ? null
+        : revenue + (input.questGainYen ?? 0) - extraRentalYen - (input.extraExpenseYen ?? 0) - (input.returnFailureCostYen ?? 0)
     hourlyYen[s] = deltaProfitYen[s] === null || deltaHours === null ? null : divide(deltaProfitYen[s]!, deltaHours)
   }
 

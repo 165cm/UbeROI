@@ -68,3 +68,10 @@ describe('追加レンタル', () => {
     expect(zero.hourlyYen.standard).toBeNull()
   })
 })
+
+describe('レビュー指摘：仕様 §5 の控除をすべて入れる', () => {
+  it('追加経費と返却失敗の期待費用を、各見込みの増える利益から差し引く', () => {
+    const r = evaluateContinuation(base({ extraRevenueYen: { pessimistic: 1000, standard: 1200, optimistic: 1400 }, extraExpenseYen: 100, returnFailureCostYen: 50 }))
+    expect(r.deltaProfitYen).toEqual({ pessimistic: 850, standard: 1050, optimistic: 1250 })
+  })
+})

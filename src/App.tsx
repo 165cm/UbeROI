@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DataProvider, useData } from './storage/context'
+import { Analytics } from './features/Analytics'
 import { Home } from './features/Home'
 import { Records } from './features/Records'
 import { Settings } from './features/Settings'
@@ -19,8 +20,7 @@ function currentTab(): TabId {
   return TABS.some((t) => t.id === hash) ? (hash as TabId) : 'home'
 }
 
-const COMING_SOON: Record<'analytics' | 'plan', { title: string; body: string }> = {
-  analytics: { title: '分析', body: '日・週・月の利益、本当の時給、投資の回収曲線を見る画面です。次の更新で追加します。今月の成績はホームに出ています。' },
+const COMING_SOON: Record<'plan', { title: string; body: string }> = {
   plan: { title: '計画', body: '空き時間の候補を比べ、悲観／標準／楽観で見込みを出す画面です。準備中です。' },
 }
 
@@ -66,8 +66,9 @@ function Shell() {
           />
         )}
         {tab === 'records' && <Records editId={editId} onEdit={setEditId} />}
+        {tab === 'analytics' && <Analytics />}
         {tab === 'settings' && <Settings />}
-        {(tab === 'analytics' || tab === 'plan') && (
+        {tab === 'plan' && (
           <section className="card muted">
             <h3>{COMING_SOON[tab].title}</h3>
             <p>{COMING_SOON[tab].body}</p>

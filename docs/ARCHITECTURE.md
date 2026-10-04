@@ -24,12 +24,15 @@
 | `src/domain/investment.ts` | 装備・車両の現金投資、月ごとの配賦、投資回収 |
 | `src/domain/period.ts` | 日・週・月などの期間損益（固定費・配賦を稼働へ配る） |
 | `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
+| `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
 | `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
 | `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え）、デモ表示の帯 |
 | `src/features/Home.tsx` | ホーム：出発・レンタル開始／返却・帰宅して精算、今月の成績 |
 | `src/features/Records.tsx` `SessionForm.tsx` | 記録の一覧・追加・編集・削除（取り消しつき）、計算明細のプレビュー |
 | `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・データ（デモ切り替え・JSON書き出し） |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
+| `src/features/Analytics.tsx` | 分析：期間の成績、売上→利益の内訳、回収の推移、買うか借りるか、所得の目安、内訳表、CSV |
+| `src/components/charts.tsx` | 折れ線（なぞると値が出る）と横棒の部品 |
 | `src/components/fields.tsx` | 入力欄（整数円・未設定の区別）、エラー表示、「元に戻す」つきのお知らせ |
 | `src/format.ts` | 円・時間の表示用の整形（計算はしない） |
 | `src/storage/db.ts` | IndexedDB（Dexie）の定義。実績 `deli-kan` とデモ `deli-kan-demo` を分ける |

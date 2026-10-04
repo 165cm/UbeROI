@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Notice, Problems, errorMessages, localToday } from '../components/fields'
 import { useData } from '../storage/context'
+import { InstallHelp } from './InstallHelp'
 import {
   TABLE_LABELS,
   backupFileName,
@@ -88,6 +89,7 @@ export function DataSettings() {
 
   return (
     <div className="stack">
+      <InstallHelp />
       <section className="card stack">
         <h3>🧪 表示するデータ</h3>
         <p className="hint">デモは合成データで、実績とは別の場所に保存されます。切り替えても実績は消えません。</p>

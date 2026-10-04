@@ -45,6 +45,10 @@
 | `src/storage/context.tsx` | 画面からデータベースを使う入口 |
 | `src/storage/storage.test.ts` `backup.test.ts` | 保存・検証・装備と実績の分離、バックアップと復元のテスト |
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
+| `src/pwa.ts` | Service Worker の登録、新しい版の知らせ、オフライン判定、ホーム画面に追加、消えにくい保存の依頼 |
+| `src/features/InstallHelp.tsx` | 「アプリとして使う」の案内（設定 → データ） |
+| `sw/sw.template.js` | Service Worker のひな形。ビルド時に版と一覧を埋め込んで `dist/sw.js` になる |
+| `public/` | マニフェスト（`manifest.webmanifest`）とアイコン（`icon.svg` と PNG） |
 | `.github/workflows/` | `ci.yml`＝PRのテスト、`pages.yml`＝main を GitHub Pages に公開 |
 | `docs/spec/` | 仕様書（`MANIFEST.sha256` で中身を確かめられる）と、収益性の参考資料（全国版） |
 

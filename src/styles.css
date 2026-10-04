@@ -586,3 +586,25 @@ tr.low-sample .tag {
 .notice-card p {
   margin: 4px 0 0;
 }
+
+/* ---- オフライン・更新 ---- */
+.offline-note {
+  margin: 0 16px 8px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.update-banner {
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+}
+
+ol.steps {
+  margin: 0;
+  padding-left: 20px;
+}

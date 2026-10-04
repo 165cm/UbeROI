@@ -3,6 +3,7 @@ import {
   breakdown,
   calculateRecovery,
   csvCell,
+  isValidRange,
   periodRange,
   recoverySeries,
   shiftPeriod,
@@ -19,6 +20,14 @@ describe('期間の区切り（A27）', () => {
     expect(periodRange('year', '2026-10-04')).toEqual({ from: '2026-01-01', to: '2026-12-31' })
     expect(shiftPeriod('month', '2026-12-15', 1)).toBe('2027-01-01')
     expect(shiftPeriod('week', '2026-10-26', -1)).toBe('2026-10-19')
+  })
+
+  it('任意期間は、開始・終了とも実在する日付で開始 ≦ 終了の時だけ有効', () => {
+    expect(isValidRange('2026-10-01', '2026-10-31')).toBe(true)
+    expect(isValidRange('', '2026-10-31')).toBe(false)
+    expect(isValidRange('2026-10-01', '')).toBe(false)
+    expect(isValidRange('2026-02-30', '2026-03-01')).toBe(false)
+    expect(isValidRange('2026-10-31', '2026-10-01')).toBe(false)
   })
 
   it('時間帯と曜日は日本時間で決める', () => {

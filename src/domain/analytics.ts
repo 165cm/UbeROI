@@ -22,6 +22,18 @@ export function periodRange(kind: PeriodKind, date: string): { from: string; to:
   }
 }
 
+/** 実在する日付 YYYY-MM-DD か（空欄・2月30日などは false） */
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const d = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value
+}
+
+/** 任意期間として使えるか：開始・終了とも実在する日付で、開始 ≦ 終了 */
+export function isValidRange(from: string, to: string): boolean {
+  return isCalendarDate(from) && isCalendarDate(to) && from <= to
+}
+
 /** 前後の期間へ移動した時の基準日 */
 export function shiftPeriod(kind: PeriodKind, date: string, step: number): string {
   if (kind === 'month') return `${addMonths(date.slice(0, 7), step)}-01`

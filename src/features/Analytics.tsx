@@ -6,6 +6,7 @@ import {
   breakdown,
   divide,
   forecastRecoveryMonths,
+  isValidRange,
   localDate,
   periodRange,
   recoverySeries,
@@ -60,7 +61,7 @@ export function Analytics() {
   const [custom, setCustom] = useState({ from: `${today.slice(0, 7)}-01`, to: today })
 
   const range = kind === 'custom' ? custom : periodRange(kind, anchor)
-  const validRange = range.from <= range.to
+  const validRange = isValidRange(range.from, range.to)
 
   const result = useMemo(() => {
     if (!data || !validRange) return null
@@ -71,7 +72,8 @@ export function Analytics() {
     const value = (x: (typeof rows)[number]) => ({ hours: x.row.result.hours ?? 0, operatingProfitYen: x.row.result.operatingProfitYen ?? 0 })
     const nowIso = new Date().toISOString()
     const events = cashEventsFor(data, nowIso)
-    const year = periodFor(settled, `${today.slice(0, 4)}-01-01`, `${today.slice(0, 4)}-12-31`)
+    // 実績なので今日までで集計する（12月31日までにすると、まだ来ていない月の固定費まで引いてしまう）
+    const year = periodFor(settled, `${today.slice(0, 4)}-01-01`, today)
     // 直近90日のレンタル代（購入とレンタルの比較に使う）
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString()
     const recent = periodFor(settled, localDate(ninetyAgo), today)
@@ -82,6 +84,7 @@ export function Analytics() {
       bySlot: breakdown(rows, (x) => TIME_SLOT_LABELS[timeSlotOf(x.session.departedAt)], value),
       byWeekday: breakdown(rows, (x) => `${weekdayOf(x.session.returnedAt!)}曜`, value),
       byPlatform: breakdown(rows, (x) => PLATFORM_LABELS[x.session.platform], value),
+      byArea: breakdown(rows, (x) => x.session.areaLabel.trim() || '未入力', value),
       recovery: recoveryFor(data, nowIso),
       series: recoverySeries(events),
       yearProfit: year.totals.operatingProfitYen,
@@ -153,7 +156,7 @@ export function Analytics() {
       <p className="hint">税引前・確定した記録のみ。日をまたいだ稼働は帰宅日（日本時間）に入れます。</p>
 
       {!validRange || !result ? (
-        <p className="problems" role="alert">開始日は終了日以前にしてください。</p>
+        <p className="problems" role="alert">開始日と終了日を選び、開始日は終了日以前にしてください。</p>
       ) : (
         <>
           <section className="card" aria-labelledby="kpi-title">
@@ -244,7 +247,7 @@ export function Analytics() {
           </section>
 
           <section className="card stack" aria-labelledby="tax-title">
-            <h3 id="tax-title">🧾 今年の所得の目安（{today.slice(0, 4)}年）</h3>
+            <h3 id="tax-title">🧾 今年の所得の目安（{today.slice(0, 4)}年1月1日〜今日）</h3>
             <dl className="stats">
               <div><dt>営業純利益（売上 − 経費）</dt><dd className="big">{formatYen(result.yearProfit)}</dd></div>
               <div><dt>副業の確定申告の目安</dt><dd>{formatYen(SIDE_JOB_FILING_LINE_YEN)}{result.yearProfit > SIDE_JOB_FILING_LINE_YEN ? '（⚠️ 超えています）' : ''}</dd></div>
@@ -256,6 +259,7 @@ export function Analytics() {
           <Breakdown title="🕐 出発の時間帯別" rows={result.bySlot} />
           <Breakdown title="📅 曜日別（帰宅日）" rows={result.byWeekday} />
           <Breakdown title="📱 サービス別" rows={result.byPlatform} />
+          <Breakdown title="📍 エリア別" rows={result.byArea} />
         </>
       )}
     </div>

@@ -24,6 +24,7 @@
 | `src/domain/investment.ts` | 装備・車両の現金投資、月ごとの配賦、投資回収 |
 | `src/domain/period.ts` | 日・週・月などの期間損益（固定費・配賦を稼働へ配る） |
 | `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
+| `src/domain/planning.ts` | 計画：売上の見込み（本人の実績／参考資料の推計）、候補枠の評価、週の最適な組み合わせ、装備の回収の目安 |
 | `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
 | `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
 | `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え）、デモ表示の帯 |
@@ -32,6 +33,7 @@
 | `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・装備と投資・データ |
 | `src/features/DataSettings.tsx` | データ：デモ切り替え、バックアップの書き出し・復元、全削除 |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
+| `src/features/Plan.tsx` | 計画：週の候補枠の入力・おすすめの組み合わせ・3つの見込みの比較・装備の回収の目安 |
 | `src/features/Analytics.tsx` | 分析：期間の成績、売上→利益の内訳、回収の推移、買うか借りるか、所得の目安、内訳表、CSV |
 | `src/components/charts.tsx` | 折れ線（なぞると値が出る）と横棒の部品 |
 | `src/components/fields.tsx` | 入力欄（整数円・未設定の区別）、エラー表示、「元に戻す」つきのお知らせ |
@@ -55,7 +57,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）
+- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`

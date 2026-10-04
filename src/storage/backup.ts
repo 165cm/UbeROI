@@ -7,7 +7,7 @@ import { SCHEMA_VERSION, type SessionRecord } from './schema'
 
 export const APP_VERSION = '0.1.0'
 
-const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets'] as const
+const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots'] as const
 type TableName = (typeof TABLES)[number]
 
 export const TABLE_LABELS: Record<TableName, string> = {
@@ -17,6 +17,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   recurringExpenses: '固定費',
   plans: '装備プラン',
   assets: '登録済みの装備',
+  slots: '計画の候補枠',
 }
 
 export interface Backup {
@@ -224,6 +225,22 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.int(r, 'businessSaleYen', path, { nullable: true })
     c.stamped(r, path)
   },
+  slots(c, r, path) {
+    c.instant(r, 'startsAt', path)
+    c.instant(r, 'endsAt', path)
+    if (typeof r.startsAt === 'string' && typeof r.endsAt === 'string' && Date.parse(r.endsAt) <= Date.parse(r.startsAt)) {
+      c.add(`${path}.endsAt`, '帰宅予定が出発予定より後になっていません')
+    }
+    c.str(r, 'areaLabel', path)
+    if (c.obj(r.revenueYen, `${path}.revenueYen`)) {
+      for (const k of ['pessimistic', 'standard', 'optimistic']) c.int(r.revenueYen, k, `${path}.revenueYen`, { nullable: true })
+    }
+    c.str(r, 'estimateNote', path)
+    c.int(r, 'rentalOverrideYen', path, { nullable: true })
+    c.int(r, 'expenseYen', path)
+    c.str(r, 'tariffId', path, { nullable: true })
+    c.stamped(r, path)
+  },
 }
 
 export type ParseResult =
@@ -239,6 +256,11 @@ export function parseBackup(text: string): ParseResult {
     return { ok: false, problems: ['JSONとして読めません。デリ勘で書き出したファイルか確認してください'] }
   }
   const c = new Checker()
+  if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
+  // 版1（計画の候補枠がない頃）のバックアップは、候補枠を空として読み込む
+  if (raw.schema_version === 1 && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], ...(raw.datasets as object) } }
+  }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
   if (raw.schema_version !== SCHEMA_VERSION) {
     return { ok: false, problems: [`データの版（${String(raw.schema_version)}）にこのアプリは対応していません（対応：${SCHEMA_VERSION}）`] }
@@ -300,7 +322,7 @@ async function replaceAll(db: DeliKanDB, datasets: Record<TableName, unknown[]>)
 /** すべて消して、初期状態（料金プリセット・空の設定・3プラン）に戻す */
 export async function deleteAllData(db: DeliKanDB): Promise<void> {
   const initial = initialRecords()
-  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [] })
+  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [] })
 }
 
 /** バックアップを書き出した日時を設定に残す（ホームでの声かけに使う） */

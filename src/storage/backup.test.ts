@@ -146,6 +146,45 @@ describe('レビュー指摘：保存時と同じ制約で検証する', () => {
   })
 })
 
+describe('候補枠の検証', () => {
+  it('帰宅予定が出発予定以前の候補枠は復元しない', async () => {
+    const b = await createBackup(db, 'real')
+    const now = new Date().toISOString()
+    b.datasets.slots = [
+      {
+        id: 's1',
+        startsAt: '2026-10-05T08:00:00Z',
+        endsAt: '2026-10-05T08:00:00Z',
+        areaLabel: '',
+        revenueYen: { pessimistic: null, standard: null, optimistic: null },
+        estimateNote: '',
+        rentalOverrideYen: null,
+        expenseYen: 0,
+        tariffId: null,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      },
+    ]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
+})
+
+describe('データの版の移行', () => {
+  it('版1（計画の候補枠がない頃）のバックアップも、候補枠を空として復元できる', async () => {
+    await seed()
+    const v2 = await createBackup(db, 'real')
+    const { slots: _omit, ...v1Datasets } = v2.datasets
+    const v1 = { ...v2, schema_version: 1, datasets: v1Datasets }
+    const parsed = parseBackup(JSON.stringify(v1))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.counts.slots).toBe(0)
+    await restoreBackup(db, parsed.backup)
+    expect(await db.sessions.count()).toBe(1)
+  })
+})
+
 describe('最終バックアップ日時', () => {
   it('書き出した日時を設定に残し、バックアップにも含めて復元できる', async () => {
     await markBackedUp(db, '2026-10-05T01:00:00Z')

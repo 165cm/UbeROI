@@ -2,7 +2,8 @@
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
 import type { EquipmentCategory, Platform, Tariff } from '../domain'
 
-export const SCHEMA_VERSION = 1
+/** 2：計画の候補枠（slots）を追加。版1のバックアップは slots を空として読み込む */
+export const SCHEMA_VERSION = 2
 
 interface Stamped {
   createdAt: string
@@ -149,4 +150,20 @@ export const CATEGORY_LABELS: Record<EquipmentCategory, string> = {
   rainwear: '☔ 雨具',
   visibility: '🦺 視認性用品',
   other: '📦 その他',
+}
+
+/** 計画の候補枠（仕様 AvailabilitySlot）。帰宅までの拘束時間を持つ。実績には入らない */
+export interface SlotRecord extends Stamped {
+  id: string
+  startsAt: string
+  endsAt: string
+  areaLabel: string
+  /** シナリオごとの売上見込み（整数円）。null は未入力 */
+  revenueYen: { pessimistic: number | null; standard: number | null; optimistic: number | null }
+  /** 見込みの出どころ（推計・自分の実績・手入力） */
+  estimateNote: string
+  /** 想定レンタル代。null は「料金から自動で見積もる」 */
+  rentalOverrideYen: number | null
+  expenseYen: number
+  tariffId: string | null
 }

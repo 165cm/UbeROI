@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { RentalChecker } from './features/RentalChecker'
+import { DataProvider, useData } from './storage/context'
+import { Home } from './features/Home'
+import { Records } from './features/Records'
+import { Settings } from './features/Settings'
 
 const TABS = [
   { id: 'home', label: 'ホーム', icon: '🏠' },
@@ -16,15 +19,23 @@ function currentTab(): TabId {
   return TABS.some((t) => t.id === hash) ? (hash as TabId) : 'home'
 }
 
-const EMPTY_STATES: Record<Exclude<TabId, 'home'>, { title: string; body: string }> = {
-  records: { title: '稼働の記録', body: '出発・帰宅・売上・レンタル代を記録する画面です。次の更新で使えるようになります。' },
-  analytics: { title: '分析', body: '日・週・月の利益、本当の時給、投資の回収を見る画面です。記録ができたら表示します。' },
+const COMING_SOON: Record<'analytics' | 'plan', { title: string; body: string }> = {
+  analytics: { title: '分析', body: '日・週・月の利益、本当の時給、投資の回収曲線を見る画面です。次の更新で追加します。今月の成績はホームに出ています。' },
   plan: { title: '計画', body: '空き時間の候補を比べ、悲観／標準／楽観で見込みを出す画面です。準備中です。' },
-  settings: { title: '設定', body: '起点・目標時給・料金・装備（初級／中級／上級）を登録する画面です。準備中です。' },
 }
 
 export function App() {
+  return (
+    <DataProvider>
+      <Shell />
+    </DataProvider>
+  )
+}
+
+function Shell() {
+  const { mode } = useData()
   const [tab, setTab] = useState<TabId>(currentTab)
+  const [editId, setEditId] = useState<string | null>(null)
 
   useEffect(() => {
     const onHash = () => setTab(currentTab())
@@ -39,28 +50,33 @@ export function App() {
       <header className="app-header">
         <h1>デリ勘</h1>
       </header>
+      {mode === 'demo' && (
+        <p className="demo-banner" role="status">
+          🧪 デモ表示中（合成データ・実績ではありません）
+        </p>
+      )}
       <main className="app-main" aria-labelledby="page-title">
-        <h2 id="page-title" className="visually-hidden">
-          {active.label}
-        </h2>
-        {tab === 'home' ? (
-          <>
-            <RentalChecker />
-            <section className="card muted">
-              <h3>今日の収益</h3>
-              <p>まだ記録がありません。記録画面ができたら、ここに営業純時給と投資配賦後の時給が出ます。</p>
-            </section>
-          </>
-        ) : (
+        <h2 id="page-title">{active.label}</h2>
+        {tab === 'home' && (
+          <Home
+            onSettle={(id) => {
+              setEditId(id)
+              window.location.hash = 'records'
+            }}
+          />
+        )}
+        {tab === 'records' && <Records editId={editId} onEdit={setEditId} />}
+        {tab === 'settings' && <Settings />}
+        {(tab === 'analytics' || tab === 'plan') && (
           <section className="card muted">
-            <h3>{EMPTY_STATES[tab].title}</h3>
-            <p>{EMPTY_STATES[tab].body}</p>
+            <h3>{COMING_SOON[tab].title}</h3>
+            <p>{COMING_SOON[tab].body}</p>
           </section>
         )}
       </main>
       <nav className="tabbar" aria-label="メニュー">
         {TABS.map((t) => (
-          <a key={t.id} href={`#${t.id}`} aria-current={t.id === tab ? 'page' : undefined}>
+          <a key={t.id} href={`#${t.id}`} aria-current={t.id === tab ? 'page' : undefined} onClick={() => t.id !== 'records' && setEditId(null)}>
             <span aria-hidden="true">{t.icon}</span>
             {t.label}
           </a>

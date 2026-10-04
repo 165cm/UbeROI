@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { summarizePlan, type EquipmentCategory } from '../domain'
-import { IntInput, Notice, Problems, Select, TextInput, errorMessages } from '../components/fields'
+import { IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS, VEHICLE_PRESET } from '../storage/presets'
@@ -120,10 +120,10 @@ export function Equipment() {
             </div>
             {!locked && (
               <div className="row">
-                <button type="button" onClick={() => setAcquiring({ itemId: item.id, mode: 'purchased', date: new Date().toISOString().slice(0, 10), value: null })}>
+                <button type="button" onClick={() => setAcquiring({ itemId: item.id, mode: 'purchased', date: localToday(), value: null })}>
                   🧾 購入した
                 </button>
-                <button type="button" onClick={() => setAcquiring({ itemId: item.id, mode: 'owned', date: new Date().toISOString().slice(0, 7), value: null })}>
+                <button type="button" onClick={() => setAcquiring({ itemId: item.id, mode: 'owned', date: localToday().slice(0, 7), value: null })}>
                   🏠 前から持っている
                 </button>
                 <button type="button" className="danger-text" onClick={() => setDraft({ ...draft, items: draft.items.filter((i) => i.id !== item.id) })}>

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Tariff } from '../domain'
-import { IntInput, Notice, Problems, Select, TextInput, errorMessages } from '../components/fields'
+import { IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { listTariffs, newId, saveRecurringExpense, saveSettings, saveTariff } from '../storage/repo'
@@ -225,7 +225,7 @@ function TariffForm({ initial, onDone, onCancel }: { initial: TariffRecord; onDo
 function FixedCosts() {
   const { db } = useData()
   const items = useLiveQuery(() => db.recurringExpenses.toArray(), [db])
-  const thisMonth = new Date().toISOString().slice(0, 7)
+  const thisMonth = localToday().slice(0, 7)
   const blank = (): RecurringExpenseRecord => ({ id: newId(), label: '', category: 'communication', amountYen: 0, startMonth: thisMonth, endMonth: null, createdAt: '', updatedAt: '', revision: 0 })
   const [form, setForm] = useState<RecurringExpenseRecord>(blank)
   const [problems, setProblems] = useState<string[]>([])
@@ -320,7 +320,7 @@ function DataSettings() {
       const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `deli-kan-${mode === 'demo' ? 'demo-' : ''}${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `deli-kan-${mode === 'demo' ? 'demo-' : ''}${localToday()}.json`
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {

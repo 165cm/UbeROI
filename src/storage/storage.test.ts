@@ -5,6 +5,7 @@ import { DeliKanDB } from './db'
 import {
   ValidationError,
   acquirePlanItem,
+  arriveHome,
   applyPreset,
   deleteAsset,
   deleteSession,
@@ -170,5 +171,30 @@ describe('A24 デモと実績の分離', () => {
     await saveSession(demo, completed())
     expect(await db.sessions.count()).toBe(0)
     await demo.delete()
+  })
+})
+
+describe('レビュー指摘', () => {
+  it('前から持っている物の利用開始月が空・不正なら登録しない', async () => {
+    const plan = (await db.plans.where('tier').equals('beginner').first())!
+    for (const month of ['', '2026-13', '2026-1']) {
+      await expect(
+        acquirePlanItem(db, plan.id, plan.items[0]!.id, { state: 'owned', managementValueYen: 1200, inServiceMonth: month }),
+      ).rejects.toThrow(ValidationError)
+    }
+    expect(await db.assets.count()).toBe(0)
+  })
+
+  it('帰宅したら稼働中を終え、精算待ちの下書きにする（レンタルも返却）', async () => {
+    const tariff = (await db.tariffs.toArray()).find((t) => t.tariff.kind === 'tiered')!
+    const id = await departNow(db, '2026-10-04T09:00:00Z')
+    await startRental(db, id, tariff, '2026-10-04T09:05:00Z')
+    await arriveHome(db, id, '2026-10-04T12:00:00Z')
+    const s = (await db.sessions.get(id))!
+    expect(s.status).toBe('draft')
+    expect(s.returnedAt).toBe('2026-10-04T12:00:00Z')
+    expect(s.rentals[0]!.endAt).toBe('2026-10-04T12:00:00Z')
+    // 稼働中が残らないので、次の出発ができる
+    await expect(departNow(db, '2026-10-05T09:00:00Z')).resolves.toBeTypeOf('string')
   })
 })

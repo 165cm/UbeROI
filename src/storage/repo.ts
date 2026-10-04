@@ -275,6 +275,22 @@ export async function endRental(db: DeliKanDB, sessionId: string, rentalId: stri
   })
 }
 
+/**
+ * 帰宅：返却していないレンタルを返却し、稼働中を終えて「精算待ちの下書き」にする。
+ * 精算画面で保存する前に画面を閉じても、稼働中が残って次の出発を妨げない。
+ */
+export async function arriveHome(db: DeliKanDB, sessionId: string, at = nowIso()): Promise<void> {
+  await db.transaction('rw', db.sessions, async () => {
+    const s = await db.sessions.get(sessionId)
+    if (!s) throw new Error('記録が見つかりません')
+    for (const r of s.rentals) if (r.startAt && !r.endAt) r.endAt = at
+    const next: SessionRecord = { ...s, status: s.status === 'active' ? 'draft' : s.status, returnedAt: s.returnedAt ?? at }
+    const problems = await validateSession(db, next)
+    if (problems.length) throw new ValidationError(problems)
+    await db.sessions.put(stamp(next))
+  })
+}
+
 /** 削除した記録を返す（直後の「元に戻す」に使う） */
 export async function deleteSession(db: DeliKanDB, id: string): Promise<SessionRecord | undefined> {
   return db.transaction('rw', db.sessions, async () => {
@@ -345,6 +361,16 @@ export async function acquirePlanItem(
     if (!plan || !item) throw new Error('品目が見つかりません')
     if (item.assetId) throw new ValidationError(['この品目はすでに登録済みです'])
     if (acquisition.state === 'purchased' && item.unitYen === null) throw new ValidationError(['購入にするには価格を入力してください'])
+    if (acquisition.state === 'owned' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(acquisition.inServiceMonth)) {
+      throw new ValidationError(['使い始めた月を選んでください'])
+    }
+    if (acquisition.state === 'purchased') {
+      try {
+        parseInstant(acquisition.purchasedAt, '購入日')
+      } catch {
+        throw new ValidationError(['購入日を選んでください'])
+      }
+    }
     const purchased = acquisition.state === 'purchased'
     const asset: AssetRecord = stamp({
       id: newId(),

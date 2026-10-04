@@ -5,7 +5,7 @@ import { calculateRental, localDate } from '../domain'
 import { Problems, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
-import { departNow, endRental, listTariffs, pickDefaultTariff, saveSession, startRental } from '../storage/repo'
+import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, startRental } from '../storage/repo'
 import { periodFor } from '../storage/toDomain'
 
 function useNow(active: boolean): string {
@@ -51,13 +51,22 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
   const settled = { ...data, sessions: data.sessions.filter((s) => s.status !== 'active') }
   const todayResult = periodFor(settled, today, today)
   const month = periodFor(settled, monthStart, today)
-  const drafts = data.sessions.filter((s) => s.status === 'draft').length
+  const drafts = data.sessions.filter((s) => s.status === 'draft')
+  const awaitingSettle = drafts.filter((s) => s.returnedAt).length
   const openRental = active?.rentals.find((r) => r.startAt && !r.endAt)
   const selectedTariff =
     data.tariffs.find((t) => t.id === tariffId) ?? pickDefaultTariff(data.tariffs, data.settings)
   const target = data.settings?.targetHourlyYen ?? null
 
-  const status = active ? '🟢 稼働中' : todayResult.rows.length > 0 ? '✅ 今日の記録あり' : drafts > 0 ? '📝 帰宅未記録の下書きあり' : '⚪ 未開始'
+  const status = active
+    ? '🟢 稼働中'
+    : awaitingSettle > 0
+      ? '📝 精算待ちの記録あり（記録から確定）'
+      : todayResult.rows.length > 0
+        ? '✅ 今日の記録あり'
+        : drafts.length > 0
+          ? '📝 帰宅未記録の下書きあり'
+          : '⚪ 未開始'
 
   return (
     <div className="stack">
@@ -99,10 +108,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
               className="primary"
               onClick={() =>
                 void run(async () => {
-                  const at = new Date().toISOString()
-                  if (openRental) await endRental(db, active.id, openRental.id, at)
-                  const fresh = await db.sessions.get(active.id)
-                  if (fresh && !fresh.returnedAt) await saveSession(db, { ...fresh, returnedAt: at })
+                  await arriveHome(db, active.id)
                   onSettle(active.id)
                 })
               }

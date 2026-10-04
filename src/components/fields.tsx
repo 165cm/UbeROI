@@ -118,6 +118,11 @@ export function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/** 端末の時刻での今日 YYYY-MM-DD（UTCの日付ではない） */
+export function localToday(): string {
+  return toLocalInput(new Date().toISOString()).slice(0, 10)
+}
+
 export function fromLocalInput(value: string): string | null {
   if (!value) return null
   const d = new Date(value)

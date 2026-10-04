@@ -8,6 +8,10 @@
   --accent-text: #ffffff;
   --danger: #b42318;
   --warn: #b54708;
+  /* グラフの色（検証済み：明るさ帯・彩度・背景とのコントラスト） */
+  --chart: #0d9488;
+  --chart-muted: #b9c0bc;
+  --grid: #e6e9e6;
   --radius: 12px;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -25,6 +29,9 @@
     --accent-text: #08201d;
     --danger: #f97066;
     --warn: #fdb022;
+    --chart: #1aa89a;
+    --chart-muted: #4a524e;
+    --grid: #2a2f2c;
   }
 }
 
@@ -408,4 +415,166 @@ input[type='date'],
 input[type='month'],
 input[type='time'] {
   min-width: 0;
+}
+
+/* ---- 分析 ---- */
+.period-nav {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.period-nav button {
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.chart {
+  margin: 0;
+  touch-action: pan-y;
+}
+
+.chart svg {
+  display: block;
+}
+
+.chart-title {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.chart-grid {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+.chart-zero {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--chart);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-dot {
+  fill: var(--chart);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart-cross {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.chart-readout {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.barlist {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.barlist-row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.barlist-track {
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.barlist-bar {
+  display: block;
+  height: 16px;
+  min-width: 2px;
+  background: var(--chart-muted);
+  border-radius: 0 4px 4px 0;
+}
+
+.barlist-bar.strong {
+  background: var(--chart);
+}
+
+.barlist-bar.negative {
+  background: transparent;
+  border: 2px solid var(--chart);
+}
+
+.barlist-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table.breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+table.breakdown th,
+table.breakdown td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--grid);
+  text-align: right;
+  white-space: nowrap;
+}
+
+table.breakdown th[scope='row'],
+table.breakdown thead th:first-child {
+  text-align: left;
+}
+
+table.breakdown td:last-child {
+  position: relative;
+  min-width: 7em;
+}
+
+.cell-bar {
+  position: absolute;
+  left: 4px;
+  bottom: 2px;
+  height: 3px;
+  background: var(--chart);
+  border-radius: 2px;
+  max-width: calc(100% - 8px);
+}
+
+tr.low-sample th,
+tr.low-sample td {
+  color: var(--text-muted);
+}
+
+tr.low-sample .tag {
+  margin-left: 4px;
 }

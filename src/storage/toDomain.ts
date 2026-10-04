@@ -83,6 +83,11 @@ export function periodFor(data: DataSnapshot, from: string, to: string): PeriodR
  * 固定費は各月1日、装備は購入日・売却日に計上する。
  */
 export function recoveryFor(data: DataSnapshot, asOf: string): RecoveryResult {
+  return calculateRecovery(cashEventsFor(data, asOf), asOf)
+}
+
+/** 現金の出入り（投資回収と、その推移のグラフに使う） */
+export function cashEventsFor(data: DataSnapshot, asOf: string): CashEvent[] {
   const events: CashEvent[] = []
   for (const s of data.sessions) {
     if (s.status !== 'completed' || !s.returnedAt) continue
@@ -98,5 +103,6 @@ export function recoveryFor(data: DataSnapshot, asOf: string): RecoveryResult {
     events.push({ at: `${m.month}-01T00:00:00+09:00`, kind: 'expense', amountYen: m.amountYen })
   }
   for (const a of data.assets) events.push(...assetCashEvents(assetToInput(a)))
-  return calculateRecovery(events, asOf)
+  const cutoff = Date.parse(asOf)
+  return events.filter((e) => Date.parse(e.at) <= cutoff)
 }

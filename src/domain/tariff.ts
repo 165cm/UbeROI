@@ -26,7 +26,7 @@ export interface NoRentalTariff {
 
 export type Tariff = TieredTariff | PassTariff | NoRentalTariff
 
-/** 初期値：HELLO CYCLING 東京都シティサイクル（利用時の公式表示を優先し、設定で編集する） */
+/** プリセット例：HELLO CYCLING 東京都シティサイクル。地域・事業者で違うため、利用者が選択・編集する */
 export const HELLO_TOKYO_CITY: TieredTariff = {
   kind: 'tiered',
   initialMinutes: 30,

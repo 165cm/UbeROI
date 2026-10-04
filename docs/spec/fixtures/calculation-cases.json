@@ -15,7 +15,7 @@
     "direct_expense_yen": 200,
     "allocated_investment_yen": 600,
     "completed_count": 10,
-    "area_label": "千歳烏山駅周辺",
+    "area_label": "サンプルエリア",
     "expected": {
       "revenue_yen": 7180,
       "operating_profit_yen": 5220,

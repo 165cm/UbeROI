@@ -72,4 +72,4 @@ npm run dev
 - 計算式を変える時は、先に `docs/spec/docs/02-profitability.md` との食い違いがないか確かめ、`src/domain/core.ts` の `CALCULATION_VERSION` を上げる
 - 保存データの形を変える時は、データの版（schema_version）を上げて移行処理を書く
 - 画面から計算式を書かない。必ず `src/domain/` の関数を使う
-- `docs/spec/` の原本は書き換えない。仕様を変える決めごとは `docs/CURRENT_TASK.md` に書く
+- `docs/spec/` を変えたら `MANIFEST.sha256` を作り直す（`docs/spec` で `sha256sum $(awk '{print $2}' MANIFEST.sha256) > MANIFEST.sha256`）。変えた理由は `docs/CURRENT_TASK.md` の決めごとに書く

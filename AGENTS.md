@@ -11,7 +11,7 @@
 3. `docs/ARCHITECTURE.md` … ファイル構成・データ・外部サービス
 4. `docs/UI_RULES.md` … 画面のルール（画面がないリポジトリでは無くてよい）
 5. `docs/PRODUCT.md` … 何を作っているか・やらないこと
-6. `docs/spec/` … 引き継ぎ仕様書の原本と収益性レポート。計算式は `docs/spec/docs/02-profitability.md` が正本
+6. `docs/spec/` … 仕様書と収益性の参考資料（全国版）。計算式は `docs/spec/docs/02-profitability.md` が正本
 
 ## 4つのルール
 

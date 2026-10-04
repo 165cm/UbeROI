@@ -38,7 +38,6 @@ export function App() {
     <div className="app">
       <header className="app-header">
         <h1>デリ勘</h1>
-        <span className="origin">📍 千歳烏山駅周辺</span>
       </header>
       <main className="app-main" aria-labelledby="page-title">
         <h2 id="page-title" className="visually-hidden">

@@ -1,4 +1,4 @@
-// HELLO CYCLING の料金チェック：借りた時刻から、今の料金と次に上がる時刻を出す
+// シェアサイクルの料金チェック：借りた時刻から、今の料金と次に上がる時刻を出す
 import { useEffect, useState } from 'react'
 import { HELLO_TOKYO_CITY, calculateRental } from '../domain'
 import { formatClock, formatDuration, formatYen } from '../format'
@@ -49,7 +49,7 @@ export function RentalChecker() {
 
   return (
     <section className="card" aria-labelledby="rental-title">
-      <h3 id="rental-title">🚲 HELLO CYCLING 料金（見積）</h3>
+      <h3 id="rental-title">🚲 シェアサイクル料金（見積）</h3>
       {!result ? (
         <>
           <p className="hint">借りた時に押すと、今の料金と次に料金が上がる時刻が分かります。</p>
@@ -74,13 +74,13 @@ export function RentalChecker() {
                 {result.nextIncreaseAt
                   ? `${formatClock(result.nextIncreaseAt)}（あと${formatDuration((Date.parse(result.nextIncreaseAt) - Date.parse(now)) / 1000)}）`
                   : result.capped
-                    ? '上限に到達：12時間まで追加課金なし'
+                    ? '上限に到達：上限の時間内は追加課金なし'
                     : '見積の対象外（実請求額を確認）'}
               </dd>
             </div>
           </dl>
           <p className="hint">
-            料金：最初の30分160円、以後15分ごと160円、12時間まで上限2,500円（東京都・2026-10確認）。返却時はアプリの請求額が正です。
+            料金の例：HELLO CYCLING 東京都（最初の30分160円、以後15分ごと160円、12時間まで上限2,500円・2026-10確認）。地域・事業者で違うので、設定画面で選べるようにします。返却時はアプリの請求額が正です。
           </p>
           <button type="button" onClick={reset}>
             返却した（リセット）

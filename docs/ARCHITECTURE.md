@@ -26,12 +26,12 @@
 | `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
 | `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
 | `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え） |
-| `src/features/` | 画面ごとのまとまり（今は HELLO 料金チェックのみ） |
+| `src/features/` | 画面ごとのまとまり（今はシェアサイクル料金チェックのみ） |
 | `src/format.ts` | 円・時間の表示用の整形（計算はしない） |
 | `src/storage/` | （予定）IndexedDB の読み書き、データの版の移行、バックアップ・取込 |
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
 | `.github/workflows/` | `ci.yml`＝PRのテスト、`pages.yml`＝main を GitHub Pages に公開 |
-| `docs/spec/` | 引き継ぎ仕様書の原本（`MANIFEST.sha256` で改変がないか確かめられる）と収益性レポート |
+| `docs/spec/` | 仕様書（`MANIFEST.sha256` で中身を確かめられる）と、収益性の参考資料（全国版） |
 
 ## データ
 
@@ -43,4 +43,4 @@
 ## 外部サービス・環境変数
 
 - MVP ではなし（外部への送信なし）
-- MVP 後の候補：HELLO CYCLING の公開データ（GBFS）、天気、AIの説明（サーバー経由のみ）
+- MVP 後の候補：シェアサイクルの公開データ（GBFS。例：HELLO CYCLING）、天気、AIの説明（サーバー経由のみ）

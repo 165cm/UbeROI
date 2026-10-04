@@ -19,6 +19,8 @@ export interface SettingsRecord extends Stamped {
   /** 帰宅締切 HH:mm */
   homeDeadline: string | null
   defaultTariffId: string | null
+  /** 最後にバックアップを書き出した日時（未実施なら null／未定義） */
+  lastBackupAt?: string | null
 }
 
 export interface TariffRecord extends Stamped {

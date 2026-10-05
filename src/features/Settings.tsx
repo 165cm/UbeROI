@@ -25,7 +25,7 @@ export function Settings() {
   const [section, setSection] = useState<SectionId>('basic')
   return (
     <div className="stack">
-      <div className="segmented scroll" role="tablist" aria-label="設定の項目">
+      <div className="segmented wrap" role="tablist" aria-label="設定の項目">
         {SECTIONS.map((s) => (
           <button key={s.id} type="button" role="tab" aria-selected={section === s.id} onClick={() => setSection(s.id)}>
             {s.label}

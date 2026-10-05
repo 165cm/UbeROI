@@ -1,5 +1,5 @@
 // データの読み書き。保存前の検証と、まとめて書く操作（トランザクション）をここに集める
-import { assertYen, isBusynessTable, localMonth, parseInstant } from '../domain'
+import { assertYen, isBusynessTable, isCalendarDate, localMonth, parseInstant } from '../domain'
 import type { DeliKanDB } from './db'
 import { EQUIPMENT_PRESETS, TARIFF_PRESETS, type EquipmentPresetItem } from './presets'
 import type {
@@ -504,17 +504,27 @@ export function areaProblems(area: AreaRecord): string[] {
   if (area.name.trim() === '') problems.push('エリアの名前を入れてください')
   if (!isBusynessTable(area.levels)) problems.push('混み具合の表が正しくありません')
   if (area.towns.some((t) => t.trim() === '')) problems.push('空の地名があります')
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(area.checkedAt)) problems.push('確かめた日が正しくありません')
+  if (!isCalendarDate(area.checkedAt)) problems.push('確かめた日が実在する日付（YYYY-MM-DD）ではありません')
   return problems
 }
 
-/** 地名は前後の空白を除き、重なりを消して保存する */
-export async function saveArea(db: DeliKanDB, area: AreaRecord): Promise<void> {
+/**
+ * 地名は前後の空白を除き、重なりを消して保存する。
+ * primary を渡すと、主なエリアの指定（する／外す）も同じ1回の書き込みで変える（片方だけ保存されない）
+ */
+export async function saveArea(db: DeliKanDB, area: AreaRecord, primary?: boolean): Promise<void> {
   const towns = [...new Set(area.towns.map((t) => t.trim()).filter(Boolean))]
   const next = { ...area, name: area.name.trim(), towns }
   const problems = areaProblems(next)
   if (problems.length) throw new ValidationError(problems)
-  await db.areas.put(stamp(next))
+  await db.transaction('rw', db.areas, db.settings, async () => {
+    await db.areas.put(stamp(next))
+    if (primary === undefined) return
+    const settings = await db.settings.get('settings')
+    if (!settings) throw new Error('設定が見つかりません')
+    const primaryAreaId = primary ? next.id : settings.primaryAreaId === next.id ? null : (settings.primaryAreaId ?? null)
+    if (primaryAreaId !== (settings.primaryAreaId ?? null)) await db.settings.put(stamp({ ...settings, primaryAreaId }))
+  })
 }
 
 /** エリアを消す。主なエリアだったら、主なエリアの指定も外す（1回の書き込み） */

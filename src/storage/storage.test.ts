@@ -281,6 +281,21 @@ describe('エリアの混み具合', () => {
     await expect(saveArea(db, area({ id: 'a2', name: ' ' }))).rejects.toBeInstanceOf(ValidationError)
   })
 
+  it('主なエリアの指定は、エリアの保存と同じ1回の書き込みで変わる。外すと指定も消える', async () => {
+    await saveArea(db, area({ id: 'a3', name: '荻窪' }), true)
+    expect((await db.settings.get('settings'))?.primaryAreaId).toBe('a3')
+    await saveArea(db, area({ id: 'a3', name: '荻窪' }), false)
+    expect((await db.settings.get('settings'))?.primaryAreaId).toBeNull()
+    // 名前が空なら、主なエリアの指定も変わらない
+    await expect(saveArea(db, area({ id: 'a4', name: '' }), true)).rejects.toBeInstanceOf(ValidationError)
+    expect((await db.settings.get('settings'))?.primaryAreaId).toBeNull()
+  })
+
+  it('確かめた日が実在しない日付（2月30日など）なら保存しない', async () => {
+    await expect(saveArea(db, area({ checkedAt: '2026-02-30' }))).rejects.toThrow(/実在する日付/)
+    await expect(saveArea(db, area({ checkedAt: '2026-99-99' }))).rejects.toThrow(/実在する日付/)
+  })
+
   it('主なエリア：指定したものを使い、指定がなく1つだけならそれを使う。消すと指定も外れる', async () => {
     await saveArea(db, area())
     expect(primaryArea(await db.areas.toArray(), await db.settings.get('settings'))?.id).toBe('a1')

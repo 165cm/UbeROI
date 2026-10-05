@@ -273,7 +273,6 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.arr(r, 'towns', path).forEach((t, i) => {
       if (typeof t !== 'string') c.add(`${path}.towns[${i}]`, '文字ではありません')
     })
-    if (typeof r.checkedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(r.checkedAt)) c.add(`${path}.checkedAt`, '日付（YYYY-MM-DD）が正しくありません')
     c.stamped(r, path)
   },
 }

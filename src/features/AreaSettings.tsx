@@ -36,9 +36,8 @@ export function AreaSettings() {
         initialPrimary={editing.primary}
         onCancel={() => setEditing(null)}
         onSave={async (area, makePrimary) => {
-          await saveArea(db, area)
-          if (makePrimary) await saveSettings(db, { primaryAreaId: area.id })
-          else if (data.settings?.primaryAreaId === area.id) await saveSettings(db, { primaryAreaId: null })
+          // エリアと主なエリアの指定は、同じ1回の書き込みで保存する
+          await saveArea(db, area, makePrimary)
           setEditing(null)
           setNotice({ message: '💾 エリアを保存しました' })
         }}

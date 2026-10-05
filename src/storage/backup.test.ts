@@ -241,5 +241,8 @@ describe('データの版の移行（版4）とエリアの検証', () => {
     b.datasets.areas = [{ id: 'a1', name: '中野', levels: [[9]], towns: [], checkedAt: '2026-10-05', createdAt: now, updatedAt: now, revision: 1 }]
     const parsed = parseBackup(JSON.stringify(b))
     expect(parsed.ok).toBe(false)
+    const levels = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))
+    b.datasets.areas = [{ id: 'a1', name: '中野', levels, towns: [], checkedAt: '2026-02-30', createdAt: now, updatedAt: now, revision: 1 }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
   })
 })

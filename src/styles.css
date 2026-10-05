@@ -412,9 +412,15 @@ select:focus-visible {
   border-radius: var(--radius);
 }
 
-.segmented.scroll {
-  grid-auto-columns: max-content;
-  overflow-x: auto;
+/* 項目が多い時は、横にスクロールさせず折り返す（UI_RULES：横スクロールは表だけ）。
+   列の幅を文字の大きさ（em）で決めるので、文字を大きくすると列が減って1つずつ広くなる */
+.segmented.wrap {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(6.5em, 1fr));
+}
+
+.segmented.wrap button {
+  white-space: normal;
 }
 
 .segmented button {

@@ -45,3 +45,11 @@ test('空の記録で「天気・エリア・メモ」を開いて入力して�
   await expect(area).toBeVisible()
   await expect(area).toHaveValue('駅前')
 })
+
+test('設定の項目のタブは、幅320pxでも横にスクロールせずに全部見える', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 })
+  await page.goto('#settings')
+  const list = page.getByRole('tablist', { name: '設定の項目' })
+  expect(await list.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0)
+  for (const tab of await list.getByRole('tab').all()) await expect(tab).toBeInViewport({ ratio: 1 })
+})

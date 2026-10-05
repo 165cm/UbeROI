@@ -60,10 +60,15 @@ function median(sorted: readonly number[]): number {
  */
 export function learnTownRatings(offers: readonly LearnOffer[]): TownRating[] {
   const sorted = offers.map((o) => ({ ...o, ms: parseInstant(o.at) })).sort((a, b) => a.ms - b.ms)
+  // 各記録の「次の（時刻が後の）オファー」の位置を、後ろから1回の走査で求める（記録が増えても重くしない）
+  const nextIndex: number[] = new Array(sorted.length).fill(-1)
+  for (let i = sorted.length - 2; i >= 0; i--) {
+    nextIndex[i] = sorted[i + 1]!.ms > sorted[i]!.ms ? i + 1 : nextIndex[i + 1]!
+  }
   const waits = new Map<string, { town: string; band: number; values: number[] }>()
   sorted.forEach((o, i) => {
     if (o.outcome !== 'accepted' || !o.town) return
-    const next = sorted.slice(i + 1).find((n) => n.ms > o.ms)
+    const next = sorted[nextIndex[i]!]
     if (!next) return
     const doneMs = o.ms + o.minutes * 60_000
     const wait = Math.max(0, (next.ms - doneMs) / 60_000)
@@ -87,4 +92,18 @@ export function learnedRatingAt(ratings: readonly TownRating[], town: string | n
   if (!town) return null
   const band = timeBandAt(ms)
   return ratings.find((r) => r.town === town && r.band === band && r.samples >= TOWN_LEARNING_MIN_SAMPLES) ?? null
+}
+
+/**
+ * 2つの評価の一覧をまとめる。同じ地名×時間帯は件数の多い方を使う
+ * （設定コードの評価と、Safari にたまった記録から出した評価。重なった記録を二重に数えないため足し合わせない）
+ */
+export function mergeTownRatings(a: readonly TownRating[], b: readonly TownRating[]): TownRating[] {
+  const merged = new Map<string, TownRating>()
+  for (const r of [...a, ...b]) {
+    const key = `${r.town}\u0000${r.band}`
+    const prev = merged.get(key)
+    if (!prev || r.samples > prev.samples) merged.set(key, r)
+  }
+  return [...merged.values()]
 }

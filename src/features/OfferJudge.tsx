@@ -11,6 +11,7 @@ import {
   evaluateOffer,
   findTown,
   learnTownRatings,
+  mergeTownRatings,
   learnedRatingAt,
   parseOfferText,
   rentalYenPerMinute,
@@ -135,7 +136,9 @@ export function OfferJudge() {
   const now = new Date().toISOString()
   const ready = payYen !== null && minutes !== null && minutes > 0
   // 地名×時間帯の評価（記録が10件以上たまったもの）。届け先を手で選んだ時は地名が分からないので使わない
-  const learned = !chosen && ready ? learnedRatingAt(config.learned, found?.town ?? null, Date.parse(now) + minutes * 60_000) : null
+  // Safari（設定コード）では、設定コードの評価と、Safari にたまった記録の評価の両方を見る
+  const learnedPool = fromCode ? mergeTownRatings(config.learned, ratings) : ratings
+  const learned = !chosen && ready ? learnedRatingAt(learnedPool, found?.town ?? null, Date.parse(now) + minutes * 60_000) : null
   let result: ReturnType<typeof evaluateOffer> | null = null
   let calcError: string[] = []
   if (ready) {

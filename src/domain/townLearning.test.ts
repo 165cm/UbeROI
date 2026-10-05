@@ -1,6 +1,6 @@
 // 地名の評価の自動学習：受けた配達を終えてから次のオファーまでの待ち時間を、地名×時間帯ごとに集める
 import { describe, expect, it } from 'vitest'
-import { TOWN_LEARNING_MIN_SAMPLES, evaluateOffer, emptyBusyness, learnTownRatings, learnedRatingAt, levelFromWait, timeBandAt, type LearnOffer } from './index'
+import { TOWN_LEARNING_MIN_SAMPLES, evaluateOffer, emptyBusyness, learnTownRatings, learnedRatingAt, levelFromWait, mergeTownRatings, timeBandAt, type LearnOffer } from './index'
 
 const jst = (s: string) => new Date(`${s}+09:00`).toISOString()
 
@@ -55,5 +55,24 @@ describe('記録から学ぶ', () => {
     const r = evaluateOffer({ payYen: 900, minutes: 20, km: null, at: jst('2026-10-20T17:40:00'), bufferMinutes: 5, targetHourlyYen: 2000, destinationBusyness: busy, destinationLearned: learned })
     expect(r).toMatchObject({ arrivalLevel: 2, arrivalSource: 'learned', thresholdYen: 2100 })
     expect(r.reasons.join()).toContain('「高円寺」の夕方は、これまで10件で次のオファーまで中央値10分')
+  })
+
+  it('同じ時刻の記録は「次」に数えず、その後の記録までの待ちを測る', () => {
+    const offers: LearnOffer[] = [
+      { at: jst('2026-10-05T18:00:00'), minutes: 10, town: '高円寺', outcome: 'accepted' },
+      { at: jst('2026-10-05T18:00:00'), minutes: 10, town: '中野', outcome: 'declined' },
+      { at: jst('2026-10-05T18:15:00'), minutes: 10, town: '中野', outcome: 'declined' },
+    ]
+    expect(learnTownRatings(offers)).toEqual([{ town: '高円寺', band: 3, samples: 1, medianWaitMinutes: 5, level: 3 }])
+  })
+
+  it('設定コードの評価と Safari の記録の評価をまとめる（同じ地名×時間帯は件数の多い方）', () => {
+    const fromCode = [{ town: '高円寺', band: 3, samples: 10, medianWaitMinutes: 10, level: 2 }]
+    const local = [
+      { town: '高円寺', band: 3, samples: 12, medianWaitMinutes: 2, level: 4 },
+      { town: '阿佐谷', band: 1, samples: 3, medianWaitMinutes: 8, level: 2 },
+    ]
+    expect(mergeTownRatings(fromCode, local)).toEqual(local)
+    expect(mergeTownRatings(fromCode, local.slice(1))).toEqual([...fromCode, local[1]])
   })
 })

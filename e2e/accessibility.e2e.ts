@@ -2,7 +2,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
-const TABS = ['home', 'records', 'analytics', 'plan', 'settings'] as const
+const TABS = ['home', 'records', 'analytics', 'plan', 'offer', 'settings'] as const
 const SETTINGS_SECTIONS = ['基本', '料金', '装備と投資', '固定費', 'エリア', 'データ'] as const
 
 /** デモのデータ（合成）を入れて、グラフや一覧がある状態で確かめる */

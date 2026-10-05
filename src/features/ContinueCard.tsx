@@ -26,7 +26,8 @@ interface Prefs {
   minutesToHome: number
   minutesToReturnBike: number
 }
-function loadPrefs(): Prefs {
+/** 続ける？帰る？・オファー判定で共通の移動時間（端末の好みとして覚える） */
+export function loadPrefs(): Prefs {
   try {
     const v = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as Partial<Prefs> | null
     return { minutesToHome: v?.minutesToHome ?? 15, minutesToReturnBike: v?.minutesToReturnBike ?? 5 }

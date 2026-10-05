@@ -4,6 +4,7 @@ import type { DeliKanDB } from './db'
 import { EQUIPMENT_PRESETS, TARIFF_PRESETS, type EquipmentPresetItem } from './presets'
 import type {
   AreaRecord,
+  OfferRecord,
   AssetRecord,
   EquipmentPlanRecord,
   PlanItemRecord,
@@ -96,6 +97,12 @@ export async function saveSettings(db: DeliKanDB, patch: Partial<Omit<SettingsRe
   }
   if (patch.weeklyBudgetMinutes != null && (!Number.isSafeInteger(patch.weeklyBudgetMinutes) || patch.weeklyBudgetMinutes < 0)) {
     problems.push('週の時間は0以上で入力してください')
+  }
+  if (patch.offerBufferMinutes !== undefined && (!Number.isSafeInteger(patch.offerBufferMinutes) || patch.offerBufferMinutes < 0)) {
+    problems.push('余裕の分数は0以上の整数で入力してください')
+  }
+  if (patch.offerMinKmYen != null && (!Number.isSafeInteger(patch.offerMinKmYen) || patch.offerMinKmYen < 0)) {
+    problems.push('km単価の下限は0以上の整数円で入力してください')
   }
   if (patch.homeDeadline != null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(patch.homeDeadline)) {
     problems.push('帰宅締切は 21:30 のように入力してください')
@@ -541,4 +548,23 @@ export async function deleteArea(db: DeliKanDB, id: string): Promise<AreaRecord 
 /** 見込みに使うエリア：主なエリア。指定がなく1つだけ登録されていれば、それを使う */
 export function primaryArea(areas: readonly AreaRecord[], settings: SettingsRecord | undefined): AreaRecord | undefined {
   return areas.find((a) => a.id === settings?.primaryAreaId) ?? (areas.length === 1 ? areas[0] : undefined)
+}
+
+// ---- オファーの記録 ----
+
+/** オファー判定の余裕（分）の既定値：お店での待ちや次の注文までの間の目安 */
+export const DEFAULT_OFFER_BUFFER_MINUTES = 5
+
+export async function saveOffer(db: DeliKanDB, offer: OfferRecord): Promise<void> {
+  const problems: string[] = []
+  try {
+    parseInstant(offer.at, 'オファーの時刻')
+  } catch (e) {
+    problems.push((e as Error).message)
+  }
+  if (!Number.isSafeInteger(offer.payYen) || offer.payYen < 0) problems.push('報酬は0以上の整数円にしてください')
+  if (!Number.isSafeInteger(offer.minutes) || offer.minutes <= 0) problems.push('分は1以上の整数にしてください')
+  if (offer.km !== null && (!Number.isFinite(offer.km) || offer.km < 0)) problems.push('km は0以上にしてください')
+  if (problems.length) throw new ValidationError(problems)
+  await db.offers.put(stamp(offer))
 }

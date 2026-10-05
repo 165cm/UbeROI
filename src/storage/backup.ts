@@ -7,7 +7,7 @@ import { SCHEMA_VERSION, type AreaRecord, type QuestRecord, type SessionRecord }
 
 export const APP_VERSION = '0.1.0'
 
-const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots', 'quests', 'areas'] as const
+const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots', 'quests', 'areas', 'offers'] as const
 type TableName = (typeof TABLES)[number]
 
 export const TABLE_LABELS: Record<TableName, string> = {
@@ -20,6 +20,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   slots: '計画の候補枠',
   quests: 'クエスト',
   areas: 'エリアの混み具合',
+  offers: 'オファーの記録',
 }
 
 export interface Backup {
@@ -133,6 +134,8 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.str(r, 'defaultTariffId', path, { nullable: true })
     if (r.lastBackupAt !== undefined) c.instant(r, 'lastBackupAt', path, { nullable: true })
     if (r.primaryAreaId !== undefined) c.str(r, 'primaryAreaId', path, { nullable: true })
+    if (r.offerBufferMinutes !== undefined) c.int(r, 'offerBufferMinutes', path)
+    if (r.offerMinKmYen !== undefined) c.int(r, 'offerMinKmYen', path, { nullable: true })
     c.stamped(r, path)
   },
   tariffs(c, r, path) {
@@ -275,6 +278,18 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     })
     c.stamped(r, path)
   },
+  offers(c, r, path) {
+    c.instant(r, 'at', path)
+    c.int(r, 'payYen', path)
+    c.int(r, 'minutes', path)
+    c.num(r, 'km', path, { nullable: true })
+    c.str(r, 'town', path, { nullable: true })
+    c.str(r, 'areaName', path, { nullable: true })
+    c.oneOf(r, 'decision', path, ['accept', 'maybe', 'decline'])
+    c.int(r, 'hourlyYen', path, { nullable: true, min: null })
+    c.oneOf(r, 'outcome', path, ['accepted', 'declined'])
+    c.stamped(r, path)
+  },
 }
 
 export type ParseResult =
@@ -291,10 +306,10 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし）のバックアップは、足りない一覧を空として読み込む。
+  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし）のバックアップは、足りない一覧を空として読み込む。
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ([1, 2, 3, 4].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
-    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], ...(raw.datasets as object) } }
+  if ([1, 2, 3, 4, 5].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], offers: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
   if (raw.schema_version !== SCHEMA_VERSION) {
@@ -360,7 +375,7 @@ async function replaceAll(db: DeliKanDB, datasets: Record<TableName, unknown[]>)
 /** すべて消して、初期状態（料金プリセット・空の設定・3プラン）に戻す */
 export async function deleteAllData(db: DeliKanDB): Promise<void> {
   const initial = initialRecords()
-  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [], quests: [], areas: [] })
+  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [], quests: [], areas: [], offers: [] })
 }
 
 /** バックアップを書き出した日時を設定に残す（ホームでの声かけに使う） */

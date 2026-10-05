@@ -4,6 +4,7 @@ import { Analytics } from './features/Analytics'
 import { Home } from './features/Home'
 import { Plan } from './features/Plan'
 import { Records } from './features/Records'
+import { OfferJudge } from './features/OfferJudge'
 import { Settings } from './features/Settings'
 import { applyUpdate, useOnline, usePwa } from './pwa'
 
@@ -15,10 +16,12 @@ const TABS = [
   { id: 'settings', label: '設定', icon: '⚙️' },
 ] as const
 
-type TabId = (typeof TABS)[number]['id']
+type TabId = (typeof TABS)[number]['id'] | 'offer'
 
+/** 「#offer?text=…」のように、画面の名前の後ろに値が付くことがある（ショートカットから開く時） */
 function currentTab(): TabId {
-  const hash = window.location.hash.replace('#', '')
+  const hash = window.location.hash.replace('#', '').split('?')[0]!
+  if (hash === 'offer') return 'offer'
   return TABS.some((t) => t.id === hash) ? (hash as TabId) : 'home'
 }
 
@@ -36,14 +39,20 @@ function Shell() {
   const { updateReady } = usePwa()
   const [tab, setTab] = useState<TabId>(currentTab)
   const [editId, setEditId] = useState<string | null>(null)
+  // 「#offer?text=…」を続けて開いた時に、前の値のまま判定しないよう、ハッシュ全体で画面を作り直す
+  const [hash, setHash] = useState(() => window.location.hash)
 
   useEffect(() => {
-    const onHash = () => setTab(currentTab())
+    const onHash = () => {
+      setTab(currentTab())
+      setHash(window.location.hash)
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const active = TABS.find((t) => t.id === tab)!
+  // オファー判定はホームから開く画面なので、下のメニューではホームを選んだ状態にする
+  const active = TABS.find((t) => t.id === (tab === 'offer' ? 'home' : tab))!
 
   return (
     <div className="app">
@@ -70,7 +79,7 @@ function Shell() {
       )}
       <main className="app-main" aria-labelledby="page-title">
         {/* 画面の名前は下のメニューで分かるので、見た目では出さず読み上げ用に残す */}
-        <h2 id="page-title" className="visually-hidden">{active.label}</h2>
+        <h2 id="page-title" className="visually-hidden">{tab === 'offer' ? 'オファー判定' : active.label}</h2>
         {tab === 'home' && (
           <Home
             onSettle={(id) => {
@@ -83,10 +92,11 @@ function Shell() {
         {tab === 'analytics' && <Analytics />}
         {tab === 'settings' && <Settings />}
         {tab === 'plan' && <Plan />}
+        {tab === 'offer' && <OfferJudge key={hash} />}
       </main>
       <nav className="tabbar" aria-label="メニュー">
         {TABS.map((t) => (
-          <a key={t.id} href={`#${t.id}`} aria-current={t.id === tab ? 'page' : undefined} onClick={() => t.id !== 'records' && setEditId(null)}>
+          <a key={t.id} href={`#${t.id}`} aria-current={t.id === active.id ? 'page' : undefined} onClick={() => t.id !== 'records' && setEditId(null)}>
             <span aria-hidden="true">{t.icon}</span>
             {t.label}
           </a>

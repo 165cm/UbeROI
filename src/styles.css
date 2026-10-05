@@ -1033,3 +1033,24 @@ select.shot-day {
   width: auto;
   flex: none;
 }
+
+/* 終了までの見通し：この先の混み具合（1時間ごと） */
+.busy-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+}
+.busy-timeline > span {
+  white-space: nowrap;
+}
+/* 終了までの見通し：おすすめの行 */
+.outlook-options .num {
+  text-align: right;
+}
+.outlook-options .picked {
+  font-weight: 700;
+}
+.outlook-options .tag {
+  margin-left: 4px;
+}

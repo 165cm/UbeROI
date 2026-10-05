@@ -96,7 +96,12 @@ export function ContinueCard({
   })
 
   return (
-    <section className="card stack" aria-labelledby="continue-title">
+    <details className="card fold">
+      <summary>
+        <strong>🤔 あと少し続ける？</strong>
+        <span className="hint">+{extendMinutes}分：{DECISION_LABELS[result.decision].split('：')[0]}</span>
+      </summary>
+      <div className="stack">
       <CardTitle
         id="continue-title"
         tip={
@@ -105,7 +110,7 @@ export function ContinueCard({
           </>
         }
       >
-        🤔 続ける？帰る？
+        30・60・90分だけ延ばした時
       </CardTitle>
       <div className="segmented" role="radiogroup" aria-label="延長する時間">
         {[30, 60, 90].map((m) => (
@@ -187,6 +192,7 @@ export function ContinueCard({
           </div>
         </div>
       </details>
-    </section>
+      </div>
+    </details>
   )
 }

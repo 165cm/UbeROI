@@ -1,7 +1,7 @@
 // 金額・時間・日本時間の暦の共通処理。計算式の正本は docs/spec/docs/02-profitability.md
 
 /** 計算式を変えたら上げる。2：売上見込みにエリアの混み具合を追加。3：オファー判定を追加（docs/spec/docs/02-profitability.md §5） */
-export const CALCULATION_VERSION = 4
+export const CALCULATION_VERSION = 5
 export const CURRENCY = 'JPY' as const
 
 /** 金額（整数円）として扱える値か確かめる。桁あふれ・小数・NaN は拒否する */

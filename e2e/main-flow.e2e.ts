@@ -20,17 +20,19 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
 
   // 1. 初期設定：目標の時給
   await goto(page, 'settings')
-  await page.getByLabel('目標の営業純時給').fill('1500')
+  await page.getByLabel('目標の営業純時給', { exact: true }).fill('1500')
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.getByRole('status').filter({ hasText: '保存しました' })).toBeVisible()
 
   // 2. 装備購入：初級プランの1品目を30,000円で「購入した」
   await settingsSection(page, '装備と投資')
-  await page.getByLabel('価格（税込・1個）').first().fill('30000')
+  // 品目は1行に畳まれているので、押して開いてから編集する
+  await page.locator('details.fold > summary').first().click()
+  await page.getByLabel('価格（税込・1個）', { exact: true }).first().fill('30000')
   await page.getByRole('button', { name: '💾 保存' }).click()
   await page.getByRole('button', { name: '🧾 購入した' }).first().click()
   await page.getByRole('button', { name: '登録する' }).click()
-  await expect(page.locator('section', { hasText: '投資の回収' })).toContainText('30,000円')
+  await expect(page.locator('section', { has: page.getByRole('heading', { name: '💰 投資の回収' }) })).toContainText('30,000円')
 
   // 3. 出発 → レンタル開始（18:00）→ 3時間後に帰宅して精算
   await page.clock.fastForward('10:00')
@@ -42,12 +44,12 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
   await page.getByRole('button', { name: '🏁 帰宅して精算' }).click()
 
   // 4. 精算：売上 6,600 + 180 + 400 = 7,180円、その他経費 200円（レンタルは見積 1,760円）
-  await page.getByLabel('基本報酬（配送料の合計）').fill('6600')
-  await page.getByLabel('チップ').fill('180')
-  await page.getByLabel('確定したクエスト・ボーナス').fill('400')
-  await page.getByLabel('完了件数').fill('10')
-  await page.getByRole('button', { name: '＋ 経費を追加' }).click()
-  await page.getByLabel('金額').fill('200')
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('6600')
+  await page.getByLabel('チップ', { exact: true }).fill('180')
+  await page.getByLabel('確定ボーナス', { exact: true }).fill('400')
+  await page.getByLabel('完了件数', { exact: true }).fill('10')
+  await page.getByRole('button', { name: '経費を追加' }).click()
+  await page.getByLabel('金額', { exact: true }).fill('200')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.locator('.list-item').first()).toContainText('5,220円')
 
@@ -57,12 +59,12 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
   await expect(kpi).toContainText('5,220円')
   await expect(kpi).toContainText('1,740円/時')
   await expect(kpi).toContainText('目標以上')
-  await expect(page.locator('section', { hasText: '投資の回収' })).toContainText('24,780円')
+  await expect(page.locator('section', { has: page.getByRole('heading', { name: '💰 投資の回収' }) })).toContainText('24,780円')
 
   // 6. 記録訂正：チップを 180 → 480 円に直すと、利益は 5,520円
   await goto(page, 'records')
   await page.locator('.list-item').first().click()
-  await page.getByLabel('チップ').fill('480')
+  await page.getByLabel('チップ', { exact: true }).fill('480')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.locator('.list-item').first()).toContainText('5,520円')
 
@@ -81,16 +83,16 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
 
   // 9. 復元 → 記録・ID・計算結果が元どおり
   await settingsSection(page, 'データ')
-  await page.getByLabel('バックアップのファイル（.json）').setInputFiles(backupPath)
+  await page.getByLabel(/バックアップのファイル/).setInputFiles(backupPath)
   await expect(page.getByText('稼働の記録：1件')).toBeVisible()
   await page.getByRole('button', { name: '♻️ この内容で置き換える' }).click()
   await expect(page.getByText('✅ 復元しました')).toBeVisible()
   await goto(page, 'analytics')
   await expect(kpi).toContainText('5,520円')
-  await expect(page.locator('section', { hasText: '投資の回収' })).toContainText('24,480円')
+  await expect(page.locator('section', { has: page.getByRole('heading', { name: '💰 投資の回収' }) })).toContainText('24,480円')
   await goto(page, 'records')
   await page.locator('.list-item').first().click()
-  await expect(page.getByLabel('チップ')).toHaveValue('480')
+  await expect(page.getByLabel('チップ', { exact: true })).toHaveValue('480')
 
   expect(errors).toEqual([])
 })

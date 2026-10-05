@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { questProgress, selectiveQuestPeriod, type Platform } from '../domain'
-import { DateTimeInput, IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
+import { CardTitle, DateTimeInput, IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { newId, saveQuest } from '../storage/repo'
@@ -45,7 +45,19 @@ export function QuestCard({ now }: { now: string }) {
 
   return (
     <section className="card stack" aria-labelledby="quest-title">
-      <h3 id="quest-title">🎯 クエスト</h3>
+      <CardTitle
+        id="quest-title"
+        tip="配達アプリで選んだクエストの段階を入れると、期間内に帰宅した確定記録の件数から「あと何件で次の段階か」を出します。達成分は見込みなので、報酬が確定したら精算の「確定ボーナス」に入れてください。"
+        right={
+          !editing && (
+            <button type="button" className="icon" aria-label="クエストを追加" onClick={() => setEditing(blankQuest(now))}>
+              ＋
+            </button>
+          )
+        }
+      >
+        🎯 クエスト
+      </CardTitle>
       {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
       {editing ? (
         <QuestForm
@@ -59,7 +71,7 @@ export function QuestCard({ now }: { now: string }) {
         />
       ) : (
         <>
-          {visible.length === 0 && <p className="hint">今の期間のクエストはありません。配達アプリで選んだクエストを入れると、あと何件で次の段階かが分かります。</p>}
+          {visible.length === 0 && <p className="hint">今の期間のクエストはありません（＋で追加）</p>}
           {visible.map((q) => {
             const p = questProgress(
               q,
@@ -69,40 +81,38 @@ export function QuestCard({ now }: { now: string }) {
             const target = p.next ? p.count + p.next.remaining : q.tiers[q.tiers.length - 1]?.count ?? p.count
             const upcoming = nowMs < Date.parse(q.startsAt)
             return (
-              <div key={q.id} className="subcard stack">
-                <div className="row-between">
-                  <strong>{q.label}</strong>
+              <div key={q.id} className="subcard">
+                <div className="line">
+                  <strong className="grow">{q.label}</strong>
                   <span className="tag">{p.ended ? '⌛ 終了' : upcoming ? '🕒 これから' : PLATFORM_LABELS[q.platform]}</span>
-                </div>
-                <p className="hint">{periodText(q)}</p>
-                <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={target} aria-valuenow={p.count} aria-label="クエストの件数">
-                  <span style={{ width: `${Math.min(100, (p.count / Math.max(1, target)) * 100)}%` }} />
-                </div>
-                <p>
-                  <strong>{p.count}件</strong>
-                  {p.next ? `／あと${p.next.remaining}件で第${p.next.tier}段階（+${formatYen(p.next.gainYen)}）` : '／全段階を達成'}
-                </p>
-                {p.earnedYen > 0 && (
-                  <p className="hint">達成分 {formatYen(p.earnedYen)}（見込み）。報酬が確定したら、その日の精算の「確定したクエスト・ボーナス」に入れてください。</p>
-                )}
-                {p.unknownCountSessions > 0 && <p className="hint">⚠️ 件数が未入力の記録が{p.unknownCountSessions}件あり、数えていません。</p>}
-                <div className="row">
-                  <button type="button" onClick={() => setEditing(q)}>✏️ 編集・件数の調整</button>
+                  <button type="button" className="icon" aria-label={`${q.label}を編集・件数の調整`} onClick={() => setEditing(q)}>✏️</button>
                   <button
                     type="button"
-                    className="danger-text"
+                    className="icon danger-text"
+                    aria-label={`${q.label}を削除`}
                     onClick={async () => {
                       await db.quests.delete(q.id)
                       setNotice({ message: '🗑️ 削除しました', undo: () => void db.quests.put(q).then(() => setNotice(null)) })
                     }}
                   >
-                    削除
+                    🗑️
                   </button>
                 </div>
+                <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={target} aria-valuenow={p.count} aria-label="クエストの件数">
+                  <span style={{ width: `${Math.min(100, (p.count / Math.max(1, target)) * 100)}%` }} />
+                </div>
+                <p className="line">
+                  <span className="grow">
+                    <strong>{p.count}件</strong>
+                    {p.next ? `／あと${p.next.remaining}件で+${formatYen(p.next.gainYen)}` : '／全段階を達成'}
+                    {p.earnedYen > 0 && <span className="hint">（達成 {formatYen(p.earnedYen)}・見込み）</span>}
+                  </span>
+                  <span className="hint">{periodText(q)}</span>
+                </p>
+                {p.unknownCountSessions > 0 && <p className="hint">⚠️ 件数未入力の記録{p.unknownCountSessions}件は数えていません</p>}
               </div>
             )
           })}
-          <button type="button" onClick={() => setEditing(blankQuest(now))}>＋ クエストを追加</button>
         </>
       )}
     </section>
@@ -129,21 +139,24 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
         }
       }}
     >
-      <TextInput label="名前" value={q.label} onChange={(v) => setQ({ ...q, label: v })} />
-      <Select
-        label="対象のサービス"
-        value={q.platform}
-        options={(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))}
-        onChange={(v) => setQ({ ...q, platform: v })}
-      />
-      <p className="hint">期間をすばやく入れる：</p>
       <div className="row">
+        <TextInput label="名前" value={q.label} onChange={(v) => setQ({ ...q, label: v })} />
+        <Select
+          label="対象のサービス"
+          value={q.platform}
+          options={(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))}
+          onChange={(v) => setQ({ ...q, platform: v })}
+        />
+      </div>
+      <div className="buttons" role="group" aria-label="期間をすばやく入れる">
         <button type="button" onClick={() => setQ({ ...q, ...selectiveQuestPeriod(new Date().toISOString()), label: q.label })}>選択制（今の期間）</button>
         <button type="button" onClick={() => peak('10:30', '15:00', '今日のランチピーク')}>今日のランチ</button>
         <button type="button" onClick={() => peak('17:00', '21:30', '今日のディナーピーク')}>今日のディナー</button>
       </div>
-      <DateTimeInput label="開始" value={q.startsAt} onChange={(v) => v && setQ({ ...q, startsAt: v })} />
-      <DateTimeInput label="終了" value={q.endsAt} onChange={(v) => v && setQ({ ...q, endsAt: v })} />
+      <div className="row">
+        <DateTimeInput label="開始" value={q.startsAt} onChange={(v) => v && setQ({ ...q, startsAt: v })} />
+        <DateTimeInput label="終了" value={q.endsAt} onChange={(v) => v && setQ({ ...q, endsAt: v })} />
+      </div>
       <Select
         label="報酬の書き方"
         value={q.rewardMode}
@@ -152,7 +165,7 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
           { value: 'cumulative', label: '段階を達成した時の合計額' },
         ]}
         onChange={(v) => setQ({ ...q, rewardMode: v })}
-        hint="配達アプリの表示に合わせて選んでください"
+        tip="配達アプリの表示に合わせて選んでください"
       />
       {q.tiers.map((t, i) => (
         <div key={i} className="row">
@@ -174,7 +187,7 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
         allowNegative
         value={q.manualOffset}
         onChange={(v) => setQ({ ...q, manualOffset: v ?? 0 })}
-        hint="記録していない配達の分を足します（配達アプリの件数と合わせる時に使います）"
+        tip="記録していない配達の分を足します（配達アプリの件数と合わせる時に使います）"
       />
       <Problems items={problems} />
       <div className="actions">

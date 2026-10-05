@@ -50,15 +50,14 @@ function Shell() {
       <header className="app-header">
         <h1>デリ勘</h1>
         {!online && (
-          <span className="tag" role="status">
-            📴 オフライン
+          <span className="tag" role="status" title="電波がなくても記録できます（端末に保存されます）">
+            📴 オフライン・記録できます
           </span>
         )}
       </header>
-      {!online && <p className="offline-note">電波がなくても記録できます（端末に保存されます）。</p>}
       {updateReady && (
         <div className="update-banner" role="status">
-          <span>🔄 新しい版があります。入力中の内容を保存してから更新してください。</span>
+          <span>🔄 新しい版があります（入力中なら保存してから）</span>
           <button type="button" className="primary" onClick={applyUpdate}>
             更新する
           </button>
@@ -66,11 +65,12 @@ function Shell() {
       )}
       {mode === 'demo' && (
         <p className="demo-banner" role="status">
-          🧪 デモ表示中（合成データ・実績ではありません）
+          🧪 デモ表示中（合成データ・実績ではない）
         </p>
       )}
       <main className="app-main" aria-labelledby="page-title">
-        <h2 id="page-title">{active.label}</h2>
+        {/* 画面の名前は下のメニューで分かるので、見た目では出さず読み上げ用に残す */}
+        <h2 id="page-title" className="visually-hidden">{active.label}</h2>
         {tab === 'home' && (
           <Home
             onSettle={(id) => {

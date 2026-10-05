@@ -11,7 +11,7 @@ import {
   type Scenario,
   type Tariff,
 } from '../domain'
-import { IntInput } from '../components/fields'
+import { CardTitle, IntInput } from '../components/fields'
 import { formatClock, formatYen } from '../format'
 
 const DECISION_LABELS: Record<Decision, string> = {
@@ -93,8 +93,16 @@ export function ContinueCard({
 
   return (
     <section className="card stack" aria-labelledby="continue-title">
-      <h3 id="continue-title">🤔 続ける？帰る？</h3>
-      <p className="hint">止まっている時に確かめてください（走行中は操作しないでください）。</p>
+      <CardTitle
+        id="continue-title"
+        tip={
+          <>
+            止まっている時に確かめてください（走行中は操作しないでください）。あと30・60・90分続けた時に増える利益と時給を、悲観・標準・楽観の3つの見込みで出します。悲観・楽観は標準の売上の0.8倍・1.2倍の目安です。見込みの出どころ：{manualRevenue === null ? estimate.note : '手入力'}。
+          </>
+        }
+      >
+        🤔 続ける？帰る？
+      </CardTitle>
       <div className="segmented" role="radiogroup" aria-label="延長する時間">
         {[30, 60, 90].map((m) => (
           <button
@@ -124,12 +132,12 @@ export function ContinueCard({
       </ul>
 
       <dl className="stats">
-        <div><dt>延長した分の売上（標準）</dt><dd>{formatYen(standard)}{manualRevenue === null ? '（見込み）' : '（手入力）'}</dd></div>
+        <div><dt>延長分の売上（標準）</dt><dd>{formatYen(standard)}{manualRevenue === null ? '（見込み）' : '（手入力）'}</dd></div>
         <div><dt>増えるレンタル代</dt><dd>{result.extraRentalYen === null ? '算出不可' : formatYen(result.extraRentalYen)}</dd></div>
         {(extraExpense ?? 0) + (rental ? (returnFailureCost ?? 0) : 0) > 0 && (
           <div><dt>そのほか差し引く額</dt><dd>{formatYen((extraExpense ?? 0) + (rental ? (returnFailureCost ?? 0) : 0))}</dd></div>
         )}
-        <div><dt>延長した場合の帰宅</dt><dd>{formatClock(result.arrivalIfExtended).slice(0, 5)}ごろ</dd></div>
+        <div><dt>延長した時の帰宅</dt><dd>{formatClock(result.arrivalIfExtended).slice(0, 5)}ごろ</dd></div>
       </dl>
       <div className="table-scroll" tabIndex={0} role="region" aria-label="見込みごとの増える利益と時給">
         <table className="breakdown">
@@ -147,27 +155,32 @@ export function ContinueCard({
           </tbody>
         </table>
       </div>
-      <p className="hint">見込みの出どころ：{manualRevenue === null ? estimate.note : '手入力'}。悲観・楽観は標準の0.8倍・1.2倍の目安です。</p>
 
       <details>
         <summary>見込みや移動時間を直す</summary>
         <div className="stack">
-          <IntInput label={`あと${extendMinutes}分の売上の見込み（標準）`} unit="円" value={manualRevenue} onChange={setManualRevenue} placeholder={`自動：${estimate.revenueYen}`} hint="空欄なら自動の見込みを使います" />
-          <IntInput label="クエストで増えそうな額（見込み）" unit="円" value={questGain} onChange={setQuestGain} hint="確定していない額は実績の売上には入りません" />
-          <IntInput label="延長中にかかる経費（駐輪代など）" unit="円" value={extraExpense} onChange={setExtraExpense} />
-          {rental && (
-            <IntInput
-              label="返却できないリスクの費用（見込み）"
-              unit="円"
-              value={returnFailureCost}
-              onChange={setReturnFailureCost}
-              hint="遅い時間に返す場所が満車になりやすい等で、追加料金がかかりそうな額 × その確率の目安"
-            />
-          )}
-          <IntInput label="やめてから家に着くまで" unit="分" value={prefs.minutesToHome} onChange={(v) => setPrefs({ ...prefs, minutesToHome: v ?? 0 })} />
-          {rental && (
-            <IntInput label="やめてから自転車を返すまで" unit="分" value={prefs.minutesToReturnBike} onChange={(v) => setPrefs({ ...prefs, minutesToReturnBike: v ?? 0 })} />
-          )}
+          <div className="row">
+            <IntInput label={`あと${extendMinutes}分の売上（標準）`} unit="円" value={manualRevenue} onChange={setManualRevenue} placeholder={`自動：${estimate.revenueYen}`} tip="空欄なら自動の見込みを使います" />
+            <IntInput label="クエストで増えそうな額" unit="円" value={questGain} onChange={setQuestGain} tip="見込みです。確定していない額は実績の売上には入りません" />
+          </div>
+          <div className="row">
+            <IntInput label="延長中の経費" unit="円" value={extraExpense} onChange={setExtraExpense} tip="駐輪代など" />
+            {rental && (
+              <IntInput
+                label="返却できないリスク"
+                unit="円"
+                value={returnFailureCost}
+                onChange={setReturnFailureCost}
+                tip="遅い時間に返す場所が満車になりやすい等で、追加料金がかかりそうな額 × その確率の目安"
+              />
+            )}
+          </div>
+          <div className="row">
+            <IntInput label="やめてから家まで" unit="分" value={prefs.minutesToHome} onChange={(v) => setPrefs({ ...prefs, minutesToHome: v ?? 0 })} />
+            {rental && (
+              <IntInput label="やめてから返却まで" unit="分" value={prefs.minutesToReturnBike} onChange={(v) => setPrefs({ ...prefs, minutesToReturnBike: v ?? 0 })} />
+            )}
+          </div>
         </div>
       </details>
     </section>

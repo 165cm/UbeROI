@@ -1,7 +1,7 @@
 // データ管理（S07）：デモ切り替え・バックアップの書き出し／復元・全削除
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Notice, Problems, errorMessages, localToday } from '../components/fields'
+import { CardTitle, Notice, Problems, errorMessages, localToday } from '../components/fields'
 import { useData } from '../storage/context'
 import { InstallHelp } from './InstallHelp'
 import { CsvImport } from './CsvImport'
@@ -92,8 +92,7 @@ export function DataSettings() {
     <div className="stack">
       <InstallHelp />
       <section className="card stack">
-        <h3>🧪 表示するデータ</h3>
-        <p className="hint">デモは合成データで、実績とは別の場所に保存されます。切り替えても実績は消えません。</p>
+        <CardTitle tip="デモは合成データで、実績とは別の場所に保存されます。切り替えても実績は消えません。">🧪 表示するデータ</CardTitle>
         <div className="segmented" role="radiogroup" aria-label="表示するデータ">
           <button type="button" role="radio" aria-checked={mode === 'real'} onClick={() => setMode('real')}>📒 自分の実績</button>
           <button type="button" role="radio" aria-checked={mode === 'demo'} onClick={() => setMode('demo')}>🧪 デモ</button>
@@ -103,19 +102,17 @@ export function DataSettings() {
       {notice && <Notice message={notice} onClose={() => setNotice(null)} />}
 
       <section className="card stack">
-        <h3>💾 バックアップ</h3>
-        <p>
+        <CardTitle
+          tip={`データはこの端末のブラウザーの中だけにあります（外部へは送りません。暗号化はしていません）。機種変更やブラウザーのデータ削除で消えるので、ときどき書き出して、クラウドやパソコンにも保存してください。復元は、今の${mode === 'demo' ? 'デモの' : ''}データを選んだファイルの内容ですべて置き換えます（足し合わせはしません）。読み込む前に中身を確かめ、壊れたファイルや対応していない版なら今のデータはそのままです。`}
+        >
+          💾 バックアップと復元
+        </CardTitle>
+        <p className="hint">
           最後のバックアップ：<strong>{settings?.lastBackupAt ? formatDateTime(settings.lastBackupAt) : 'まだありません'}</strong>
         </p>
-        <p className="hint">データはこの端末のブラウザーの中だけにあります（外部へは送りません。暗号化はしていません）。機種変更やブラウザーのデータ削除で消えるので、ときどき書き出して、クラウドやパソコンにも保存してください。</p>
         <button type="button" className="primary" onClick={() => void exportJson()}>⬇️ バックアップを書き出す</button>
-      </section>
-
-      <section className="card stack">
-        <h3>♻️ バックアップから復元</h3>
-        <p className="hint">今の{mode === 'demo' ? 'デモの' : ''}データを、選んだファイルの内容で<strong>すべて置き換えます</strong>（足し合わせはしません）。読み込む前に中身を確かめます。</p>
         <label className="field">
-          <span>バックアップのファイル（.json）</span>
+          <span>♻️ 復元：バックアップのファイル（.json）<span className="hint">・今のデータは置き換わります</span></span>
           <input type="file" accept="application/json,.json" onChange={(e) => void pickFile(e.target.files?.[0])} />
         </label>
         {pending && (
@@ -143,8 +140,7 @@ export function DataSettings() {
       <CsvImport />
 
       <section className="card stack">
-        <h3>🗑️ すべて削除</h3>
-        <p className="hint">{mode === 'demo' ? 'デモのデータ' : '自分の実績'}をすべて消して、初期状態に戻します。元に戻せないので、先にバックアップを書き出してください。</p>
+        <CardTitle tip={`${mode === 'demo' ? 'デモのデータ' : '自分の実績'}をすべて消して、初期状態に戻します。元に戻せないので、先にバックアップを書き出してください。`}>🗑️ すべて削除</CardTitle>
         <button type="button" className="danger" onClick={() => void deleteAll()}>🗑️ すべて削除する</button>
       </section>
     </div>

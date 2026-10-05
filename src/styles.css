@@ -15,7 +15,7 @@
   --radius: 12px;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  line-height: 1.6;
+  line-height: 1.45;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -55,22 +55,22 @@ body {
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 6px 12px;
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.0625rem;
 }
 
 .app-main {
   flex: 1;
-  padding: 0 16px calc(88px + env(safe-area-inset-bottom));
+  padding: 0 12px calc(72px + env(safe-area-inset-bottom));
   display: grid;
-  gap: 12px;
+  gap: 8px;
   align-content: start;
 }
 
@@ -78,53 +78,80 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .card h3 {
-  margin: 0 0 8px;
-  font-size: 1rem;
+  margin: 0 0 4px;
+  font-size: 0.9375rem;
+}
+
+/* 見出しと ⓘ・右端の小さな操作を1行に並べる */
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.card-title h3 {
+  margin: 0;
+}
+
+.card-title-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .card.muted p,
 .hint {
   color: var(--text-muted);
-  font-size: 0.875rem;
-  margin: 8px 0;
+  font-size: 0.8125rem;
+  margin: 2px 0;
 }
 
+/* 数字は「小さなラベル＋値」のマスを横に並べ、1画面に多く入れる */
 .stats {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 6px 12px;
   margin: 0;
 }
 
-.stats div {
+.stats > div {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stats > div.wide {
+  grid-column: 1 / -1;
 }
 
 .stats dt {
   color: var(--text-muted);
+  font-size: 0.75rem;
 }
 
 .stats dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  font-weight: 600;
 }
 
 .stats .big {
-  font-size: 1.5rem;
+  font-size: 1.375rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 button {
   min-height: 44px;
   width: 100%;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -159,7 +186,7 @@ a:focus-visible {
 }
 
 .tabbar a {
-  min-height: 56px;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -194,8 +221,9 @@ h2#page-title {
 }
 
 .demo-banner {
-  margin: 0 16px 8px;
-  padding: 8px 12px;
+  margin: 0 12px 6px;
+  padding: 4px 10px;
+  font-size: 0.875rem;
   border-radius: var(--radius);
   border: 2px dashed var(--warn);
   color: var(--text);
@@ -204,7 +232,7 @@ h2#page-title {
 
 .stack {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .row {
@@ -229,18 +257,83 @@ h2#page-title {
 .subcard {
   border: 1px dashed var(--border);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 8px 10px;
 }
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .field label,
 .field > span {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
+}
+
+/* ⓘ のある欄とない欄で、入力欄の高さがそろうようにする */
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+}
+
+/* ⓘ：押すと説明が開く。見た目は小さく、押せる範囲は28px（最低24pxを満たす） */
+.tip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  font-weight: 400;
+}
+
+.tip-button {
+  width: 28px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.tip-button[aria-expanded='true'] {
+  background: var(--bg);
+}
+
+.tip-body {
+  flex-basis: 100%;
+  order: 2;
+  margin: 2px 0 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.tip-body[hidden] {
+  display: none;
+}
+
+/* 見出しの横の ⓘ は、開いた説明を見出しの下の行に出す */
+.card-title .tip,
+.field-label .tip {
+  display: contents;
+}
+
+.card-title .tip-body,
+.field-label .tip-body {
+  flex-basis: 100%;
+}
+
+.field-label {
+  flex-wrap: wrap;
 }
 
 .field .hint {
@@ -251,7 +344,7 @@ input,
 select {
   min-height: 44px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg);
@@ -312,8 +405,8 @@ select:focus-visible {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  gap: 4px;
-  padding: 4px;
+  gap: 2px;
+  padding: 2px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -344,14 +437,85 @@ select:focus-visible {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .list-item {
   display: grid;
-  gap: 2px;
+  gap: 0;
   text-align: left;
-  padding: 12px 16px;
+  padding: 6px 12px;
+}
+
+/* 1行の一覧：左に名前と補足、右に数字や小さな操作 */
+.line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.line > .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.line .num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 一覧の中の小さな操作（✏️・🗑️ など）。押せる範囲は40px */
+button.icon {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  flex: none;
+  border: none;
+  background: transparent;
+}
+
+button.icon.danger-text {
+  color: var(--danger);
+}
+
+/* 畳んだ明細：1行の要約を押すと編集欄が開く */
+details.fold > summary {
+  min-height: 44px;
+  color: var(--text);
+  list-style: none;
+  gap: 6px;
+}
+
+details.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.fold > summary::after {
+  content: '▸';
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+details.fold[open] > summary::after {
+  content: '▾';
+}
+
+details.fold > summary > * {
+  min-width: 0;
+}
+
+/* 横に並べるボタン（幅は中身に合わせる） */
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.buttons > button {
+  width: auto;
+  flex: 1 1 auto;
 }
 
 .list-title {
@@ -369,7 +533,8 @@ select:focus-visible {
 
 .actions {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 6px;
 }
 
 button:disabled {
@@ -592,18 +757,12 @@ tr.low-sample .tag {
 }
 
 .notice-card p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
 }
 
-/* ---- オフライン・更新 ---- */
-.offline-note {
-  margin: 0 16px 8px;
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
+/* ---- 更新 ---- */
 .update-banner {
-  margin: 0 16px 8px;
+  margin: 0 12px 6px;
   padding: 8px 12px;
   border: 2px solid var(--accent);
   border-radius: var(--radius);
@@ -620,7 +779,7 @@ ol.steps {
 /* ---- 続ける？帰る？ ---- */
 .decision {
   margin: 0;
-  padding: 10px 12px;
+  padding: 6px 10px;
   border-radius: var(--radius);
   border: 2px solid var(--border);
   font-size: 1.125rem;
@@ -646,7 +805,7 @@ ul.reasons {
 }
 
 details summary {
-  min-height: 44px;
+  min-height: 40px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -666,4 +825,71 @@ details summary {
   height: 100%;
   background: var(--chart);
   border-radius: 999px;
+}
+
+/* 日時の入力は狭いと時刻が隠れるので、横に並べず1行ずつにする */
+.row > .field:has(input[type='datetime-local']) {
+  flex-basis: 15rem;
+}
+
+/* 畳んだ要約・一覧の補足は1行に収め、はみ出す分は … にする */
+details.fold > summary strong {
+  white-space: nowrap;
+}
+
+details.fold > summary .hint,
+.record-item .line > .grow {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-head h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.page-head button.back {
+  width: auto;
+  flex: none;
+}
+
+/* 1枚のカードの中に、畳んだ明細を区切り線で並べる */
+.fold-list {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.fold-list > details.fold + details.fold {
+  border-top: 1px solid var(--grid);
+}
+
+.fold-list > details.fold[open] {
+  padding-bottom: 8px;
+}
+
+/* カードの中の1行の一覧は、区切り線で分ける */
+.card .list {
+  gap: 0;
+}
+
+.card .list > li + li {
+  border-top: 1px solid var(--grid);
+}
+
+.card .list > li.line {
+  padding: 2px 0;
+  font-size: 0.9375rem;
+}
+
+a {
+  color: var(--accent);
 }

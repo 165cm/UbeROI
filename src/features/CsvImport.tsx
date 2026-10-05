@@ -1,7 +1,7 @@
 // CSVから記録を取り込む（P1）：読み込み → 確認（追加・取込済み・問題）→ まとめて確定。問題があれば1件も保存しない
 import { useState } from 'react'
 import { calculateSession, type Platform } from '../domain'
-import { Notice, Problems, Select, errorMessages } from '../components/fields'
+import { CardTitle, Notice, Problems, Select, errorMessages } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { CSV_V1_SAMPLE, commitCsvImport, previewCsvImport, type ImportPreview } from '../storage/csvImport'
@@ -82,12 +82,21 @@ export function CsvImport() {
 
   return (
     <section className="card stack" aria-labelledby="csv-import-title">
-      <h3 id="csv-import-title">📥 CSVから記録を取り込む</h3>
-      <p className="hint">
-        ほかのアプリや表計算ソフトで付けていた記録を、まとめて{mode === 'demo' ? 'デモに' : '自分の実績に'}追加します（1行＝1回の稼働）。
-        見本と同じ見出しの列にして、「CSV UTF-8」形式で保存してください。日時は 2026-10-04T18:00:00+09:00 のように時差まで書きます。
-      </p>
-      <button type="button" onClick={downloadSample}>⬇️ 見本のCSVをダウンロード</button>
+      <CardTitle
+        id="csv-import-title"
+        tip={
+          <>
+            ほかのアプリや表計算ソフトで付けていた記録を、まとめて{mode === 'demo' ? 'デモに' : '自分の実績に'}追加します（1行＝1回の稼働）。見本と同じ見出しの列にして、「CSV UTF-8」形式で保存してください。日時は 2026-10-04T18:00:00+09:00 のように時差まで書きます。読み込む前に中身を確かめ、問題が1つでもあれば1件も保存しません。
+          </>
+        }
+        right={
+          <button type="button" className="icon" aria-label="見本のCSVをダウンロード" onClick={downloadSample}>
+            ⬇️
+          </button>
+        }
+      >
+        📥 CSVから記録を取り込む
+      </CardTitle>
       <Select
         label="どのサービスの記録か"
         value={platform}
@@ -96,7 +105,7 @@ export function CsvImport() {
           setPlatform(p)
           void check(file, p)
         }}
-        hint="CSVに platform 列がある行は、その値を使います"
+        tip="CSVに platform 列がある行は、その値を使います"
       />
       <label className="field">
         <span>CSVファイル（.csv）</span>

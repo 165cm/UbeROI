@@ -14,6 +14,7 @@ import {
   summarizePlan,
   weeklyFixedCostYen,
   weeksToRecover,
+  type BusynessTable,
   type PastSession,
   type Scenario,
   type SlotInput,
@@ -23,7 +24,7 @@ import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, l
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
-import { listTariffs, newId, pickDefaultTariff, saveSlot } from '../storage/repo'
+import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 
@@ -65,6 +66,7 @@ export function Plan() {
     plans: await db.plans.toArray(),
     tariffs: await listTariffs(db),
     settings: await db.settings.get('settings'),
+    areas: await db.areas.toArray(),
   }), [db])
   const [anchor, setAnchor] = useState(localToday())
   const [scenario, setScenario] = useState<Scenario>('standard')
@@ -128,6 +130,7 @@ export function Plan() {
       <SlotForm
         initial={editing}
         past={past}
+        busyness={primaryArea(data.areas, data.settings)?.levels ?? null}
         tariff={computed.tariffOf(editing)}
         onCancel={() => setEditing(null)}
         onSave={async (slot) => {
@@ -289,12 +292,14 @@ export function Plan() {
 function SlotForm({
   initial,
   past,
+  busyness,
   tariff,
   onSave,
   onCancel,
 }: {
   initial: SlotRecord
   past: PastSession[]
+  busyness: BusynessTable | null
   tariff: TariffRecord | undefined
   onSave: (slot: SlotRecord) => Promise<void>
   onCancel: () => void
@@ -318,7 +323,7 @@ function SlotForm({
 
   const fillEstimate = () => {
     if (!times) return
-    const est = estimateRevenue(times.startsAt, times.endsAt, past)
+    const est = estimateRevenue(times.startsAt, times.endsAt, past, busyness)
     setSlot({
       ...slot,
       revenueYen: {
@@ -372,7 +377,7 @@ function SlotForm({
       </section>
 
       <section className="card stack">
-        <CardTitle tip="自動の見込みは、自分の確定記録が10回以上あれば自分の平均、それまでは参考資料の推計（時間帯・月の目安）を使います。あとから手で直せます。">💴 売上の見込み</CardTitle>
+        <CardTitle tip="自動の見込みは、自分の確定記録が10回以上あれば自分の平均、それまでは推計を使います。推計は、主なエリアの混み具合（設定 → エリア）があればそれを、なければ参考資料の時間帯・月の目安を使います。自分の平均も混み具合の比で補正します。あとから手で直せます。">💴 売上の見込み</CardTitle>
         <button type="button" onClick={fillEstimate} disabled={!times}>🔮 見込みを自動で入れる</button>
         <div className="row">
           {SCENARIOS.map((s) => (

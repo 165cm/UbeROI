@@ -7,6 +7,7 @@ import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { listTariffs, newId, saveRecurringExpense, saveSettings, saveTariff } from '../storage/repo'
 import type { RecurringExpenseRecord, SettingsRecord, TariffRecord } from '../storage/schema'
+import { AreaSettings } from './AreaSettings'
 import { DataSettings } from './DataSettings'
 import { Equipment } from './Equipment'
 
@@ -15,6 +16,7 @@ const SECTIONS = [
   { id: 'tariff', label: '料金' },
   { id: 'equipment', label: '装備と投資' },
   { id: 'fixed', label: '固定費' },
+  { id: 'area', label: 'エリア' },
   { id: 'data', label: 'データ' },
 ] as const
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -23,7 +25,7 @@ export function Settings() {
   const [section, setSection] = useState<SectionId>('basic')
   return (
     <div className="stack">
-      <div className="segmented scroll" role="tablist" aria-label="設定の項目">
+      <div className="segmented wrap" role="tablist" aria-label="設定の項目">
         {SECTIONS.map((s) => (
           <button key={s.id} type="button" role="tab" aria-selected={section === s.id} onClick={() => setSection(s.id)}>
             {s.label}
@@ -34,6 +36,7 @@ export function Settings() {
       {section === 'tariff' && <TariffSettings />}
       {section === 'equipment' && <Equipment />}
       {section === 'fixed' && <FixedCosts />}
+      {section === 'area' && <AreaSettings />}
       {section === 'data' && <DataSettings />}
     </div>
   )

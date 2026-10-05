@@ -1,12 +1,13 @@
 // 端末に保存するデータの形（docs/spec/docs/03-data-model.md を MVP 向けに簡略化）
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
-import type { EquipmentCategory, Platform, Tariff } from '../domain'
+import type { BusynessTable, EquipmentCategory, Platform, Tariff } from '../domain'
 
 /**
  * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
+ * 5：エリアの混み具合（areas）と、設定の主なエリア（primaryAreaId）を追加。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 interface Stamped {
   createdAt: string
@@ -25,6 +26,8 @@ export interface SettingsRecord extends Stamped {
   defaultTariffId: string | null
   /** 最後にバックアップを書き出した日時（未実施なら null／未定義） */
   lastBackupAt?: string | null
+  /** 見込みに使う主なエリア（areas の id。未設定なら null／未定義） */
+  primaryAreaId?: string | null
 }
 
 export interface TariffRecord extends Stamped {
@@ -191,4 +194,20 @@ export interface QuestRecord extends Stamped {
   rewardMode: 'cumulative' | 'incremental'
   tiers: { count: number; rewardYen: number }[]
   manualOffset: number
+}
+
+/**
+ * エリアの混み具合（配達アプリの「時間帯ごとの傾向」を利用者が見て写したもの）。
+ * 段階は「そのエリアの中での比較」で、時給そのものではない。見込みの倍率としてだけ使う
+ */
+export interface AreaRecord extends Stamped {
+  id: string
+  /** 例：中野・荻窪エリア */
+  name: string
+  /** 7曜日（0=日）× 24時間。0 は未入力、1〜4 は空き〜混む（4時〜翌3時で1日） */
+  levels: BusynessTable
+  /** このエリアに入る地名（オファー判定で届け先の地名からエリアを探す） */
+  towns: string[]
+  /** 配達アプリで確かめた日 YYYY-MM-DD（1か月たったら見直しを知らせる） */
+  checkedAt: string
 }

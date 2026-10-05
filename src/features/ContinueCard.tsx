@@ -6,6 +6,7 @@ import {
   SCENARIO_LABELS,
   estimateRevenue,
   evaluateContinuation,
+  type BusynessTable,
   type Decision,
   type PastSession,
   type Scenario,
@@ -48,11 +49,13 @@ export function ContinueCard({
   past,
   targetHourlyYen,
   homeDeadline,
+  busyness,
 }: {
   now: string
   departedAt: string
   rental: { tariff: Tariff; startAt: string } | null
   past: PastSession[]
+  busyness: BusynessTable | null
   targetHourlyYen: number | null
   homeDeadline: string | null
 }) {
@@ -69,8 +72,8 @@ export function ContinueCard({
   const estimate = useMemo(() => {
     const start = `${minute}:00.000Z`
     const end = new Date(Date.parse(start) + extendMinutes * 60_000).toISOString()
-    return estimateRevenue(start, end, past)
-  }, [minute, extendMinutes, past])
+    return estimateRevenue(start, end, past, busyness)
+  }, [minute, extendMinutes, past, busyness])
 
   const standard = manualRevenue ?? estimate.revenueYen
   const revenue = {} as Record<Scenario, number>

@@ -1,6 +1,7 @@
 // IndexedDB（Dexie）。実績とデモは別のデータベースに分け、合成データが実績に混ざらないようにする
 import Dexie, { type EntityTable } from 'dexie'
 import type {
+  AreaRecord,
   AssetRecord,
   EquipmentPlanRecord,
   RecurringExpenseRecord,
@@ -22,6 +23,7 @@ export class DeliKanDB extends Dexie {
   assets!: EntityTable<AssetRecord, 'id'>
   slots!: EntityTable<SlotRecord, 'id'>
   quests!: EntityTable<QuestRecord, 'id'>
+  areas!: EntityTable<AreaRecord, 'id'>
 
   constructor(name: string) {
     super(name)
@@ -37,6 +39,8 @@ export class DeliKanDB extends Dexie {
     this.version(2).stores({ slots: 'id, startsAt' })
     // 版3：クエストを追加
     this.version(3).stores({ quests: 'id, endsAt' })
+    // 版5：エリアの混み具合を追加（版4は保存の形だけの変更で、表は増えていない）
+    this.version(5).stores({ areas: 'id' })
   }
 }
 

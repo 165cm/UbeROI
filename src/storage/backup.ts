@@ -1,13 +1,13 @@
 // バックアップ（JSON）の書き出し・検証・復元。復元は全体の置き換えのみ（マージしない）
 import type { Tariff } from '../domain'
 import type { DeliKanDB, DataMode } from './db'
-import { parseInstant } from '../domain'
-import { initialRecords, questProblems, sessionRecordProblems, sessionSetProblems } from './repo'
-import { SCHEMA_VERSION, type QuestRecord, type SessionRecord } from './schema'
+import { isBusynessTable, parseInstant } from '../domain'
+import { areaProblems, initialRecords, questProblems, sessionRecordProblems, sessionSetProblems } from './repo'
+import { SCHEMA_VERSION, type AreaRecord, type QuestRecord, type SessionRecord } from './schema'
 
 export const APP_VERSION = '0.1.0'
 
-const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots', 'quests'] as const
+const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots', 'quests', 'areas'] as const
 type TableName = (typeof TABLES)[number]
 
 export const TABLE_LABELS: Record<TableName, string> = {
@@ -19,6 +19,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   assets: '登録済みの装備',
   slots: '計画の候補枠',
   quests: 'クエスト',
+  areas: 'エリアの混み具合',
 }
 
 export interface Backup {
@@ -131,6 +132,7 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.str(r, 'homeDeadline', path, { nullable: true })
     c.str(r, 'defaultTariffId', path, { nullable: true })
     if (r.lastBackupAt !== undefined) c.instant(r, 'lastBackupAt', path, { nullable: true })
+    if (r.primaryAreaId !== undefined) c.str(r, 'primaryAreaId', path, { nullable: true })
     c.stamped(r, path)
   },
   tariffs(c, r, path) {
@@ -265,6 +267,14 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.int(r, 'manualOffset', path, { min: null })
     c.stamped(r, path)
   },
+  areas(c, r, path) {
+    c.str(r, 'name', path)
+    if (!isBusynessTable(r.levels)) c.add(`${path}.levels`, '混み具合の表（7曜日×24時間・0〜4）が正しくありません')
+    c.arr(r, 'towns', path).forEach((t, i) => {
+      if (typeof t !== 'string') c.add(`${path}.towns[${i}]`, '文字ではありません')
+    })
+    c.stamped(r, path)
+  },
 }
 
 export type ParseResult =
@@ -281,10 +291,10 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし）のバックアップは、足りない一覧を空として読み込む。
+  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし）のバックアップは、足りない一覧を空として読み込む。
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ((raw.schema_version === 1 || raw.schema_version === 2 || raw.schema_version === 3) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
-    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], ...(raw.datasets as object) } }
+  if ([1, 2, 3, 4].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
   if (raw.schema_version !== SCHEMA_VERSION) {
@@ -320,6 +330,7 @@ export function parseBackup(text: string): ParseResult {
   sessionSetProblems(sessions).forEach((p) => c.add(TABLE_LABELS.sessions, p))
   // クエストも保存時と同じ制約（段階が空・同じ件数・累積の減少）で確かめる
   ;(datasets.quests as QuestRecord[]).forEach((q, i) => questProblems(q).forEach((p) => c.add(`${TABLE_LABELS.quests}[${i + 1}]`, p)))
+  ;(datasets.areas as AreaRecord[]).forEach((a, i) => areaProblems(a).forEach((p) => c.add(`${TABLE_LABELS.areas}[${i + 1}]`, p)))
   if (c.problems.length) return { ok: false, problems: c.problems }
   return { ok: true, backup: raw as unknown as Backup, counts }
 }
@@ -349,7 +360,7 @@ async function replaceAll(db: DeliKanDB, datasets: Record<TableName, unknown[]>)
 /** すべて消して、初期状態（料金プリセット・空の設定・3プラン）に戻す */
 export async function deleteAllData(db: DeliKanDB): Promise<void> {
   const initial = initialRecords()
-  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [], quests: [] })
+  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [], quests: [], areas: [] })
 }
 
 /** バックアップを書き出した日時を設定に残す（ホームでの声かけに使う） */

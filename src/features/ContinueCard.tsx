@@ -131,7 +131,7 @@ export function ContinueCard({
         )}
         <div><dt>延長した場合の帰宅</dt><dd>{formatClock(result.arrivalIfExtended).slice(0, 5)}ごろ</dd></div>
       </dl>
-      <div className="table-scroll">
+      <div className="table-scroll" tabIndex={0} role="region" aria-label="見込みごとの増える利益と時給">
         <table className="breakdown">
           <thead>
             <tr><th scope="col">見込み</th><th scope="col">増える利益</th><th scope="col">追加の時給</th></tr>

@@ -287,7 +287,7 @@ function Breakdown({ title, rows }: { title: string; rows: BreakdownRow[] }) {
   return (
     <section className="card stack">
       <h3>{title}</h3>
-      <div className="table-scroll">
+      <div className="table-scroll" tabIndex={0} role="region" aria-label={title}>
         <table className="breakdown">
           <thead>
             <tr>

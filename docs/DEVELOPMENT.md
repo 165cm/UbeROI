@@ -49,8 +49,28 @@ npm test
 npm run build
 ```
 
+### 通しのテスト（E2E：ブラウザーを自動で動かす）
+
+最初に1回だけ、テスト用のブラウザーを入れる：
+
+```
+npx playwright install chromium
+```
+
+そのあと：
+
+```
+npm run e2e
+```
+
+- アプリをビルドして `http://localhost:4173/UbeROI/` で動かし、`e2e/*.e2e.ts` を実行する（日本時間・幅390px）
+- `e2e/main-flow.e2e.ts`：初期設定→装備購入→出発→レンタル→帰宅精算→分析→記録訂正→バックアップ→復元（仕様 07 の最低限のE2E。金額は A01・A03）
+- `e2e/data-safety.e2e.ts`：再読み込み・オフライン（A21）、CSVの2回取り込み・不正行（A19）、デモと実績の分離（A24）、未対応の版の復元（A20）
+- `e2e/accessibility.e2e.ts`：自動チェック axe（明・暗の表示）、幅320/390/1280px、文字200%、キーボードだけの操作、誤りの読み上げ（A23）
+- 手元で `npm run preview` などを動かしたままだと、それを使い回して古いビルドで試験してしまう。先に止めておく
+
 - 計算ロジックのテストは `src/domain/domain.test.ts`。値は `docs/spec/fixtures/` と受入基準（`docs/spec/docs/07-acceptance.md`）から取る
-- PR を出すと GitHub Actions（`.github/workflows/ci.yml`）が同じ3つを自動で実行する
+- PR を出すと GitHub Actions（`.github/workflows/ci.yml`）が同じ3つと E2E を自動で実行する（E2E が失敗した時は、結果の画面を `playwright-report` として7日間残す）
 - 画面を変えた時は、スマホ縦（390×844）・320px幅・横・パソコンで確認する
 
 ## 手元で動かす

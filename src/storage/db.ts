@@ -2,6 +2,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type {
   AreaRecord,
+  OfferRecord,
   AssetRecord,
   EquipmentPlanRecord,
   RecurringExpenseRecord,
@@ -24,6 +25,7 @@ export class DeliKanDB extends Dexie {
   slots!: EntityTable<SlotRecord, 'id'>
   quests!: EntityTable<QuestRecord, 'id'>
   areas!: EntityTable<AreaRecord, 'id'>
+  offers!: EntityTable<OfferRecord, 'id'>
 
   constructor(name: string) {
     super(name)
@@ -41,6 +43,8 @@ export class DeliKanDB extends Dexie {
     this.version(3).stores({ quests: 'id, endsAt' })
     // 版5：エリアの混み具合を追加（版4は保存の形だけの変更で、表は増えていない）
     this.version(5).stores({ areas: 'id' })
+    // 版6：オファーの記録を追加
+    this.version(6).stores({ offers: 'id, at' })
   }
 }
 

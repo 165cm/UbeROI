@@ -46,7 +46,8 @@ export interface ContinuationResult {
 const SCENARIOS: Scenario[] = ['pessimistic', 'standard', 'optimistic']
 const JST_MS = 9 * 3_600_000
 
-function deadlineMs(departedAt: string, deadline: string): number {
+/** 帰宅締切（日本時間 HH:mm）の時刻：基準の時刻の後で最初に来るその時刻 */
+export function deadlineMs(departedAt: string, deadline: string): number {
   const startJstMs = parseInstant(departedAt) + JST_MS
   const d = new Date(startJstMs)
   const [h, m] = deadline.split(':').map(Number) as [number, number]

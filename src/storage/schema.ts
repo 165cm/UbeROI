@@ -1,13 +1,14 @@
 // 端末に保存するデータの形（docs/spec/docs/03-data-model.md を MVP 向けに簡略化）
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
-import type { BusynessTable, EquipmentCategory, Platform, Tariff } from '../domain'
+import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, Tariff } from '../domain'
 
 /**
  * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
  * 5：エリアの混み具合（areas）と、設定の主なエリア（primaryAreaId）を追加。
+ * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 interface Stamped {
   createdAt: string
@@ -28,6 +29,10 @@ export interface SettingsRecord extends Stamped {
   lastBackupAt?: string | null
   /** 見込みに使う主なエリア（areas の id。未設定なら null／未定義） */
   primaryAreaId?: string | null
+  /** オファー判定：オファーの分数に足す余裕（待ち時間など、分）。未定義は既定値 */
+  offerBufferMinutes?: number
+  /** オファー判定：km単価の下限（任意。null／未定義は使わない） */
+  offerMinKmYen?: number | null
 }
 
 export interface TariffRecord extends Stamped {
@@ -210,4 +215,25 @@ export interface AreaRecord extends Stamped {
   towns: string[]
   /** 配達アプリで確かめた日 YYYY-MM-DD（1か月たったら見直しを知らせる） */
   checkedAt: string
+}
+
+/**
+ * オファーの記録（受けた／断った）。地名と時刻から、届け先の有利さを学ぶのに使う（MVP後 4）。
+ * 住所は保存しない（地名まで）
+ */
+export interface OfferRecord extends Stamped {
+  id: string
+  /** オファーを見た時刻 */
+  at: string
+  payYen: number
+  minutes: number
+  km: number | null
+  /** 見つかった地名とエリア（なければ null） */
+  town: string | null
+  areaName: string | null
+  /** アプリの判定 */
+  decision: OfferDecision
+  hourlyYen: number | null
+  /** 利用者がどうしたか */
+  outcome: 'accepted' | 'declined'
 }

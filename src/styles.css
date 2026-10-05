@@ -839,13 +839,16 @@ details summary {
 }
 
 /* 畳んだ要約・一覧の補足は1行に収め、はみ出す分は … にする */
+/* 見出しは1行に収まる時は折り返さず、補足（灰色の文字）を先に縮める。文字を大きくした時は見出しも折り返す */
 details.fold > summary strong {
-  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 details.fold > summary .hint,
 .record-item .line > .grow {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -982,4 +985,18 @@ input.check {
   min-height: 24px;
   height: 24px;
   flex: none;
+}
+
+/* ボタンの見た目のリンク（別の画面を開く） */
+a.button-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
 }

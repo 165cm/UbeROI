@@ -1,7 +1,7 @@
 // 稼働中の「🏁 終了までの見通し」。終了予定の時刻を決めると、今日のペースとこの先の混み具合から、
 // 続ける／休憩して再開／今やめるの、この先の利益を比べる。止まっている時に確かめる前提で、走行中の操作は求めない
 import { useEffect, useMemo, useState } from 'react'
-import { deadlineMs, estimateRevenue, evaluateOutlook, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
+import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
 import { CardTitle, IntInput, Tip } from '../components/fields'
 import { formatYen } from '../format'
 import { loadPrefs } from './ContinueCard'
@@ -38,11 +38,15 @@ function jstClock(ms: number): string {
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
 }
 
-/** 終了予定の初期値：帰宅締切から家までと返却の時間を引いた時刻（15分単位で切り下げ）。締切がなければ2時間後の正時 */
-function defaultEnd(nowIso: string, homeDeadline: string | null, departedAt: string, minutesBefore: number): string {
+/**
+ * 終了予定の初期値：帰宅締切から家までの時間を引いた時刻（15分単位で切り下げ。今より前なら今）。
+ * 締切がなければ2時間後の正時
+ */
+function defaultEnd(nowIso: string, homeDeadline: string | null, departedAt: string, minutesToHome: number): string {
   const q = 15 * 60_000
-  if (homeDeadline) return jstClock(Math.floor((deadlineMs(departedAt, homeDeadline) - minutesBefore * 60_000) / q) * q)
-  return jstClock(Math.floor((Date.parse(nowIso) + 2 * 3_600_000) / 3_600_000) * 3_600_000)
+  const nowMs = Date.parse(nowIso)
+  if (homeDeadline) return jstClock(Math.max(nowMs, Math.floor((deadlineMs(departedAt, homeDeadline) - minutesToHome * 60_000) / q) * q))
+  return jstClock(Math.floor((nowMs + 2 * 3_600_000) / 3_600_000) * 3_600_000)
 }
 
 function formatLeft(minutes: number): string {
@@ -74,16 +78,15 @@ export function OutlookCard({
   homeDeadline: string | null
 }) {
   const prefs = loadPrefs()
-  const before = prefs.minutesToHome + (rental ? prefs.minutesToReturnBike : 0)
   const [stored, setStored] = useState<Stored>(
-    () => load(sessionId) ?? { sessionId, end: defaultEnd(now, homeDeadline, departedAt, before), manualRevenueYen: null },
+    () => load(sessionId) ?? { sessionId, end: defaultEnd(now, homeDeadline, departedAt, prefs.minutesToHome), manualRevenueYen: null },
   )
   useEffect(() => save(stored), [stored])
 
   // 1分ごとに見直す（毎秒の計算はしない）
   const minute = `${now.slice(0, 16)}:00.000Z`
   const result = useMemo(() => {
-    const endAt = new Date(deadlineMs(departedAt, stored.end)).toISOString()
+    const endAt = new Date(endTimeMs(minute, stored.end)).toISOString()
     return evaluateOutlook({
       now: minute,
       departedAt,

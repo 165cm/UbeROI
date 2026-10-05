@@ -1,6 +1,6 @@
 // 終了までの見通し：今日のペース・この先の混み具合から、続ける／休憩して再開／今やめるを比べる
 import { describe, expect, it } from 'vitest'
-import { HELLO_TOKYO_CITY, emptyBusyness, evaluateOutlook, typicalOfferGapMinutes, type OutlookInput, type OutlookOffer } from './index'
+import { HELLO_TOKYO_CITY, emptyBusyness, endTimeMs, evaluateOutlook, typicalOfferGapMinutes, type OutlookInput, type OutlookOffer } from './index'
 
 const jst = (s: string) => new Date(`${s}+09:00`).toISOString()
 /** 普段の見込み：1時間1,500円（区間の長さに比例） */
@@ -88,5 +88,23 @@ describe('続ける／休憩して再開／今やめる', () => {
     expect(late.reasons[0]).toContain('帰宅締切（21:00）を過ぎます')
     const short = evaluateOutlook({ ...base, endAt: jst('2026-10-05T19:45:00') })
     expect(short.options.map((o) => o.action)).toEqual(['continue', 'stop'])
+  })
+
+  it('締切の判定は家までの分だけを足す（返却の時間は家までの分に含まれる）', () => {
+    // 21:00 終了 + 家まで30分 = 21:30 ≦ 締切21:30。返却5分は足さない
+    const r = evaluateOutlook({ ...base, minutesToHome: 30, minutesToReturnBike: 5, homeDeadline: '21:30', deadlineMs: Date.parse(jst('2026-10-05T21:30:00')) })
+    expect(r.reasons.join()).not.toContain('帰宅締切')
+  })
+})
+
+describe('終了予定の時刻', () => {
+  it('今から前後12時間のうちのその時刻（出発前の時刻を翌日へ送らない・深夜は翌日）', () => {
+    const now = jst('2026-10-05T20:50:00')
+    expect(new Date(endTimeMs(now, '20:45')).toISOString()).toBe(jst('2026-10-05T20:45:00'))
+    expect(new Date(endTimeMs(now, '22:00')).toISOString()).toBe(jst('2026-10-05T22:00:00'))
+    expect(new Date(endTimeMs(now, '01:30')).toISOString()).toBe(jst('2026-10-06T01:30:00'))
+    expect(new Date(endTimeMs(jst('2026-10-06T00:30:00'), '23:45')).toISOString()).toBe(jst('2026-10-05T23:45:00'))
+    // 終了予定を過ぎていれば、残り0分で知らせる
+    expect(evaluateOutlook({ ...base, now, endAt: new Date(endTimeMs(now, '20:45')).toISOString() })).toMatchObject({ minutesLeft: 0, recommended: 'stop' })
   })
 })

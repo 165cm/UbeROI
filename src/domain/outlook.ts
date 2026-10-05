@@ -43,7 +43,9 @@ export interface OutlookInput {
   estimate: (startIso: string, endIso: string) => number
   busyness?: BusynessTable | null
   rental?: { tariff: Tariff; startAt: string } | null
+  /** やめてから返却するまでの分（レンタル代の計算だけに使う） */
   minutesToReturnBike?: number
+  /** やめてから家に着くまでの分（返却の時間を含む。締切の判定に使う） */
   minutesToHome?: number
   homeDeadline?: string | null
   /** 締切の日付を決める時刻（帰宅締切の計算と同じ） */
@@ -110,6 +112,20 @@ export function typicalOfferGapMinutes(offers: readonly OutlookOffer[]): number 
 }
 
 const JST_MS = 9 * 3_600_000
+
+/**
+ * 終了予定（日本時間 HH:mm）の時刻：今から前後12時間のうちのその時刻。
+ * 出発の前の時刻を入れても翌日へ送らず（過ぎていれば「終了予定の時刻になりました」）、深夜の時刻は翌日として扱う
+ */
+export function endTimeMs(nowIso: string, clock: string): number {
+  const nowMs = parseInstant(nowIso)
+  const [h, m] = clock.split(':').map(Number) as [number, number]
+  const d = new Date(nowMs + JST_MS)
+  let ms = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h, m) - JST_MS
+  if (ms <= nowMs - 12 * 3_600_000) ms += 86_400_000
+  else if (ms > nowMs + 12 * 3_600_000) ms -= 86_400_000
+  return ms
+}
 const hourOf = (ms: number) => new Date(ms + JST_MS).getUTCHours()
 
 export function evaluateOutlook(input: OutlookInput): OutlookResult {
@@ -208,7 +224,7 @@ export function evaluateOutlook(input: OutlookInput): OutlookResult {
   let recommended: OutlookAction = 'stop'
   if (minutesLeft <= 0) {
     reasons.push('終了予定の時刻になりました')
-  } else if (input.deadlineMs != null && endMs + (input.minutesToHome ?? 0) * 60_000 + returnMs > input.deadlineMs) {
+  } else if (input.deadlineMs != null && endMs + (input.minutesToHome ?? 0) * 60_000 > input.deadlineMs) {
     reasons.push(`終了予定のあと家に着くと、帰宅締切（${input.homeDeadline}）を過ぎます。終了予定を早めてください`)
   } else {
     const best = options.reduce((a, b) => (score(b) > score(a) ? b : a))

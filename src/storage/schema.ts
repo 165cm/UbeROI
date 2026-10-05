@@ -3,10 +3,10 @@
 import type { EquipmentCategory, Platform, Tariff } from '../domain'
 
 /**
- * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。
- * 古い版のバックアップは、足りない一覧を空として読み込む
+ * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
+ * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 interface Stamped {
   createdAt: string
@@ -75,6 +75,15 @@ export interface SessionRecord extends Stamped {
   rentals: RentalRecord[]
   directExpenses: DirectExpenseRecord[]
   note: string
+  /** CSVから取り込んだ記録の出どころ。手入力の記録は無い（または null） */
+  imported?: ImportedFrom | null
+}
+
+/** 取り込み元の行。同じ externalId で中身（fingerprint）が違う行は、黙って上書きせず競合として止める */
+export interface ImportedFrom {
+  source: 'csv-v1'
+  externalId: string
+  fingerprint: string
 }
 
 /** 毎月かかる固定費（通信・保険など）。開始月〜終了月の各月に計上する */

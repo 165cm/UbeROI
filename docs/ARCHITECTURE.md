@@ -7,7 +7,7 @@
    │
    ▼
 端末内の保存：IndexedDB（Dexie）
-   └ 書き出し：JSONバックアップ・CSV（手動）
+   └ 書き出し：JSONバックアップ・CSV（手動）／取り込み：独自CSV（v1）
 ```
 
 - 公開URL：https://165cm.github.io/UbeROI/ （GitHub Pages）
@@ -28,12 +28,14 @@
 | `src/domain/continuation.ts` | 続けるか帰るか：追加の利益・増えるレンタル代・追加の時給と GO/WAIT/STOP の判定 |
 | `src/domain/planning.ts` | 計画：売上の見込み（本人の実績／参考資料の推計）、候補枠の評価、週の最適な組み合わせ、装備の回収の目安 |
 | `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
+| `src/domain/csv.ts` | CSVの読み取り（引用符・改行・BOM） |
 | `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
 | `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え）、デモ表示の帯 |
 | `src/features/Home.tsx` | ホーム：出発・レンタル開始／返却・帰宅して精算、今月の成績 |
 | `src/features/Records.tsx` `SessionForm.tsx` | 記録の一覧・追加・編集・削除（取り消しつき）、計算明細のプレビュー |
 | `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・装備と投資・データ |
 | `src/features/DataSettings.tsx` | データ：デモ切り替え、バックアップの書き出し・復元、全削除 |
+| `src/features/CsvImport.tsx` | データ：CSVから記録を取り込む（見本・確認・まとめて確定） |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集 |
 | `src/features/ContinueCard.tsx` | ホームの「続ける？帰る？」カード（稼働中だけ表示） |
@@ -48,8 +50,9 @@
 | `src/storage/toDomain.ts` | 保存データ → 計算関数の入力（期間損益・投資回収） |
 | `src/storage/presets.ts` `demo.ts` | 料金・装備のプリセット（例）とデモの合成データ |
 | `src/storage/backup.ts` | バックアップの書き出し・検証・復元（全体置き換え）・全削除 |
+| `src/storage/csvImport.ts` | 独自CSV（v1）の検証・取込済みの判定（external_id と中身）・1回の書き込みでの保存 |
 | `src/storage/context.tsx` | 画面からデータベースを使う入口 |
-| `src/storage/storage.test.ts` `backup.test.ts` | 保存・検証・装備と実績の分離、バックアップと復元のテスト |
+| `src/storage/storage.test.ts` `backup.test.ts` `csvImport.test.ts` | 保存・検証・装備と実績の分離、バックアップと復元、CSVの取り込み（A19）のテスト |
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
 | `src/pwa.ts` | Service Worker の登録、新しい版の知らせ、オフライン判定、ホーム画面に追加、消えにくい保存の依頼 |
 | `src/features/InstallHelp.tsx` | 「アプリとして使う」の案内（設定 → データ） |
@@ -61,7 +64,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加）
+- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加）。版4で記録に取り込み元（`imported`）を追加
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`

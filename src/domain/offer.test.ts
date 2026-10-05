@@ -98,6 +98,7 @@ describe('設定コード（ショートカットの URL に入れる）', () =>
       minutesToHome: 15,
       areas: [{ name: '中野・荻窪エリア', towns: ['高円寺', '阿佐谷'], levels }],
       primaryAreaName: '中野・荻窪エリア',
+      learned: [{ town: '高円寺', band: 3, samples: 12, medianWaitMinutes: 4.5, level: 3 }],
       createdOn: '2026-10-05',
     }
     const code = encodeOfferConfig(config)
@@ -107,7 +108,7 @@ describe('設定コード（ショートカットの URL に入れる）', () =>
 
   it('主なエリアの入っていない前の設定コードも読める（主なエリアは null）', () => {
     const old = btoa(JSON.stringify({ v: 1, t: 1500, b: 5, k: null, r: 10.67, d: null, h: 15, a: [], o: '2026-10-05' }))
-    expect(decodeOfferConfig(old)).toMatchObject({ primaryAreaName: null, targetHourlyYen: 1500 })
+    expect(decodeOfferConfig(old)).toMatchObject({ primaryAreaName: null, learned: [], targetHourlyYen: 1500 })
   })
 
   it('壊れた・版の違う設定コードは null', () => {

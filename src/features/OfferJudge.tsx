@@ -4,20 +4,27 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   OFFER_DECISION_LABELS,
+  TIME_BANDS,
+  TOWN_LEARNING_MIN_SAMPLES,
   decodeOfferConfig,
   encodeOfferConfig,
   evaluateOffer,
   findTown,
+  learnTownRatings,
+  learnedRatingAt,
   parseOfferText,
   rentalYenPerMinute,
   type BusynessTable,
   type OfferConfig,
   type OfferDecision,
+  type TownRating,
 } from '../domain'
 import { CardTitle, Field, IntInput, Notice, Problems, TextInput, Tip, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
-import { DEFAULT_OFFER_BUFFER_MINUTES, listTariffs, newId, pickDefaultTariff, primaryArea, saveOffer, saveSettings } from '../storage/repo'
+import { DEFAULT_OFFER_BUFFER_MINUTES, importOffers, listTariffs, newId, pickDefaultTariff, primaryArea, saveOffer, saveSettings } from '../storage/repo'
+import { decodeOfferTransfer, encodeOfferTransfer } from '../storage/offerTransfer'
+import type { OfferRecord } from '../storage/schema'
 import { loadPrefs } from './ContinueCard'
 
 const APP_URL = 'https://165cm.github.io/UbeROI/'
@@ -64,6 +71,7 @@ export function OfferJudge() {
     areas: await db.areas.toArray(),
     tariffs: await listTariffs(db),
     active: (await db.sessions.toArray()).find((s) => s.status === 'active'),
+    offers: await db.offers.orderBy('at').toArray(),
   }), [db])
   const params = useMemo(hashParams, [])
   const fromCode = useMemo(() => {
@@ -95,6 +103,7 @@ export function OfferJudge() {
 
   // 判定に使う設定：設定コードがあればそれ（Safari で開いた時）、なければこの端末の設定
   const prefs = loadPrefs()
+  const ratings = learnTownRatings(data.offers)
   const defaultTariff = pickDefaultTariff(data.tariffs, data.settings)
   const local: OfferConfig = {
     targetHourlyYen: data.settings?.targetHourlyYen ?? null,
@@ -105,6 +114,7 @@ export function OfferJudge() {
     minutesToHome: prefs.minutesToHome,
     areas: data.areas.map((a) => ({ name: a.name, towns: a.towns, levels: a.levels })),
     primaryAreaName: primaryArea(data.areas, data.settings)?.name ?? null,
+    learned: ratings.filter((r) => r.samples >= TOWN_LEARNING_MIN_SAMPLES),
     createdOn: localToday(),
   }
   const config = fromCode ?? local
@@ -124,6 +134,8 @@ export function OfferJudge() {
 
   const now = new Date().toISOString()
   const ready = payYen !== null && minutes !== null && minutes > 0
+  // 地名×時間帯の評価（記録が10件以上たまったもの）。届け先を手で選んだ時は地名が分からないので使わない
+  const learned = !chosen && ready ? learnedRatingAt(config.learned, found?.town ?? null, Date.parse(now) + minutes * 60_000) : null
   let result: ReturnType<typeof evaluateOffer> | null = null
   let calcError: string[] = []
   if (ready) {
@@ -139,6 +151,7 @@ export function OfferJudge() {
         targetHourlyYen: config.targetHourlyYen,
         minKmYen: config.minKmYen,
         destinationBusyness: destination?.levels ?? null,
+        destinationLearned: learned,
         homeDeadline: config.homeDeadline,
         minutesToHome: config.minutesToHome,
         departedAt: fromCode ? null : (data.active?.departedAt ?? null),
@@ -228,7 +241,13 @@ export function OfferJudge() {
                 <div><dt>基準の時給</dt><dd>{result.thresholdYen === null ? '目標 未設定' : `${formatYen(result.thresholdYen)}/時`}</dd></div>
                 <div className="wide">
                   <dt>届け先（配達を終える頃）</dt>
-                  <dd>{destination ? `${destination.name}：${result.arrivalLevel === null ? '混み具合 未入力' : `段階${result.arrivalLevel} ${LEVEL_WORDS[result.arrivalLevel]}`}` : 'エリア未登録'}</dd>
+                  <dd>
+                    {result.arrivalSource === 'learned' && learned
+                      ? `${learned.town}（記録${learned.samples}件）：段階${learned.level} ${LEVEL_WORDS[learned.level]}`
+                      : destination
+                        ? `${destination.name}：${result.arrivalLevel === null ? '混み具合 未入力' : `段階${result.arrivalLevel} ${LEVEL_WORDS[result.arrivalLevel]}`}`
+                        : 'エリア未登録'}
+                  </dd>
                 </div>
               </dl>
               <div className="actions">
@@ -265,6 +284,10 @@ export function OfferJudge() {
           </label>
         </div>
       </details>
+
+      {fromCode ? <CarryHome offers={data.offers} /> : <ImportFromSafari />}
+
+      {!fromCode && <TownRatings ratings={ratings} />}
 
       {!fromCode && <OfferSettings bufferMinutes={local.bufferMinutes} minKmYen={local.minKmYen} />}
 
@@ -351,11 +374,134 @@ function ShortcutGuide({ url }: { url: string }) {
         </button>
         {copied && <p className="hint" role="status">{copied}</p>}
         <div className="line">
-          <span className="grow hint">ショートカットから開くと Safari で開くので、「受けた／断った」の記録はホーム画面のアプリとは別に残ります</span>
+          <span className="grow hint">ショートカットから開くと Safari で開くので、「受けた／断った」の記録はときどきアプリへ持ち帰ってください</span>
           <Tip label="記録の保存場所">
-            iPhone では、ショートカットから開いたページは Safari で開き、ホーム画面に追加したアプリとは保存場所が別になります。そのため判定に必要な設定は URL に入れて渡しています。記録を1か所にまとめたい時は、Safari で開いたデリ勘を使うか、ホーム画面のアプリでこの画面を開いて手で入力してください。
+            iPhone では、ショートカットから開いたページは Safari で開き、ホーム画面に追加したアプリとは保存場所が別になります。そのため判定に必要な設定は URL に入れて渡しています。Safari で記録した分は、Safari の判定画面の「📤 アプリへ持ち帰る」でコードをコピーし、ホーム画面のアプリのこの画面の「📥 Safari の記録を取り込む」に貼り付けると1か所にまとまります。
           </Tip>
         </div>
+      </div>
+    </details>
+  )
+}
+
+/** Safari（設定コードで開いた時）：ここにたまった記録を、ホーム画面のアプリへ持ち帰るコードにする */
+function CarryHome({ offers }: { offers: OfferRecord[] }) {
+  const [copied, setCopied] = useState<string | null>(null)
+  return (
+    <details className="card fold">
+      <summary>
+        <strong>📤 アプリへ持ち帰る</strong>
+        <span className="hint">ここの記録 {offers.length}件</span>
+      </summary>
+      <div className="stack">
+        <p className="hint">
+          ここ（Safari）で記録した「受けた／断った」は、ホーム画面のアプリとは別に残っています。コードをコピーして、ホーム画面のアプリの「🧾 オファー判定 → 📥 Safari の記録を取り込む」に貼り付けてください。何度貼っても同じ記録は重なりません。
+        </p>
+        <button
+          type="button"
+          disabled={offers.length === 0}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(encodeOfferTransfer(offers))
+              setCopied(`📋 ${offers.length}件分のコードをコピーしました`)
+            } catch {
+              setCopied('コピーできませんでした。もう一度押してください')
+            }
+          }}
+        >
+          📋 持ち帰りコードをコピー
+        </button>
+        {copied && <p className="hint" role="status">{copied}</p>}
+      </div>
+    </details>
+  )
+}
+
+/** ホーム画面のアプリ：Safari からの持ち帰りコードを貼り付けて、記録を足す */
+function ImportFromSafari() {
+  const { db } = useData()
+  const [code, setCode] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [problems, setProblems] = useState<string[]>([])
+  return (
+    <details className="card fold">
+      <summary>
+        <strong>📥 Safari の記録を取り込む</strong>
+        <span className="hint">持ち帰りコードを貼る</span>
+      </summary>
+      <div className="stack">
+        <label className="field">
+          <span>持ち帰りコード</span>
+          <textarea rows={3} value={code} onChange={(e) => setCode(e.target.value)} />
+        </label>
+        <Problems items={problems} />
+        {notice && <Notice message={notice} onClose={() => setNotice(null)} />}
+        <button
+          type="button"
+          className="primary"
+          disabled={!code.trim()}
+          onClick={async () => {
+            setNotice(null)
+            const offers = decodeOfferTransfer(code)
+            if (!offers) {
+              setProblems(['持ち帰りコードを読めません。Safari の「📤 アプリへ持ち帰る」でコピーし直して、全部を貼り付けてください'])
+              return
+            }
+            try {
+              const { added, skipped } = await importOffers(db, offers)
+              setProblems([])
+              setCode('')
+              setNotice(`📥 ${added}件を取り込みました${skipped ? `（${skipped}件は取り込み済み）` : ''}`)
+            } catch (e) {
+              setProblems(errorMessages(e))
+            }
+          }}
+        >
+          📥 取り込む
+        </button>
+      </div>
+    </details>
+  )
+}
+
+/** 記録から学習した地名×時間帯の評価の一覧 */
+function TownRatings({ ratings }: { ratings: TownRating[] }) {
+  const used = ratings.filter((r) => r.samples >= TOWN_LEARNING_MIN_SAMPLES).length
+  return (
+    <details className="card fold">
+      <summary>
+        <strong>🧠 地名の評価（記録から学習）</strong>
+        <span className="hint">{ratings.length === 0 ? 'まだ記録なし' : `判定に使用 ${used}／${ratings.length}`}</span>
+      </summary>
+      <div className="stack">
+        <div className="line">
+          <span className="grow hint">
+            受けた配達を終えてから次のオファーまでの待ち時間を、地名×時間帯ごとに集めます。{TOWN_LEARNING_MIN_SAMPLES}件以上たまると、手で登録した混み具合の代わりに判定に使います
+          </span>
+          <Tip label="地名の評価の決め方">
+            待ち時間の中央値が3分以下なら段階4（混む）、7分以下なら3、12分以下なら2、それより長ければ1（空き）。次のオファーまで60分より空いた時は、休憩・終了とみなして数えません。記録した「受けた／断った」だけを使うので、記録しなかったオファーは数えません。
+          </Tip>
+        </div>
+        {ratings.length > 0 && (
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="地名の評価の一覧">
+            <table>
+              <thead>
+                <tr><th>地名</th><th>時間帯</th><th>件数</th><th>待ち</th><th>段階</th></tr>
+              </thead>
+              <tbody>
+                {ratings.map((r) => (
+                  <tr key={`${r.town}-${r.band}`}>
+                    <td>{r.town}</td>
+                    <td>{TIME_BANDS[r.band]!.label}</td>
+                    <td className="num">{r.samples}{r.samples >= TOWN_LEARNING_MIN_SAMPLES ? ' ✓' : ''}</td>
+                    <td className="num">{r.medianWaitMinutes}分</td>
+                    <td className="num">{r.level}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </details>
   )

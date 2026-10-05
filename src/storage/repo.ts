@@ -555,7 +555,7 @@ export function primaryArea(areas: readonly AreaRecord[], settings: SettingsReco
 /** オファー判定の余裕（分）の既定値：お店での待ちや次の注文までの間の目安 */
 export const DEFAULT_OFFER_BUFFER_MINUTES = 5
 
-export async function saveOffer(db: DeliKanDB, offer: OfferRecord): Promise<void> {
+export function offerProblems(offer: OfferRecord): string[] {
   const problems: string[] = []
   try {
     parseInstant(offer.at, 'オファーの時刻')
@@ -565,6 +565,24 @@ export async function saveOffer(db: DeliKanDB, offer: OfferRecord): Promise<void
   if (!Number.isSafeInteger(offer.payYen) || offer.payYen < 0) problems.push('報酬は0以上の整数円にしてください')
   if (!Number.isSafeInteger(offer.minutes) || offer.minutes <= 0) problems.push('分は1以上の整数にしてください')
   if (offer.km !== null && (!Number.isFinite(offer.km) || offer.km < 0)) problems.push('km は0以上にしてください')
+  if (!['accept', 'maybe', 'decline'].includes(offer.decision) || !['accepted', 'declined'].includes(offer.outcome)) problems.push('判定・受けたか断ったかの値が正しくありません')
+  return problems
+}
+
+export async function saveOffer(db: DeliKanDB, offer: OfferRecord): Promise<void> {
+  const problems = offerProblems(offer)
   if (problems.length) throw new ValidationError(problems)
   await db.offers.put(stamp(offer))
+}
+
+/** 別の保存場所（iPhone の Safari）から持ち帰ったオファーの記録を足す。同じIDのものは取り込み済みとして飛ばす */
+export async function importOffers(db: DeliKanDB, offers: readonly OfferRecord[]): Promise<{ added: number; skipped: number }> {
+  const problems = offers.flatMap((o, i) => offerProblems(o).map((p) => `${i + 1}件目：${p}`))
+  if (problems.length) throw new ValidationError(problems)
+  return db.transaction('rw', db.offers, async () => {
+    const existing = new Set((await db.offers.bulkGet(offers.map((o) => o.id))).filter((o) => o).map((o) => o!.id))
+    const fresh = offers.filter((o, i) => !existing.has(o.id) && offers.findIndex((x) => x.id === o.id) === i)
+    await db.offers.bulkPut(fresh.map((o) => stamp({ ...o, revision: 0 })))
+    return { added: fresh.length, skipped: offers.length - fresh.length }
+  })
 }

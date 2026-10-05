@@ -4,6 +4,7 @@ import { divide, parseInstant } from './core'
 import { BUSINESS_DAY_START_HOUR, busyLevelAt, type BusynessTable } from './busyness'
 import { deadlineMs } from './continuation'
 import { feeFor, type Tariff } from './tariff'
+import { TIME_BANDS, type TownRating } from './townLearning'
 
 export type OfferDecision = 'accept' | 'maybe' | 'decline'
 
@@ -84,6 +85,8 @@ export interface OfferInput {
   minKmYen?: number | null
   /** 届け先エリアの混み具合の表（見つかった時だけ） */
   destinationBusyness?: BusynessTable | null
+  /** 届け先の地名×時間帯の、記録から学習した評価（10件以上の時だけ。あれば混み具合の表より優先） */
+  destinationLearned?: TownRating | null
   /** 帰宅締切（日本時間 HH:mm）と、配達を終えてから家までの分。締切を過ぎるなら断る */
   homeDeadline?: string | null
   minutesToHome?: number
@@ -103,6 +106,8 @@ export interface OfferResult {
   perKmYen: number | null
   /** 届け先エリアの、配達を終える時刻の段階（不明なら null） */
   arrivalLevel: number | null
+  /** 段階をどこから出したか（記録から学習／手で登録した混み具合） */
+  arrivalSource: 'learned' | 'busyness' | null
   /** 必要な時給（目標 × 届け先の倍率）。目標が未設定なら null */
   thresholdYen: number | null
 }
@@ -145,7 +150,10 @@ export function evaluateOffer(input: OfferInput): OfferResult {
   const perMinuteYen = perMinute === null ? null : Math.round(perMinute * 10) / 10
   const perKm = input.km ? divide(input.payYen, input.km) : null
   const perKmYen = perKm === null ? null : Math.round(perKm)
-  const arrivalLevel = input.destinationBusyness ? busyLevelAt(input.destinationBusyness, doneMs) : null
+  const learned = input.destinationLearned ?? null
+  const tableLevel = input.destinationBusyness ? busyLevelAt(input.destinationBusyness, doneMs) : null
+  const arrivalLevel = learned ? learned.level : tableLevel
+  const arrivalSource = learned ? 'learned' : tableLevel !== null ? 'busyness' : null
   const reasons: string[] = []
 
   const result = (decision: OfferDecision, thresholdYen: number | null): OfferResult => ({
@@ -157,6 +165,7 @@ export function evaluateOffer(input: OfferInput): OfferResult {
     perMinuteYen,
     perKmYen,
     arrivalLevel,
+    arrivalSource,
     thresholdYen,
   })
 
@@ -178,10 +187,13 @@ export function evaluateOffer(input: OfferInput): OfferResult {
   const factor = arrivalLevel === null ? 1 : OFFER_LEVEL_THRESHOLD_FACTORS[arrivalLevel]!
   const thresholdYen = Math.round(input.targetHourlyYen * factor)
   if (arrivalLevel !== null) {
+    const change = arrivalLevel >= 3 ? `基準を${Math.round((1 - factor) * 100)}%下げました` : `基準を${Math.round((factor - 1) * 100)}%上げました`
     reasons.push(
-      arrivalLevel >= 3
-        ? `届け先は配達を終える頃に混む（段階${arrivalLevel}）ので、基準を${Math.round((1 - factor) * 100)}%下げました`
-        : `届け先は配達を終える頃に空いている（段階${arrivalLevel}）ので、基準を${Math.round((factor - 1) * 100)}%上げました`,
+      learned
+        ? `届け先「${learned.town}」の${TIME_BANDS[learned.band]!.label}は、これまで${learned.samples}件で次のオファーまで中央値${learned.medianWaitMinutes}分（段階${arrivalLevel}）なので、${change}`
+        : arrivalLevel >= 3
+          ? `届け先は配達を終える頃に混む（段階${arrivalLevel}）ので、${change}`
+          : `届け先は配達を終える頃に空いている（段階${arrivalLevel}）ので、${change}`,
     )
   }
   let decision: OfferDecision = hourlyYen >= thresholdYen ? 'accept' : hourlyYen >= thresholdYen * OFFER_MAYBE_RATIO ? 'maybe' : 'decline'

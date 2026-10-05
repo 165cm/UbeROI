@@ -30,6 +30,7 @@
 | `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
 | `src/domain/csv.ts` | CSVの読み取り（引用符・改行・BOM） |
 | `src/domain/busyness.ts` | エリアの混み具合：曜日×時間の表（4時区切り）、段階の倍率、区間の積算 |
+| `src/domain/busyScreenshot.ts` | 配達アプリの「時間帯ごとの傾向」のスクリーンショットから、24本の棒の段階と曜日（画面下の点）を読む。画像は端末の中で読むだけ |
 | `src/domain/offer.ts` `offerConfig.ts` | オファー判定：画面の文字の読み取り、実質時給と判定、設定コード（URL に入れる設定。学習した地名の評価も入れる） |
 | `src/domain/townLearning.ts` | 地名の評価の自動学習：受けた配達を終えてから次のオファーまでの待ちを、地名×時間帯ごとに集める |
 | `src/storage/offerTransfer.ts` | 持ち帰りコード：Safari に残ったオファーの記録をホーム画面のアプリへ移す |
@@ -45,7 +46,7 @@
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集 |
 | `src/features/CashChange.tsx` | ホームの「💴 お釣り」 |
 | `src/features/OfferJudge.tsx` | オファー判定（`#offer`。ショートカットから text=・cfg= を受け取る）、判定の基準、ショートカットの作り方、持ち帰り／取り込み、地名の評価の一覧 |
-| `src/features/AreaSettings.tsx` | 設定・エリア：混み具合の表（マスを押して段階を切り替え）・地名・主なエリア |
+| `src/features/AreaSettings.tsx` | 設定・エリア：混み具合の表（マスを押して段階を切り替え・スクショから読み取り）・地名・主なエリア |
 | `src/features/ContinueCard.tsx` | ホームの「続ける？帰る？」カード（稼働中だけ表示） |
 | `src/features/Plan.tsx` | 計画：週の候補枠の入力・おすすめの組み合わせ・3つの見込みの比較・装備の回収の目安 |
 | `src/features/Analytics.tsx` | 分析：期間の成績、売上→利益の内訳、回収の推移、買うか借りるか、所得の目安、内訳表、CSV |

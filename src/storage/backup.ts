@@ -281,8 +281,9 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 古い版（1：候補枠なし、2：クエストなし）のバックアップは、足りない一覧を空として読み込む
-  if ((raw.schema_version === 1 || raw.schema_version === 2) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし）のバックアップは、足りない一覧を空として読み込む。
+  // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
+  if ((raw.schema_version === 1 || raw.schema_version === 2 || raw.schema_version === 3) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
     raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }

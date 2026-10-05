@@ -3,10 +3,10 @@
 import type { EquipmentCategory, Platform, Tariff } from '../domain'
 
 /**
- * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。
- * 古い版のバックアップは、足りない一覧を空として読み込む
+ * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
+ * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 interface Stamped {
   createdAt: string

@@ -64,7 +64,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加）
+- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加）。版4で記録に取り込み元（`imported`）を追加
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`

@@ -200,6 +200,19 @@ describe('データの版の移行', () => {
   })
 })
 
+describe('データの版の移行（版3）', () => {
+  it('版3（取り込み元がない頃）のバックアップも、手入力の記録として復元できる', async () => {
+    await seed()
+    const v3 = { ...(await createBackup(db, 'real')), schema_version: 3 }
+    const parsed = parseBackup(JSON.stringify(v3))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.backup.schema_version).toBe(4)
+    await restoreBackup(db, parsed.backup)
+    expect((await db.sessions.toArray()).every((s) => !s.imported)).toBe(true)
+  })
+})
+
 describe('最終バックアップ日時', () => {
   it('書き出した日時を設定に残し、バックアップにも含めて復元できる', async () => {
     await markBackedUp(db, '2026-10-05T01:00:00Z')

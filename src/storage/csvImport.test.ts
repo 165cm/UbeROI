@@ -148,6 +148,10 @@ describe('CSVの取り込み', () => {
     const ok = previewCsvImport(`${header}\n${row('f-1', '2026-10-01')},demaecan,x\n${row('f-2', '2026-10-02')},,y\n`, [], 'rocketnow')
     expect(ok.rows.map((r) => r.session.platform)).toEqual(['demaecan', 'rocketnow'])
     expect(ok.warnings).toEqual([expect.stringContaining('memo')])
+    // platform 列のサービスを変えた行は、取込済みでも中身が違うとして止める
+    const imported = ok.rows.map((r) => ({ ...r.session, createdAt: 'x', updatedAt: 'x', revision: 1 }))
+    const changed = previewCsvImport(`${header}\n${row('f-1', '2026-10-01')},uber,x\n${row('f-2', '2026-10-02')},,y\n`, imported, 'uber')
+    expect(changed.counts).toEqual({ new: 0, duplicate: 1, conflict: 1 })
     const bad = previewCsvImport(`${header}\n${row('f-3', '2026-10-01')},ubereats,x\n`, [], 'uber')
     expect(bad.problems).toEqual([expect.stringMatching(/^2行目：platform/)])
   })

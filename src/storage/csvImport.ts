@@ -52,14 +52,18 @@ export interface ImportPreview {
 
 const NAT = /^\d+$/
 
-/** 取込済みかどうかを比べるための、行の中身の正規形（日時はUTCにそろえる。サービスの選択は含めない） */
-function fingerprint(values: Record<Column, string>): string {
-  return CSV_V1_COLUMNS.map((c) => {
+/**
+ * 取込済みかどうかを比べるための、行の中身の正規形（日時はUTC、数は「007」→「7」にそろえる）。
+ * CSVの platform 列で指定したサービスは中身に含める。画面で選んだサービス（列が空・無い時）は含めない
+ */
+function fingerprint(values: Record<Column, string>, filePlatform: Platform | null): string {
+  const cells = CSV_V1_COLUMNS.map((c) => {
     if (c === 'departed_at' || c === 'returned_at') return new Date(parseInstant(values[c])).toISOString()
     if (c === 'external_id' || c === 'area_label') return values[c]
     // 数は「0180」と「180」を同じにそろえる
     return String(Number(values[c]))
-  }).join('\u001f')
+  })
+  return [...cells, filePlatform ?? ''].join('\u001f')
 }
 
 /**
@@ -154,10 +158,10 @@ export function previewCsvImport(text: string, existing: readonly SessionRecord[
         rowProblems.push('オンライン分数が、出発から帰宅までの時間より長くなっています')
       }
     }
-    let platform = defaultPlatform
+    let filePlatform: Platform | null = null
     if (index.has('platform') && get('platform') !== '') {
       const p = get('platform') as Platform
-      if (PLATFORMS.includes(p)) platform = p
+      if (PLATFORMS.includes(p)) filePlatform = p
       else rowProblems.push(`platform は ${PLATFORMS.join(' / ')} のどれかにしてください（今：「${get('platform')}」）`)
     }
     if (rowProblems.length) {
@@ -172,13 +176,13 @@ export function previewCsvImport(text: string, existing: readonly SessionRecord[
     }
     seenInFile.set(v.external_id, line)
 
-    const fp = fingerprint(v)
+    const fp = fingerprint(v, filePlatform)
     const session: SessionRecord = {
       id: newId(),
       status: 'completed',
       departedAt: new Date(departedMs!).toISOString(),
       returnedAt: new Date(returnedMs!).toISOString(),
-      platform,
+      platform: filePlatform ?? defaultPlatform,
       weather: null,
       areaLabel: v.area_label,
       revenueMode: 'summary',

@@ -174,7 +174,7 @@ describe('データの版の移行', () => {
   it('版1（計画の候補枠がない頃）のバックアップも、候補枠を空として復元できる', async () => {
     await seed()
     const v2 = await createBackup(db, 'real')
-    const { slots: _omit, ...v1Datasets } = v2.datasets
+    const { slots: _omit, quests: _omit2, ...v1Datasets } = v2.datasets
     const v1 = { ...v2, schema_version: 1, datasets: v1Datasets }
     const parsed = parseBackup(JSON.stringify(v1))
     expect(parsed.ok).toBe(true)

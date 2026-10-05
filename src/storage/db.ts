@@ -6,6 +6,7 @@ import type {
   RecurringExpenseRecord,
   SessionRecord,
   SettingsRecord,
+  QuestRecord,
   SlotRecord,
   TariffRecord,
 } from './schema'
@@ -20,6 +21,7 @@ export class DeliKanDB extends Dexie {
   plans!: EntityTable<EquipmentPlanRecord, 'id'>
   assets!: EntityTable<AssetRecord, 'id'>
   slots!: EntityTable<SlotRecord, 'id'>
+  quests!: EntityTable<QuestRecord, 'id'>
 
   constructor(name: string) {
     super(name)
@@ -33,6 +35,8 @@ export class DeliKanDB extends Dexie {
     })
     // 版2：計画の候補枠を追加（既存のデータはそのまま）
     this.version(2).stores({ slots: 'id, startsAt' })
+    // 版3：クエストを追加
+    this.version(3).stores({ quests: 'id, endsAt' })
   }
 }
 

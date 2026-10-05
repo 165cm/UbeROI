@@ -8,6 +8,7 @@ import type {
   PlanItemRecord,
   RecurringExpenseRecord,
   SessionRecord,
+  QuestRecord,
   SettingsRecord,
   SlotRecord,
   TariffRecord,
@@ -459,4 +460,24 @@ export async function saveSlot(db: DeliKanDB, slot: SlotRecord): Promise<void> {
   if (!Number.isSafeInteger(slot.expenseYen) || slot.expenseYen < 0) problems.push('経費は0以上の整数円で入力してください')
   if (problems.length) throw new ValidationError(problems)
   await db.slots.put(stamp(slot))
+}
+
+// ---- クエスト ----
+
+export async function saveQuest(db: DeliKanDB, quest: QuestRecord): Promise<void> {
+  const problems: string[] = []
+  if (!quest.label.trim()) problems.push('名前を入力してください')
+  try {
+    if (parseInstant(quest.endsAt, '終了') <= parseInstant(quest.startsAt, '開始')) problems.push('終了は開始より後にしてください')
+  } catch (e) {
+    problems.push((e as Error).message)
+  }
+  if (quest.tiers.length === 0) problems.push('段階を1つ以上入れてください')
+  const counts = quest.tiers.map((t) => t.count)
+  if (quest.tiers.some((t) => !Number.isSafeInteger(t.count) || t.count < 1)) problems.push('件数は1以上の整数で入力してください')
+  if (quest.tiers.some((t) => !Number.isSafeInteger(t.rewardYen) || t.rewardYen < 0)) problems.push('報酬は0以上の整数円で入力してください')
+  if (new Set(counts).size !== counts.length) problems.push('同じ件数の段階が2つあります')
+  if (!Number.isSafeInteger(quest.manualOffset)) problems.push('件数の調整は整数で入力してください')
+  if (problems.length) throw new ValidationError(problems)
+  await db.quests.put(stamp({ ...quest, tiers: [...quest.tiers].sort((a, b) => a.count - b.count) }))
 }

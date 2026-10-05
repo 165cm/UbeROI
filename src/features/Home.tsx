@@ -1,13 +1,14 @@
 // ホーム（S02）：今日の状態・稼働中のレンタル料金・今月の成績
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { calculateRental, localDate } from '../domain'
-import { Problems, errorMessages } from '../components/fields'
+import { breakAdvice, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
+import { IntInput, Problems, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
 import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, startRental } from '../storage/repo'
 import { pastSessionsFor, periodFor } from '../storage/toDomain'
 import { ContinueCard } from './ContinueCard'
+import { QuestCard } from './QuestCard'
 
 function useNow(active: boolean): string {
   const [now, setNow] = useState(() => new Date().toISOString())
@@ -136,6 +137,8 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         />
       )}
 
+      <QuestCard now={now} />
+
       {needsBackup && (
         <section className="card notice-card" role="status">
           <strong>💾 バックアップしましょう</strong>
@@ -195,9 +198,43 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
         </div>
       </dl>
       <p className="hint">{rental.tariffName}。返却時はアプリの請求額が正です。</p>
+      {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       <button type="button" onClick={onReturn}>
         🅿️ 返却した
       </button>
     </div>
+  )
+}
+
+/** 休憩する前に返したほうが安いか（今までの料金はどちらでも同じなので比べない） */
+function BreakAdviceBox({ tariff, startAt, now }: { tariff: Tariff; startAt: string; now: string }) {
+  const [breakMinutes, setBreakMinutes] = useState(60)
+  const [afterMinutes, setAfterMinutes] = useState(120)
+  const advice = breakAdvice(tariff, startAt, now, breakMinutes, afterMinutes)
+  const idle = timeSlotOf(now) === 'idle'
+  return (
+    <details open={idle}>
+      <summary>☕ 休憩するなら{idle ? '（昼下がりは注文が少ない時間です）' : ''}</summary>
+      <div className="stack">
+        <div className="row">
+          <IntInput label="休憩" unit="分" value={breakMinutes} onChange={(v) => setBreakMinutes(v ?? 0)} />
+          <IntInput label="休憩のあと乗る" unit="分" value={afterMinutes} onChange={(v) => setAfterMinutes(v ?? 0)} />
+        </div>
+        {advice.savingYen === null ? (
+          <p className="hint">料金の見積の対象外のため比べられません。</p>
+        ) : (
+          <p role="status">
+            {advice.savingYen > 0
+              ? `🅿️ 今返して休憩のあと借り直すと ${formatYen(advice.savingYen)} 安くなります`
+              : advice.savingYen < 0
+                ? `🚲 借りたまま休憩したほうが ${formatYen(-advice.savingYen)} 安くなります（上限料金に近いため）`
+                : '返しても借りたままでも同じ料金です'}
+          </p>
+        )}
+        <p className="hint">
+          借りたまま：{formatYen(advice.keepYen)}／返して借り直す：{formatYen(advice.returnAndReRentYen)}（今からかかる分）。返す場所・借りる場所に空きがあるかは公式アプリで確かめてください。
+        </p>
+      </div>
+    </details>
   )
 }

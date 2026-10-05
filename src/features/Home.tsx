@@ -7,6 +7,7 @@ import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
 import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, startRental } from '../storage/repo'
 import { pastSessionsFor, periodFor } from '../storage/toDomain'
+import { CashChange } from './CashChange'
 import { ContinueCard } from './ContinueCard'
 import { QuestCard } from './QuestCard'
 
@@ -133,6 +134,8 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           homeDeadline={data.settings?.homeDeadline ?? null}
         />
       )}
+
+      <CashChange />
 
       <QuestCard now={now} />
 

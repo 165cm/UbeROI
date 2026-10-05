@@ -893,3 +893,21 @@ details.fold > summary .hint,
 a {
   color: var(--accent);
 }
+
+/* お釣り：選んだ受け取り額を色で示す（文字の「→」と金額でも分かる） */
+.cash-row[aria-pressed='true'] {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.card .list > li > .list-item {
+  border: none;
+  border-radius: 0;
+  padding: 4px 0;
+}
+
+.card .list > li > .list-item.cash-row[aria-pressed='true'] {
+  background: var(--bg);
+  border-radius: 8px;
+  padding-inline: 6px;
+}

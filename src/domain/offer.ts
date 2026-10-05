@@ -1,7 +1,7 @@
 // オファー判定（docs/spec/docs/02-profitability.md §5.2）。報酬・分・km から、レンタル代を引いた実質時給と
 // 届け先エリアの混み具合・帰宅締切で ✅受ける／⚠️微妙／❌断る を出す。承諾の操作はしない（利用者が自分で押す）
 import { divide, parseInstant } from './core'
-import { busyLevelAt, type BusynessTable } from './busyness'
+import { BUSINESS_DAY_START_HOUR, busyLevelAt, type BusynessTable } from './busyness'
 import { deadlineMs } from './continuation'
 import { feeFor, type Tariff } from './tariff'
 
@@ -87,7 +87,7 @@ export interface OfferInput {
   /** 帰宅締切（日本時間 HH:mm）と、配達を終えてから家までの分。締切を過ぎるなら断る */
   homeDeadline?: string | null
   minutesToHome?: number
-  /** 締切の日付を決める基準（稼働の出発時刻。なければ今） */
+  /** 締切の日付を決める基準（稼働の出発時刻。なければ、その日の配達の1日の始まり＝日本時間4時） */
   departedAt?: string | null
 }
 
@@ -105,6 +105,19 @@ export interface OfferResult {
   arrivalLevel: number | null
   /** 必要な時給（目標 × 届け先の倍率）。目標が未設定なら null */
   thresholdYen: number | null
+}
+
+const JST_MS = 9 * 3_600_000
+
+/**
+ * その時刻が入る「配達の1日」の始まり（日本時間4時）。出発時刻が分からない時の締切の基準にする。
+ * 例：22:10 は同じ日の4時から、翌1:00 は前の日の4時から（締切22:00は同じ日の22:00になり、翌日に送らない）
+ */
+export function businessDayStart(iso: string): string {
+  const jst = parseInstant(iso) + JST_MS
+  const shifted = jst - BUSINESS_DAY_START_HOUR * 3_600_000
+  const dayStart = Math.floor(shifted / 86_400_000) * 86_400_000 + BUSINESS_DAY_START_HOUR * 3_600_000
+  return new Date(dayStart - JST_MS).toISOString()
 }
 
 const steps: OfferDecision[] = ['decline', 'maybe', 'accept']
@@ -149,7 +162,7 @@ export function evaluateOffer(input: OfferInput): OfferResult {
 
   if (input.homeDeadline) {
     const home = doneMs + (input.minutesToHome ?? 0) * 60_000
-    if (home > deadlineMs(input.departedAt ?? input.at, input.homeDeadline)) {
+    if (home > deadlineMs(input.departedAt ?? businessDayStart(input.at), input.homeDeadline)) {
       reasons.push(`配達後に家へ帰ると帰宅締切（${input.homeDeadline}）を過ぎます`)
       return result('decline', null)
     }

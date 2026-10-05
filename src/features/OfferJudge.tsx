@@ -1,6 +1,6 @@
 // オファー判定（#offer）。iPhone のショートカットが読み取った画面の文字（text=）と設定コード（cfg=）を受け取り、
 // 実質時給・届け先の混み具合・帰宅締切で ✅/⚠️/❌ を出す。承諾は利用者が配達アプリで自分で押す
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   OFFER_DECISION_LABELS,
@@ -83,6 +83,14 @@ export function OfferJudge() {
   const [notice, setNotice] = useState<string | null>(null)
   const [problems, setProblems] = useState<string[]>([])
 
+  // 読み取った文字（届け先の住所を含むことがある）は、取り込んだらすぐ URL から消し、ブラウザーの履歴に残さない
+  useEffect(() => {
+    const cfg = params.get('cfg')
+    if (params.has('text') || params.has('pay') || params.has('min') || params.has('km')) {
+      history.replaceState(null, '', `${location.pathname}${location.search}#offer${cfg ? `?cfg=${cfg}` : ''}`)
+    }
+  }, [params])
+
   if (!data) return <p className="loading">読み込み中…</p>
 
   // 判定に使う設定：設定コードがあればそれ（Safari で開いた時）、なければこの端末の設定
@@ -96,6 +104,7 @@ export function OfferJudge() {
     homeDeadline: data.settings?.homeDeadline ?? null,
     minutesToHome: prefs.minutesToHome,
     areas: data.areas.map((a) => ({ name: a.name, towns: a.towns, levels: a.levels })),
+    primaryAreaName: primaryArea(data.areas, data.settings)?.name ?? null,
     createdOn: localToday(),
   }
   const config = fromCode ?? local
@@ -104,8 +113,7 @@ export function OfferJudge() {
   // 届け先のエリア：選んだもの → 文字の中の地名 → 主なエリア（届け先不明）
   const found = findTown(text, config.areas)
   const chosen = config.areas.find((a) => a.name === areaChoice)
-  const primaryName = primaryArea(data.areas, data.settings)?.name
-  const fallback = config.areas.find((a) => a.name === primaryName) ?? (config.areas.length === 1 ? config.areas[0] : undefined)
+  const fallback = config.areas.find((a) => a.name === config.primaryAreaName) ?? (config.areas.length === 1 ? config.areas[0] : undefined)
   const destination: { name: string; levels: BusynessTable; how: string } | null = chosen
     ? { name: chosen.name, levels: chosen.levels, how: '選んだエリア' }
     : found

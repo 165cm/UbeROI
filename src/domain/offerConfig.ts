@@ -10,6 +10,8 @@ export interface OfferConfig {
   homeDeadline: string | null
   minutesToHome: number
   areas: { name: string; towns: string[]; levels: BusynessTable }[]
+  /** 届け先の地名が見つからない時に使う主なエリアの名前（なければ null） */
+  primaryAreaName: string | null
   /** 設定コードを作った日（古くなったら作り直しを促す） */
   createdOn: string
 }
@@ -41,6 +43,7 @@ export function encodeOfferConfig(c: OfferConfig): string {
       d: c.homeDeadline,
       h: c.minutesToHome,
       a: c.areas.map((a) => ({ n: a.name, t: a.towns, l: a.levels.map((day) => day.join('')).join('') })),
+      p: c.primaryAreaName,
       o: c.createdOn,
     }),
   )
@@ -62,6 +65,8 @@ export function decodeOfferConfig(code: string): OfferConfig | null {
   if (o.v !== VERSION || !isNullableInt(o.t) || !isNum(o.b) || !isNullableInt(o.k) || !isNum(o.r) || !isNum(o.h)) return null
   if (!(o.d === null || (typeof o.d === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(o.d)))) return null
   if (typeof o.o !== 'string' || !Array.isArray(o.a)) return null
+  // 主なエリア（この項目より前に作った設定コードには無い）
+  if (!(o.p === undefined || o.p === null || typeof o.p === 'string')) return null
   const areas: OfferConfig['areas'] = []
   for (const a of o.a as unknown[]) {
     if (typeof a !== 'object' || a === null) return null
@@ -79,6 +84,7 @@ export function decodeOfferConfig(code: string): OfferConfig | null {
     homeDeadline: o.d as string | null,
     minutesToHome: o.h as number,
     areas,
+    primaryAreaName: (o.p as string | null | undefined) ?? null,
     createdOn: o.o,
   }
 }

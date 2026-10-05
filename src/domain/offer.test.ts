@@ -1,6 +1,6 @@
 // オファー判定：画面の文字の読み取り、実質時給、届け先の混み具合、帰宅締切
 import { describe, expect, it } from 'vitest'
-import { HELLO_TOKYO_CITY, decodeOfferConfig, emptyBusyness, encodeOfferConfig, evaluateOffer, findTown, parseOfferText, rentalYenPerMinute } from './index'
+import { HELLO_TOKYO_CITY, businessDayStart, decodeOfferConfig, emptyBusyness, encodeOfferConfig, evaluateOffer, findTown, parseOfferText, rentalYenPerMinute } from './index'
 
 describe('画面の文字から報酬・分・km を取り出す', () => {
   it('Uber のオファー画面の文字（例）を読む', () => {
@@ -67,6 +67,16 @@ describe('オファーの判定', () => {
     expect(evaluateOffer({ ...base, targetHourlyYen: null })).toMatchObject({ decision: 'maybe', thresholdYen: null })
   })
 
+  it('出発時刻が分からない時は、その日の配達の始まり（4時）を基準に締切を決める（22時過ぎの22時締切を翌日に送らない）', () => {
+    expect(businessDayStart('2026-10-05T13:10:00Z')).toBe('2026-10-04T19:00:00.000Z') // 22:10 → 当日4時
+    expect(businessDayStart('2026-10-05T16:00:00Z')).toBe('2026-10-04T19:00:00.000Z') // 翌1:00 → 前日4時
+    // 22:10 JST、締切22:00 → 断る（設定コードで開いた時と同じく departedAt なし）
+    const r = evaluateOffer({ ...base, at: '2026-10-05T13:10:00Z', homeDeadline: '22:00', minutesToHome: 10 })
+    expect(r.decision).toBe('decline')
+    // 締切が翌1:30なら、21:00 JST 開始で24分＋10分は間に合う
+    expect(evaluateOffer({ ...base, homeDeadline: '01:30', minutesToHome: 10 }).decision).not.toBe('decline')
+  })
+
   it('km単価が下限を下回るなら1段下げる', () => {
     const r = evaluateOffer({ ...base, targetHourlyYen: 1000, minKmYen: 300 })
     expect(r.decision).toBe('maybe')
@@ -87,11 +97,17 @@ describe('設定コード（ショートカットの URL に入れる）', () =>
       homeDeadline: '22:30',
       minutesToHome: 15,
       areas: [{ name: '中野・荻窪エリア', towns: ['高円寺', '阿佐谷'], levels }],
+      primaryAreaName: '中野・荻窪エリア',
       createdOn: '2026-10-05',
     }
     const code = encodeOfferConfig(config)
     expect(code).toMatch(/^[A-Za-z0-9_-]+$/)
     expect(decodeOfferConfig(code)).toEqual(config)
+  })
+
+  it('主なエリアの入っていない前の設定コードも読める（主なエリアは null）', () => {
+    const old = btoa(JSON.stringify({ v: 1, t: 1500, b: 5, k: null, r: 10.67, d: null, h: 15, a: [], o: '2026-10-05' }))
+    expect(decodeOfferConfig(old)).toMatchObject({ primaryAreaName: null, targetHourlyYen: 1500 })
   })
 
   it('壊れた・版の違う設定コードは null', () => {

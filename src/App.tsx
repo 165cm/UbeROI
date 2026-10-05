@@ -39,9 +39,14 @@ function Shell() {
   const { updateReady } = usePwa()
   const [tab, setTab] = useState<TabId>(currentTab)
   const [editId, setEditId] = useState<string | null>(null)
+  // 「#offer?text=…」を続けて開いた時に、前の値のまま判定しないよう、ハッシュ全体で画面を作り直す
+  const [hash, setHash] = useState(() => window.location.hash)
 
   useEffect(() => {
-    const onHash = () => setTab(currentTab())
+    const onHash = () => {
+      setTab(currentTab())
+      setHash(window.location.hash)
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -87,7 +92,7 @@ function Shell() {
         {tab === 'analytics' && <Analytics />}
         {tab === 'settings' && <Settings />}
         {tab === 'plan' && <Plan />}
-        {tab === 'offer' && <OfferJudge />}
+        {tab === 'offer' && <OfferJudge key={hash} />}
       </main>
       <nav className="tabbar" aria-label="メニュー">
         {TABS.map((t) => (

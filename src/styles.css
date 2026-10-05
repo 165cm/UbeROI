@@ -987,8 +987,9 @@ input.check {
   flex: none;
 }
 
-/* ボタンの見た目のリンク（別の画面を開く） */
-a.button-link {
+/* ボタンの見た目のリンク（別の画面を開く）・ファイルを選ぶボタン */
+a.button-link,
+label.button-link {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -999,4 +1000,36 @@ a.button-link {
   background: var(--surface);
   color: var(--text);
   text-decoration: none;
+}
+
+/* ファイルを選ぶボタン（中の input は見えないので、選ばれている時は枠で示す） */
+label.button-link {
+  margin-top: 0;
+  cursor: pointer;
+}
+label.button-link:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* スクショから読み取った24本の棒（確かめる用の小さなグラフ） */
+.mini-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 32px;
+  min-width: 0;
+}
+.mini-bars > span {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--chart);
+  border-radius: 1px;
+}
+.mini-bars > .level-1 { opacity: 0.35; }
+.mini-bars > .level-2 { opacity: 0.55; }
+.mini-bars > .level-3 { opacity: 0.8; }
+select.shot-day {
+  width: auto;
+  flex: none;
 }

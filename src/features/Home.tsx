@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { breakAdvice, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
-import { IntInput, Problems, errorMessages } from '../components/fields'
+import { CardTitle, IntInput, Problems, Tip, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
 import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, startRental } from '../storage/repo'
@@ -67,7 +67,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
   const status = active
     ? '🟢 稼働中'
     : awaitingSettle > 0
-      ? '📝 精算待ちの記録あり（記録から確定）'
+      ? '📝 精算待ちあり（記録から確定）'
       : todayResult.rows.length > 0
         ? '✅ 今日の記録あり'
         : drafts.length > 0
@@ -91,23 +91,20 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
             {openRental ? (
               <RentalStatus rental={openRental} now={now} onReturn={() => void run(() => endRental(db, active.id, openRental.id))} />
             ) : (
-              <div className="stack">
-                {data.tariffs.length > 0 && (
-                  <label className="field">
-                    <span>料金</span>
-                    <select value={selectedTariff?.id ?? ''} onChange={(e) => setTariffId(e.target.value)}>
+              selectedTariff && (
+                <div className="line">
+                  {data.tariffs.length > 1 && (
+                    <select className="grow" aria-label="料金" value={selectedTariff.id} onChange={(e) => setTariffId(e.target.value)}>
                       {data.tariffs.map((t) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
-                  </label>
-                )}
-                {selectedTariff && (
-                  <button type="button" onClick={() => void run(() => startRental(db, active.id, selectedTariff))}>
+                  )}
+                  <button type="button" className={data.tariffs.length > 1 ? 'grow' : undefined} onClick={() => void run(() => startRental(db, active.id, selectedTariff))}>
                     🚲 レンタル開始
                   </button>
-                )}
-              </div>
+                </div>
+              )
             )}
             <button
               type="button"
@@ -140,19 +137,22 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
       <QuestCard now={now} />
 
       {needsBackup && (
-        <section className="card notice-card" role="status">
-          <strong>💾 バックアップしましょう</strong>
-          <p className="hint">
-            {data.settings?.lastBackupAt
-              ? `最後のバックアップから${backupAgeDays}日たちました。`
-              : 'まだ一度もバックアップしていません。'}
-            記録はこの端末の中だけにあります。「設定 → データ」から書き出してください。
-          </p>
+        <section className="card notice-card line" role="status">
+          <span className="grow">
+            <strong>💾 バックアップしましょう</strong>
+            <span className="hint">
+              {' '}
+              {data.settings?.lastBackupAt ? `前回から${backupAgeDays}日` : '未実施'}・設定 → データ
+            </span>
+          </span>
+          <Tip label="バックアップ">記録はこの端末の中だけにあります。機種変更やブラウザーのデータ削除で消えるので、「設定 → データ」から書き出して、クラウドやパソコンにも残してください。</Tip>
         </section>
       )}
 
       <section className="card" aria-labelledby="month-title">
-        <h3 id="month-title">📅 今月（{today.slice(5, 7).replace(/^0/, '')}月）の成績（税引前）</h3>
+        <CardTitle id="month-title" tip="税引前。営業純時給＝営業純利益 ÷ 出発〜帰宅の時間。投資配賦後は、装備・車両の購入額を月ごとに配った額も引いた時給です。">
+          📅 {today.slice(5, 7).replace(/^0/, '')}月の成績
+        </CardTitle>
         {month.rows.length === 0 && month.totals.costYen === 0 ? (
           <p className="hint">まだ確定した記録がありません。</p>
         ) : (
@@ -162,7 +162,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
               <dt>営業純時給</dt>
               <dd>
                 {month.totals.hourlyYen === null ? '算出不可' : `${formatYen(month.totals.hourlyYen)}/時`}
-                {target !== null && month.totals.hourlyYen !== null && (month.totals.hourlyYen >= target ? '（🎯 目標以上）' : '（目標未満）')}
+                {target !== null && month.totals.hourlyYen !== null && (month.totals.hourlyYen >= target ? ' 🎯' : '（目標未満）')}
               </dd>
             </div>
             <div><dt>投資配賦後の時給</dt><dd>{month.totals.afterAllocationHourlyYen === null ? '算出不可' : `${formatYen(month.totals.afterAllocationHourlyYen)}/時`}</dd></div>
@@ -170,7 +170,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           </dl>
         )}
         {month.excludedDrafts + month.excludedInvalid > 0 && (
-          <p className="hint">下書き・要確認の {month.excludedDrafts + month.excludedInvalid} 件は集計に入っていません。</p>
+          <p className="hint">⚠️ 下書き・要確認の{month.excludedDrafts + month.excludedInvalid}件は集計外</p>
         )}
       </section>
     </div>
@@ -181,10 +181,14 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
   const r = calculateRental({ tariff: rental.tariff, startAt: rental.startAt }, now)
   return (
     <div className="subcard stack">
+      <div className="line">
+        <span className="grow hint">🚲 {rental.tariffName}</span>
+        <Tip label="レンタル料金">料金設定からの見積です。返却した時は、シェアサイクルのアプリに出る請求額が正しい額です。</Tip>
+      </div>
       <dl className="stats">
         <div><dt>レンタル経過</dt><dd>{formatDuration(r.elapsedSeconds ?? 0)}</dd></div>
         <div><dt>見積料金</dt><dd className="big">{formatYen(r.amountYen)}</dd></div>
-        <div>
+        <div className="wide">
           <dt>次の課金</dt>
           <dd>
             {r.nextIncreaseAt
@@ -197,7 +201,6 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
           </dd>
         </div>
       </dl>
-      <p className="hint">{rental.tariffName}。返却時はアプリの請求額が正です。</p>
       {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       <button type="button" onClick={onReturn}>
         🅿️ 返却した
@@ -214,7 +217,7 @@ function BreakAdviceBox({ tariff, startAt, now }: { tariff: Tariff; startAt: str
   const idle = timeSlotOf(now) === 'idle'
   return (
     <details open={idle}>
-      <summary>☕ 休憩するなら{idle ? '（昼下がりは注文が少ない時間です）' : ''}</summary>
+      <summary>☕ 休憩するなら{idle ? '（昼下がりは注文が少なめ）' : ''}</summary>
       <div className="stack">
         <div className="row">
           <IntInput label="休憩" unit="分" value={breakMinutes} onChange={(v) => setBreakMinutes(v ?? 0)} />
@@ -231,9 +234,10 @@ function BreakAdviceBox({ tariff, startAt, now }: { tariff: Tariff; startAt: str
                 : '返しても借りたままでも同じ料金です'}
           </p>
         )}
-        <p className="hint">
-          借りたまま：{formatYen(advice.keepYen)}／返して借り直す：{formatYen(advice.returnAndReRentYen)}（今からかかる分）。返す場所・借りる場所に空きがあるかは公式アプリで確かめてください。
-        </p>
+        <div className="line">
+          <span className="grow hint">今から：借りたまま {formatYen(advice.keepYen)}／返して借り直す {formatYen(advice.returnAndReRentYen)}</span>
+          <Tip label="休憩前の返却">今からかかる料金の比較です（今までの料金はどちらでも同じなので比べません）。返す場所・借りる場所に空きがあるかは公式アプリで確かめてください。</Tip>
+        </div>
       </div>
     </details>
   )

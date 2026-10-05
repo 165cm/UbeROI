@@ -111,10 +111,10 @@ test('キーボードだけで、出発 → 帰宅 → 精算の入力 → 保�
   await page.keyboard.press('Enter')
 
   // 精算画面：入力欄へ Tab で進み、文字で入れる。誤り（小数）は説明が出て、欄が「誤り」と伝わる
-  await expect(page.getByLabel('基本報酬（配送料の合計）')).toBeVisible()
-  await page.getByLabel('基本報酬（配送料の合計）').focus()
+  await expect(page.getByLabel('基本報酬（配送料の合計）', { exact: true })).toBeVisible()
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).focus()
   await page.keyboard.type('12.5')
-  const base = page.getByLabel('基本報酬（配送料の合計）')
+  const base = page.getByLabel('基本報酬（配送料の合計）', { exact: true })
   await expect(base).toHaveAttribute('aria-invalid', 'true')
   await expect(base).toHaveAccessibleDescription(/0以上の整数/)
   await page.keyboard.press('Control+A')
@@ -128,9 +128,9 @@ test('キーボードだけで、出発 → 帰宅 → 精算の入力 → 保�
 test('保存できない時の説明は、読み上げソフトに伝わる（role=alert）', async ({ page }) => {
   await page.goto('#records')
   await page.getByRole('button', { name: /過去の稼働をまとめて入力/ }).click()
-  await page.getByLabel('出発（自宅を出た時刻）').fill('2026-10-05T18:00')
-  await page.getByLabel('帰宅').fill('2026-10-05T17:00')
-  await page.getByLabel('基本報酬（配送料の合計）').fill('1000')
+  await page.getByLabel('出発（自宅を出た時刻）', { exact: true }).fill('2026-10-05T18:00')
+  await page.getByLabel('帰宅', { exact: true }).fill('2026-10-05T17:00')
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('1000')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.getByRole('alert').filter({ hasText: '帰宅は出発より後にしてください' })).toBeVisible()
   // 保存されていない（一覧に戻らず、記録も増えない）

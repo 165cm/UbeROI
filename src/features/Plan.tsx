@@ -19,7 +19,7 @@ import {
   type SlotInput,
   type SlotIssue,
 } from '../domain'
-import { IntInput, Notice, Problems, TextInput, errorMessages, localToday } from '../components/fields'
+import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
@@ -146,29 +146,36 @@ export function Plan() {
         <strong>{Number(week.from.slice(5, 7))}/{Number(week.from.slice(8))}（月）〜{Number(week.to.slice(5, 7))}/{Number(week.to.slice(8))}（日）</strong>
         <button type="button" aria-label="次の週" onClick={() => setAnchor(shiftPeriod('week', anchor, 1))}>›</button>
       </div>
-      <p className="hint">働けそうな時間（家を出てから帰るまで）を候補として入れると、週の時間内で見込み利益が一番大きくなる組み合わせを選びます。見込みは予測で、実績ではありません。</p>
-
-      <p className="hint">どの見込みで選ぶか：</p>
-      <div className="segmented" role="tablist" aria-label="どの見込みで選ぶか">
-        {SCENARIOS.map((s) => (
-          <button key={s} type="button" role="tab" aria-selected={scenario === s} onClick={() => setScenario(s)}>
-            {SCENARIO_LABELS[s]}
-          </button>
-        ))}
+      <div className="line">
+        <div className="segmented grow" role="tablist" aria-label="どの見込みで選ぶか">
+          {SCENARIOS.map((s) => (
+            <button key={s} type="button" role="tab" aria-selected={scenario === s} onClick={() => setScenario(s)}>
+              {SCENARIO_LABELS[s]}
+            </button>
+          ))}
+        </div>
+        <Tip label="計画">
+          働けそうな時間（家を出てから帰るまで）を候補として入れると、週の時間内で見込み利益が一番大きくなる組み合わせを選びます。上のボタンは、どの見込みで選ぶかです。悲観・楽観は標準の売上の0.8倍・1.2倍の目安で、統計的な範囲ではありません。見込みは予測で、実績ではありません。
+        </Tip>
       </div>
 
       {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
 
       <section className="card stack" aria-labelledby="plan-title">
-        <h3 id="plan-title">🗓️ この週のおすすめ（{SCENARIO_LABELS[scenario]}で選択）</h3>
+        <CardTitle
+          id="plan-title"
+          tip="営業利益は、選んだ枠の見込み利益から毎月の固定費（週の日数で按分）を引いた額です。レンタル代は料金設定からの見積です。"
+        >
+          🗓️ この週のおすすめ（{SCENARIO_LABELS[scenario]}）
+        </CardTitle>
         <dl className="stats">
-          <div><dt>選んだ枠</dt><dd>{plan.chosenIds.length}件 / 候補{inWeek.length}件</dd></div>
+          <div><dt>選んだ枠</dt><dd>{plan.chosenIds.length} / 候補{inWeek.length}件</dd></div>
           <div>
             <dt>拘束時間</dt>
-            <dd>{plan.totalHours.toFixed(1)}時間{budget !== null ? ` / 上限${(budget / 60).toFixed(1)}時間` : '（週の上限：未設定）'}</dd>
+            <dd>{plan.totalHours.toFixed(1)}h{budget !== null ? ` / 上限${(budget / 60).toFixed(1)}h` : '（上限 未設定）'}</dd>
           </div>
           {plan.fixedCostYen > 0 && (
-            <div><dt>毎月の固定費（この週の日数分）</dt><dd>−{formatYen(plan.fixedCostYen)}</dd></div>
+            <div><dt>固定費（週の日数分）</dt><dd>−{formatYen(plan.fixedCostYen)}</dd></div>
           )}
         </dl>
         <div className="table-scroll" tabIndex={0} role="region" aria-label="見込みごとの営業利益と時給">
@@ -187,57 +194,63 @@ export function Plan() {
             </tbody>
           </table>
         </div>
-        <p className="hint">営業利益は、選んだ枠の見込み利益から毎月の固定費（週の日数で按分）を引いた額です。悲観・楽観は標準の売上の 0.8倍・1.2倍の目安で、統計的な範囲ではありません。レンタル代は料金設定からの見積です。</p>
       </section>
 
-      <button type="button" className="primary" onClick={() => setEditing(newSlot())}>＋ 候補枠を追加</button>
-
-      {inWeek.length === 0 ? (
-        <section className="card muted">
-          <h3>候補枠がありません</h3>
-          <p>「＋ 候補枠を追加」で、この週に働けそうな時間を入れてください。</p>
-        </section>
-      ) : (
-        <ul className="list">
-          {inWeek.map((s) => {
-            const input = inputs.find((i) => i.id === s.id)!
-            const ev = evaluateSlot(input, scenario)
-            const reason = skippedReason.get(s.id)
-            return (
-              <li key={s.id} className="card stack">
-                <div className="row-between">
-                  <strong>{slotLabel(s)}</strong>
-                  <span className="tag">{chosen.has(s.id) ? '✅ おすすめ' : `— ${reason ? ISSUE_LABELS[reason] : ''}`}</span>
-                </div>
-                <p className="hint">
-                  {ev.hours.toFixed(1)}時間{s.areaLabel && `・${s.areaLabel}`}・レンタル {input.rentalYen === null ? '算出不可（入力してください）' : formatYen(input.rentalYen)}
-                </p>
-                <p>
-                  {SCENARIO_LABELS[scenario]}の見込み利益 <strong>{formatYen(ev.profitYen[scenario])}</strong>（{perHour(ev.hourlyYen[scenario])}）
-                </p>
-                {s.estimateNote && <p className="hint">見込みの出どころ：{s.estimateNote}</p>}
-                <div className="row">
-                  <button type="button" onClick={() => setEditing(s)}>✏️ 編集</button>
+      <section className="card">
+        <CardTitle
+          right={
+            <button type="button" className="icon" aria-label="候補枠を追加" onClick={() => setEditing(newSlot())}>
+              ＋
+            </button>
+          }
+        >
+          ⏱️ 候補枠
+        </CardTitle>
+        {inWeek.length === 0 ? (
+          <p className="hint">この週に働けそうな時間を＋で入れてください</p>
+        ) : (
+          <ul className="list">
+            {inWeek.map((s) => {
+              const input = inputs.find((i) => i.id === s.id)!
+              const ev = evaluateSlot(input, scenario)
+              const reason = skippedReason.get(s.id)
+              return (
+                <li key={s.id} className="line slot-item">
+                  <span className="grow">
+                    <span className="line">
+                      <strong className="grow">{slotLabel(s)}</strong>
+                      <span className="num">{formatYen(ev.profitYen[scenario])}</span>
+                    </span>
+                    <span className="line hint">
+                      <span className="grow">
+                        {chosen.has(s.id) ? '✅ おすすめ' : `— ${reason ? ISSUE_LABELS[reason] : ''}`}・{ev.hours.toFixed(1)}h{s.areaLabel && `・${s.areaLabel}`}・🚲{input.rentalYen === null ? '算出不可' : formatYen(input.rentalYen)}
+                      </span>
+                      <span>{perHour(ev.hourlyYen[scenario])}</span>
+                    </span>
+                  </span>
+                  <button type="button" className="icon" aria-label={`${slotLabel(s)}を編集`} onClick={() => setEditing(s)}>✏️</button>
                   <button
                     type="button"
-                    className="danger-text"
+                    className="icon danger-text"
+                    aria-label={`${slotLabel(s)}を削除`}
                     onClick={async () => {
                       await db.slots.delete(s.id)
                       setNotice({ message: '🗑️ 候補枠を削除しました', undo: () => void db.slots.put(s).then(() => setNotice(null)) })
                     }}
                   >
-                    削除
+                    🗑️
                   </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="card stack" aria-labelledby="eq-title">
-        <h3 id="eq-title">🎒 装備を買った場合の回収の目安</h3>
-        <p className="hint">この週の{SCENARIO_LABELS[scenario]}の見込み利益で、各プランの「これから必要な現金」を割った目安です。装備を良くしても売上が増えるとは仮定していません。</p>
+        <CardTitle id="eq-title" tip={`この週の${SCENARIO_LABELS[scenario]}の見込み利益で、各プランの「これから必要な現金」を割った目安です。装備を良くしても売上が増えるとは仮定していません。`}>
+          🎒 装備を買った場合の回収の目安
+        </CardTitle>
         <dl className="stats">
           {(['beginner', 'intermediate', 'advanced'] as const).map((tier) => {
             const p = data.plans.find((x) => x.tier === tier)
@@ -254,10 +267,10 @@ export function Plan() {
             const weeks = weeksToRecover(cash, plan.profitYen[scenario])
             return (
               <div key={tier}>
-                <dt>{EQUIPMENT_PRESETS[tier].name}（必要な現金 {formatYen(cash)}{unpriced ? `・価格未設定${unpriced}品目` : ''}）</dt>
+                <dt>{EQUIPMENT_PRESETS[tier].name}（{formatYen(cash)}{unpriced ? `・未設定${unpriced}` : ''}）</dt>
                 <dd>
                   {cash === 0 && unpriced > 0
-                    ? '価格を入れると計算します'
+                    ? '価格未設定'
                     : weeks === null
                       ? '回収見込みなし'
                       : weeks === 0
@@ -340,12 +353,12 @@ function SlotForm({
     >
       <button type="button" className="link back" onClick={onCancel}>← 計画へ戻る</button>
       <section className="card stack">
-        <h3>⏱️ 候補の時間（家を出てから帰るまで）</h3>
-        <label className="field">
-          <span>日付</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
+        <CardTitle tip="家を出てから帰るまでの時間です。帰宅が出発より前の時刻なら、翌日の帰宅とみなします。">⏱️ 候補の時間</CardTitle>
         <div className="row">
+          <label className="field">
+            <span>日付</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
           <label className="field">
             <span>出発</span>
             <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
@@ -359,25 +372,29 @@ function SlotForm({
       </section>
 
       <section className="card stack">
-        <h3>💴 売上の見込み</h3>
+        <CardTitle tip="自動の見込みは、自分の確定記録が10回以上あれば自分の平均、それまでは参考資料の推計（時間帯・月の目安）を使います。あとから手で直せます。">💴 売上の見込み</CardTitle>
         <button type="button" onClick={fillEstimate} disabled={!times}>🔮 見込みを自動で入れる</button>
-        <p className="hint">自分の確定記録が10回以上あれば自分の平均、それまでは参考資料の推計（時間帯・月の目安）を使います。あとから手で直せます。</p>
-        {SCENARIOS.map((s) => (
-          <IntInput key={s} label={`${SCENARIO_LABELS[s]}の売上`} unit="円" value={slot.revenueYen[s]} onChange={(v) => setRevenue(s, v)} />
-        ))}
+        <div className="row">
+          {SCENARIOS.map((s) => (
+            <IntInput key={s} label={`${SCENARIO_LABELS[s]}の売上`} unit="円" value={slot.revenueYen[s]} onChange={(v) => setRevenue(s, v)} />
+          ))}
+        </div>
         {slot.estimateNote && <p className="hint">出どころ：{slot.estimateNote}</p>}
       </section>
 
       <section className="card stack">
         <h3>🧾 費用の見込み</h3>
+        <div className="row">
         <IntInput
-          label="レンタル代（空欄なら料金から見積）"
+          label="レンタル代"
+          tip="空欄なら料金設定から見積もります"
           unit="円"
           value={slot.rentalOverrideYen}
           onChange={(v) => setSlot({ ...slot, rentalOverrideYen: v })}
           hint={tariff ? `見積：${autoRental === null ? '算出不可（入力してください）' : formatYen(autoRental)}（${tariff.name}）` : undefined}
         />
         <IntInput label="その他の経費" unit="円" value={slot.expenseYen} onChange={(v) => setSlot({ ...slot, expenseYen: v ?? 0 })} />
+        </div>
       </section>
 
       <Problems items={problems} />

@@ -18,7 +18,7 @@ import {
   type PeriodKind,
 } from '../domain'
 import { BarList, LineChart } from '../components/charts'
-import { localToday } from '../components/fields'
+import { CardTitle, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { PLATFORM_LABELS, WEATHER_LABELS, type SessionRecord } from '../storage/schema'
@@ -153,38 +153,52 @@ export function Analytics() {
           <button type="button" aria-label="次の期間" onClick={() => setAnchor(shiftPeriod(kind, anchor, 1))}>›</button>
         </div>
       )}
-      <p className="hint">税引前・確定した記録のみ。日をまたいだ稼働は帰宅日（日本時間）に入れます。</p>
 
       {!validRange || !result ? (
         <p className="problems" role="alert">開始日と終了日を選び、開始日は終了日以前にしてください。</p>
       ) : (
         <>
           <section className="card" aria-labelledby="kpi-title">
-            <h3 id="kpi-title">📊 {periodLabel(kind, range.from, range.to)}の成績</h3>
+            <CardTitle
+              id="kpi-title"
+              tip={
+                <>
+                  税引前・確定した記録のみ。日をまたいだ稼働は帰宅日（日本時間）に入れます。時給＝期間の利益合計 ÷ 出発〜帰宅の時間合計（1回ごとの時給の平均ではありません）。
+                  {result.period.partialMonthsNote.length > 0 && `稼働のない月（${result.period.partialMonthsNote.join('、')}）の固定費・配賦は、月単位で見ると入ります。`}
+                </>
+              }
+            >
+              📊 {periodLabel(kind, range.from, range.to)}の成績
+            </CardTitle>
             <dl className="stats">
               <div><dt>営業純利益</dt><dd className="big">{formatYen(result.period.totals.operatingProfitYen)}</dd></div>
               <div>
                 <dt>営業純時給</dt>
                 <dd>
                   {perHour(result.period.totals.hourlyYen)}
-                  {target !== null && result.period.totals.hourlyYen !== null && (result.period.totals.hourlyYen >= target ? '（🎯 目標以上）' : '（目標未満）')}
+                  {target !== null && result.period.totals.hourlyYen !== null && (result.period.totals.hourlyYen >= target ? ' 🎯目標以上' : '（目標未満）')}
                 </dd>
               </div>
               <div><dt>投資配賦後の時給</dt><dd>{perHour(result.period.totals.afterAllocationHourlyYen)}</dd></div>
-              <div><dt>稼働</dt><dd>{result.rows.length}回・{result.period.totals.hours.toFixed(1)}時間・{result.period.totals.completedCount}件</dd></div>
+              <div><dt>稼働</dt><dd>{result.rows.length}回・{result.period.totals.hours.toFixed(1)}h・{result.period.totals.completedCount}件</dd></div>
               <div><dt>1件あたり営業利益</dt><dd>{formatYen(divide(result.period.totals.operatingProfitYen, result.period.totals.completedCount))}</dd></div>
             </dl>
-            <p className="hint">時給＝期間の利益合計 ÷ 出発〜帰宅の時間合計（1回ごとの時給の平均ではありません）。</p>
             {result.period.excludedDrafts + result.period.excludedInvalid > 0 && (
-              <p className="hint">⚠️ 下書き {result.period.excludedDrafts}件・要確認 {result.period.excludedInvalid}件は集計に入っていません。</p>
-            )}
-            {result.period.partialMonthsNote.length > 0 && (
-              <p className="hint">稼働のない月（{result.period.partialMonthsNote.join('、')}）の固定費・配賦は、月単位で見ると入ります。</p>
+              <p className="hint">⚠️ 下書き{result.period.excludedDrafts}件・要確認{result.period.excludedInvalid}件は集計外</p>
             )}
           </section>
 
           <section className="card" aria-labelledby="wf-title">
-            <h3 id="wf-title">🧮 売上から利益まで</h3>
+            <CardTitle
+              id="wf-title"
+              right={
+                <button type="button" className="icon" aria-label="この期間の記録をCSVで書き出す" onClick={exportCsv} disabled={result.rows.length === 0}>
+                  ⬇️
+                </button>
+              }
+            >
+              🧮 売上から利益まで
+            </CardTitle>
             <BarList
               title="売上から投資配賦後の利益までの内訳"
               rows={[
@@ -197,13 +211,14 @@ export function Analytics() {
                 { label: '＝ 配賦後利益', value: result.period.totals.afterAllocationProfitYen, emphasis: true, display: formatYen(result.period.totals.afterAllocationProfitYen) },
               ]}
             />
-            <button type="button" onClick={exportCsv} disabled={result.rows.length === 0}>⬇️ この期間の記録をCSVで書き出す</button>
           </section>
 
           <section className="card stack" aria-labelledby="rec-title">
-            <h3 id="rec-title">💰 投資の回収（現金ベース・全期間）</h3>
+            <CardTitle id="rec-title" tip="現金ベース・全期間。購入した装備・車両の代金を、確定した記録の営業純利益でどれだけ取り戻したかです。回収までの見込みは、直近90日のペースでの予測です。">
+              💰 投資の回収
+            </CardTitle>
             {result.recovery.investedYen === 0 ? (
-              <p className="hint">購入した装備・車両がまだありません。「設定 → 装備と投資」で「購入した」を登録すると、回収の推移が出ます。</p>
+              <p className="hint">まだありません（設定 → 装備と投資 で「購入した」を登録）</p>
             ) : (
               <>
                 <dl className="stats">
@@ -213,7 +228,7 @@ export function Analytics() {
                   <div><dt>投資ROI</dt><dd>{result.recovery.roi === null ? '算出不可' : `${(result.recovery.roi * 100).toFixed(1)}%`}</dd></div>
                   <RecoveryForecast remainingYen={result.recovery.remainingYen} data={data} today={today} />
                 </dl>
-                <h4 className="chart-title">投資込みの累積キャッシュ（0円を超えたら回収済み）</h4>
+                <h4 className="chart-title">投資込みの累積キャッシュ（0円超で回収済み）</h4>
                 <LineChart
                   title="投資込みの累積キャッシュの推移"
                   describe={`最新の累積キャッシュは${formatYen(result.series[result.series.length - 1]?.netCashYen ?? 0)}です`}
@@ -225,9 +240,18 @@ export function Analytics() {
           </section>
 
           <section className="card stack" aria-labelledby="buy-title">
-            <h3 id="buy-title">🚲 買うか借りるか（推計）</h3>
+            <CardTitle
+              id="buy-title"
+              tip={
+                vehicle
+                  ? '今のペースでレンタル代がなくなった場合の推計です。充電・修理・バッテリー交換などの維持費（月1,500〜3,000円程度が目安）は含めていません。'
+                  : '「設定 → 装備と投資」で「🚲 車両」を追加して価格を入れると、購入の元が取れるまでの月数を出します。'
+              }
+            >
+              🚲 買うか借りるか（推計）
+            </CardTitle>
             <dl className="stats">
-              <div><dt>直近90日のレンタル代（月あたり）</dt><dd>{formatYen(result.monthlyRentalYen)}</dd></div>
+              <div><dt>レンタル代（直近90日・月あたり）</dt><dd>{formatYen(result.monthlyRentalYen)}</dd></div>
               {vehicle && (
                 <div>
                   <dt>{vehicle.label}（{formatYen((vehicle.unitYen ?? 0) * vehicle.quantity)}）の元が取れるまで</dt>
@@ -239,20 +263,19 @@ export function Analytics() {
                 </div>
               )}
             </dl>
-            <p className="hint">
-              {vehicle
-                ? '今のペースでレンタル代がなくなった場合の推計です。充電・修理・バッテリー交換などの維持費（月1,500〜3,000円程度が目安）は含めていません。'
-                : '「設定 → 装備と投資」で「🚲 車両を追加」し価格を入れると、購入の元が取れるまでの月数を出します。'}
-            </p>
           </section>
 
           <section className="card stack" aria-labelledby="tax-title">
-            <h3 id="tax-title">🧾 今年の所得の目安（{today.slice(0, 4)}年1月1日〜今日）</h3>
+            <CardTitle
+              id="tax-title"
+              tip={`${today.slice(0, 4)}年1月1日〜今日の営業純利益（売上 − 経費）です。確定申告の目安は、給与所得のある副業の一般的な目安です。税務上の経費や減価償却とは一致しません。個別の判断は税務署・税理士に確認してください。`}
+            >
+              🧾 今年の所得の目安
+            </CardTitle>
             <dl className="stats">
-              <div><dt>営業純利益（売上 − 経費）</dt><dd className="big">{formatYen(result.yearProfit)}</dd></div>
+              <div><dt>営業純利益（今年）</dt><dd className="big">{formatYen(result.yearProfit)}</dd></div>
               <div><dt>副業の確定申告の目安</dt><dd>{formatYen(SIDE_JOB_FILING_LINE_YEN)}{result.yearProfit > SIDE_JOB_FILING_LINE_YEN ? '（⚠️ 超えています）' : ''}</dd></div>
             </dl>
-            <p className="hint">給与所得のある副業の一般的な目安です。税務上の経費や減価償却とは一致しません。個別の判断は税務署・税理士に確認してください。</p>
           </section>
 
           <Breakdown title="🌦️ 天気別" rows={result.byWeather} />
@@ -276,7 +299,7 @@ function RecoveryForecast({ remainingYen, data, today }: { remainingYen: number;
   return (
     <div>
       <dt>回収までの見込み（予測）</dt>
-      <dd>{months === null ? '回収見込みなし（直近の利益が0以下）' : `約${months.toFixed(1)}か月（直近90日のペース）`}</dd>
+      <dd>{months === null ? '見込みなし（直近の利益が0以下）' : `約${months.toFixed(1)}か月`}</dd>
     </div>
   )
 }
@@ -285,8 +308,8 @@ function Breakdown({ title, rows }: { title: string; rows: BreakdownRow[] }) {
   if (rows.length === 0) return null
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.hourlyYen ?? 0)))
   return (
-    <section className="card stack">
-      <h3>{title}</h3>
+    <section className="card">
+      <CardTitle tip={rows.some((r) => r.lowSample) ? '「参考」は10回未満で、偶然の差が大きい区分です。比較の根拠にしすぎないでください。' : undefined}>{title}</CardTitle>
       <div className="table-scroll" tabIndex={0} role="region" aria-label={title}>
         <table className="breakdown">
           <thead>
@@ -312,7 +335,6 @@ function Breakdown({ title, rows }: { title: string; rows: BreakdownRow[] }) {
           </tbody>
         </table>
       </div>
-      {rows.some((r) => r.lowSample) && <p className="hint">「参考」は10回未満で、偶然の差が大きい区分です。比較の根拠にしすぎないでください。</p>}
     </section>
   )
 }

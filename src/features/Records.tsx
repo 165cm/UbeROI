@@ -33,10 +33,12 @@ export function Records({ editId, onEdit }: { editId: string | null; onEdit: (id
   if (editing) {
     return (
       <div className="stack">
-        <button type="button" className="link back" onClick={() => (setCreating(null), onEdit(null))}>
-          ← 一覧へ戻る
-        </button>
-        <h3>{creating ? '記録を追加' : `${formatDateTime(editing.departedAt)} の記録`}</h3>
+        <div className="page-head">
+          <button type="button" className="link back" onClick={() => (setCreating(null), onEdit(null))}>
+            ← 一覧
+          </button>
+          <h3>{creating ? '記録を追加' : `${formatDateTime(editing.departedAt)} の記録`}</h3>
+        </div>
         <SessionForm
           key={editing.id}
           initial={editing}
@@ -71,36 +73,34 @@ export function Records({ editId, onEdit }: { editId: string | null; onEdit: (id
         ＋ 過去の稼働をまとめて入力
       </button>
       {sessions.length === 0 ? (
-        <section className="card muted">
-          <h3>まだ記録がありません</h3>
-          <p>ホームの「出発」から始めるか、上のボタンで過去の稼働を入力してください。</p>
-        </section>
+        <p className="card hint">まだ記録がありません。ホームの「出発」か、上のボタンから入力します。</p>
       ) : (
         <ul className="list">
           {sessions.map((s) => {
-            let summary = ''
+            let main = ''
+            let sub = ''
             try {
               const r = calculateSession(sessionToInput(s), { asOf: new Date().toISOString() })
-              summary =
-                s.status === 'completed'
-                  ? `利益 ${formatYen(r.operatingProfitYen)}・${r.hourlyYen === null ? '時給 算出不可' : `${formatYen(r.hourlyYen)}/時`}`
-                  : `売上 ${formatYen(r.revenueYen)}（未確定）`
-              if (r.errors.length && s.status === 'completed') summary += '・⚠️ 要確認'
+              main = s.status === 'completed' ? formatYen(r.operatingProfitYen) : `売上 ${formatYen(r.revenueYen)}`
+              sub = s.status === 'completed' ? (r.hourlyYen === null ? '時給 算出不可' : `${formatYen(r.hourlyYen)}/時`) : '未確定'
+              if (r.errors.length && s.status === 'completed') sub += '・⚠️ 要確認'
             } catch {
-              summary = '⚠️ 入力に誤りがあります'
+              main = '⚠️ 入力に誤り'
             }
+            const meta = [PLATFORM_LABELS[s.platform], s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note === 'デモ用の合成データ' && 'デモ'].filter(Boolean).join('・')
             return (
               <li key={s.id}>
-                <button type="button" className="list-item" onClick={() => onEdit(s.id)}>
-                  <span className="list-title">
-                    {formatDateTime(s.departedAt)} <span className="tag">{STATUS_LABELS[s.status]}</span>
+                <button type="button" className="list-item record-item" onClick={() => onEdit(s.id)}>
+                  <span className="line">
+                    <span className="grow list-title">{formatDateTime(s.departedAt)}</span>
+                    <span className="num">{main}</span>
                   </span>
-                  <span className="hint">
-                    {PLATFORM_LABELS[s.platform]}
-                    {s.weather && `・${WEATHER_LABELS[s.weather]}`}
-                    {s.note === 'デモ用の合成データ' && '・デモ'}
+                  <span className="line hint">
+                    <span className="grow">
+                      <span className="tag">{STATUS_LABELS[s.status]}</span> {meta}
+                    </span>
+                    <span>{sub}</span>
                   </span>
-                  <span>{summary}</span>
                 </button>
               </li>
             )

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { summarizePlan, type EquipmentCategory } from '../domain'
-import { IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
+import { CardTitle, IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS, VEHICLE_PRESET } from '../storage/presets'
@@ -27,6 +27,20 @@ export function Equipment() {
   const [draft, setDraft] = useState<EquipmentPlanRecord | null>(null)
   const [problems, setProblems] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
+  // 開いている品目。新しく足した品目は開き、名前を入力しても畳まれないよう、開閉は押した時だけ変える
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
+  const toggleOpen = (id: string, open: boolean) =>
+    setOpenIds((cur) => {
+      if (cur.has(id) === open) return cur
+      const next = new Set(cur)
+      if (open) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  const addItem = (item: PlanItemRecord) => {
+    setDraft({ ...draft!, items: [...draft!.items, item] })
+    toggleOpen(item.id, true)
+  }
   const [acquiring, setAcquiring] = useState<{ itemId: string; mode: 'purchased' | 'owned'; date: string; value: number | null } | null>(null)
 
   // 保存済みのプランが変わったら（別の段階を選んだ時など）、編集中の内容を読み直す
@@ -80,54 +94,64 @@ export function Equipment() {
       </div>
 
       <section className="card">
-        <h3>{draft.name}プラン</h3>
-        <p className="hint">3つの段階は「どれか1つを選ぶ」ための比較です。合計はしません。</p>
+        <CardTitle tip="3つの段階は「どれか1つを選ぶ」ための比較です。合計はしません。購入・所有として登録した物だけが実績（投資の回収）に入ります。品目を押すと、価格などを編集できます。">{draft.name}プラン</CardTitle>
         {summary && (
           <dl className="stats">
             <div><dt>セット総額</dt><dd className="big">{formatYen(summary.totalYen)}</dd></div>
             <div><dt>これから必要な現金</dt><dd>{formatYen(summary.cashNeededYen)}</dd></div>
             <div><dt>所有済みの額</dt><dd>{formatYen(summary.ownedYen)}</dd></div>
-            {summary.unpricedCount > 0 && <div><dt>価格未設定</dt><dd>{summary.unpricedCount}品目（総額に含めていません）</dd></div>}
+            {summary.unpricedCount > 0 && <div><dt>価格未設定（総額の外）</dt><dd>{summary.unpricedCount}品目</dd></div>}
           </dl>
         )}
       </section>
 
       {notice && <Notice message={notice} onClose={() => setNotice(null)} />}
 
+      <section className="card fold-list" aria-label={`${draft.name}プランの品目`}>
       {draft.items.map((item) => {
         const locked = item.assetId !== null
         return (
-          <section key={item.id} className="card stack">
-            <div className="row-between">
-              <strong>{CATEGORY_LABELS[item.category]}</strong>
+          <details key={item.id} className="fold" open={openIds.has(item.id) || acquiring?.itemId === item.id} onToggle={(e) => toggleOpen(item.id, e.currentTarget.open)}>
+            <summary>
+              <span aria-hidden="true">{CATEGORY_LABELS[item.category].split(' ')[0]}</span>
+              <span className="grow">
+                {item.label || '（名前なし）'}
+                <span className="hint">
+                  {' '}
+                  {item.unitYen === null ? '価格未設定' : `${formatYen(item.unitYen)}${item.quantity > 1 ? `×${item.quantity}` : ''}`}
+                </span>
+              </span>
               <span className="tag">{STATE_LABELS[item.state]}</span>
-            </div>
-            <TextInput label="品目" value={item.label} onChange={(v) => updateItem(item.id, { label: v })} />
+            </summary>
+            <div className="stack">
+            <div className="row">
+              <TextInput label="品目" value={item.label} onChange={(v) => updateItem(item.id, { label: v })} />
             <Select
               label="分類"
               value={item.category}
               options={(Object.keys(CATEGORY_LABELS) as EquipmentCategory[]).map((c) => ({ value: c, label: CATEGORY_LABELS[c] }))}
               onChange={(v) => updateItem(item.id, { category: v })}
             />
-            <IntInput label="価格（税込・1個）" unit="円" value={item.unitYen} onChange={(v) => updateItem(item.id, { unitYen: v })} hint={locked ? '登録済みの資産の額は変わりません' : '分からなければ空欄（0円＝無料とは別）'} />
-            <div className="row">
-              <IntInput label="数量" value={item.quantity} onChange={(v) => updateItem(item.id, { quantity: v ?? 1 })} />
-              <IntInput label="業務で使う割合" unit="%" value={Math.round(item.businessRatioBps / 100)} onChange={(v) => updateItem(item.id, { businessRatioBps: (v ?? 0) * 100 })} />
             </div>
             <div className="row">
-              <IntInput label="配賦期間" unit="か月" value={item.lifetimeMonths} onChange={(v) => updateItem(item.id, { lifetimeMonths: v ?? 1 })} />
-              <IntInput label="想定残存額" unit="円" value={item.residualYen} onChange={(v) => updateItem(item.id, { residualYen: v ?? 0 })} />
+              <IntInput label="価格（税込・1個）" unit="円" value={item.unitYen} onChange={(v) => updateItem(item.id, { unitYen: v })} hint={locked ? '登録済みの資産の額は変わりません' : undefined} tip="分からなければ空欄（0円＝無料とは別）" />
+              <IntInput label="数量" value={item.quantity} onChange={(v) => updateItem(item.id, { quantity: v ?? 1 })} />
+            </div>
+            <div className="row">
+              <IntInput label="業務で使う割合" unit="%" value={Math.round(item.businessRatioBps / 100)} onChange={(v) => updateItem(item.id, { businessRatioBps: (v ?? 0) * 100 })} />
+              <IntInput label="配賦期間" unit="か月" value={item.lifetimeMonths} onChange={(v) => updateItem(item.id, { lifetimeMonths: v ?? 1 })} tip="購入額をこの月数で分けて、毎月の利益から引きます（管理用）" />
+              <IntInput label="想定残存額" unit="円" value={item.residualYen} onChange={(v) => updateItem(item.id, { residualYen: v ?? 0 })} tip="使い終わった時に売れそうな額" />
             </div>
             {!locked && (
-              <div className="row">
+              <div className="buttons">
                 <button type="button" onClick={() => setAcquiring({ itemId: item.id, mode: 'purchased', date: localToday(), value: null })}>
                   🧾 購入した
                 </button>
                 <button type="button" onClick={() => setAcquiring({ itemId: item.id, mode: 'owned', date: localToday().slice(0, 7), value: null })}>
                   🏠 前から持っている
                 </button>
-                <button type="button" className="danger-text" onClick={() => setDraft({ ...draft, items: draft.items.filter((i) => i.id !== item.id) })}>
-                  外す
+                <button type="button" className="icon danger-text" aria-label={`${item.label || '品目'}を外す`} onClick={() => setDraft({ ...draft, items: draft.items.filter((i) => i.id !== item.id) })}>
+                  🗑️
                 </button>
               </div>
             )}
@@ -144,7 +168,7 @@ export function Equipment() {
                       <span>配達に使い始めた月</span>
                       <input type="month" value={acquiring.date} onChange={(e) => setAcquiring({ ...acquiring, date: e.target.value })} />
                     </label>
-                    <IntInput label="管理用の価値（任意）" unit="円" value={acquiring.value} onChange={(v) => setAcquiring({ ...acquiring, value: v })} hint="今回の支出は0円。入力すると、その額を月ごとに配賦します" />
+                    <IntInput label="管理用の価値（任意）" unit="円" value={acquiring.value} onChange={(v) => setAcquiring({ ...acquiring, value: v })} tip="今回の支出は0円。入力すると、その額を月ごとに配賦します" />
                   </>
                 )}
                 <button
@@ -173,23 +197,29 @@ export function Equipment() {
                 <button type="button" onClick={() => setAcquiring(null)}>やめる</button>
               </div>
             )}
-          </section>
+            </div>
+          </details>
         )
       })}
+      </section>
 
       <Problems items={problems} />
-      <div className="actions">
-        <button type="button" className="primary" disabled={!dirty} onClick={() => void save()}>
-          💾 保存
+      {dirty && (
+        <div className="actions">
+          <button type="button" className="primary" onClick={() => void save()}>
+            💾 保存
+          </button>
+          <button type="button" onClick={() => setDraft(structuredClone(saved!))}>
+            ↩ 変更を取り消す
+          </button>
+        </div>
+      )}
+      <div className="buttons">
+        <button type="button" onClick={() => addItem({ ...planItemFromPreset({ label: '', category: 'other', lifetimeMonths: 24 }), id: newId() })}>
+          ＋ 明細
         </button>
-        <button type="button" disabled={!dirty} onClick={() => setDraft(structuredClone(saved!))}>
-          ↩ 変更を取り消す
-        </button>
-        <button type="button" onClick={() => setDraft({ ...draft, items: [...draft.items, { ...planItemFromPreset({ label: '', category: 'other', lifetimeMonths: 24 }), id: newId() }] })}>
-          ＋ 明細を追加
-        </button>
-        <button type="button" onClick={() => setDraft({ ...draft, items: [...draft.items, planItemFromPreset(VEHICLE_PRESET)] })}>
-          🚲 車両を追加
+        <button type="button" onClick={() => addItem(planItemFromPreset(VEHICLE_PRESET))}>
+          🚲 車両
         </button>
         <button
           type="button"
@@ -198,14 +228,14 @@ export function Equipment() {
             setDraft(applyPreset(draft, EQUIPMENT_PRESETS[tier].items))
           }}
         >
-          📋 プリセットをコピー
+          📋 プリセット
         </button>
       </div>
 
       <section className="card">
-        <h3>💰 投資の回収（実績・現金ベース）</h3>
+        <CardTitle tip="実績・現金ベース。購入した装備の代金を、確定した記録の営業純利益でどれだけ取り戻したかです。">💰 投資の回収</CardTitle>
         {recovery.investedYen === 0 ? (
-          <p className="hint">購入した装備はまだありません。「購入した」で登録すると、ここに回収状況が出ます。</p>
+          <p className="hint">まだありません（品目を開いて「購入した」で登録）</p>
         ) : (
           <dl className="stats">
             <div><dt>現金投資</dt><dd>{formatYen(recovery.investedYen)}</dd></div>
@@ -216,12 +246,12 @@ export function Equipment() {
         )}
       </section>
 
-      <section className="card stack">
+      <section className="card">
         <h3>📦 登録済みの装備（資産）</h3>
-        {assets.length === 0 && <p className="hint">まだありません。</p>}
+        {assets.length === 0 && <p className="hint">まだありません</p>}
         {assets.map((a) => (
-          <div key={a.id} className="row-between">
-            <span>
+          <div key={a.id} className="line">
+            <span className="grow">
               {CATEGORY_LABELS[a.category]} {a.label}
               <span className="hint">
                 {' '}
@@ -230,14 +260,15 @@ export function Equipment() {
             </span>
             <button
               type="button"
-              className="danger-text"
+              className="icon danger-text"
+              aria-label={`${a.label}の登録を消す`}
               onClick={async () => {
                 if (!window.confirm(`「${a.label}」の登録を消しますか？プランの品目は「予定」に戻ります。`)) return
                 await deleteAsset(db, a.id)
                 setNotice('🗑️ 登録を消しました')
               }}
             >
-              消す
+              🗑️
             </button>
           </div>
         ))}

@@ -2,16 +2,61 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 
 /**
- * ラベルと説明つきの入力欄。説明（入力の誤りを含む）は aria-describedby で入力欄に結びつけ、
- * 読み上げソフトでも欄と一緒に読まれるようにする
+ * 毎回読まなくていい説明。ⓘ を押した時だけ開く（UI_RULES「文字は最小限」）。
+ * 閉じていても文章は残し、id で入力欄や見出しから読み上げに結びつけられる
  */
-export function Field({ label, hint, children }: { label: string; hint?: string; children: (id: string, describedBy: string | undefined) => ReactNode }) {
+export function Tip({ label, children, id }: { label: string; children: ReactNode; id?: string }) {
+  const [open, setOpen] = useState(false)
+  const autoId = useId()
+  const bodyId = id ?? `${autoId}-tip`
+  return (
+    <span className="tip">
+      <button type="button" className="tip-button" aria-label={`${label}の説明`} aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
+        ⓘ
+      </button>
+      <span id={bodyId} className="tip-body" role="note" hidden={!open}>
+        {children}
+      </span>
+    </span>
+  )
+}
+
+/** 見出しの文字だけを取り出す（ⓘ の読み上げ名に使う） */
+function textOf(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(textOf).join('')
+  return ''
+}
+
+/** カードの見出し。説明は ⓘ に入れ、見出しの右に置く */
+export function CardTitle({ id, children, tip, right }: { id?: string; children: ReactNode; tip?: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="card-title">
+      <h3 id={id}>{children}</h3>
+      {tip && <Tip label={textOf(children).replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '').trim() || '見出し'}>{tip}</Tip>}
+      {right && <span className="card-title-right">{right}</span>}
+    </div>
+  )
+}
+
+/**
+ * ラベルと説明つきの入力欄。
+ * - hint：いつも見せる説明（入力の誤り・計算した値など、今の状態で変わるもの）
+ * - tip：毎回読まなくていい説明（ⓘ の中）
+ * どちらも aria-describedby で入力欄に結びつけ、読み上げソフトでは欄と一緒に読まれる
+ */
+export function Field({ label, hint, tip, children }: { label: string; hint?: string; tip?: string; children: (id: string, describedBy: string | undefined) => ReactNode }) {
   const id = useId()
   const hintId = `${id}-hint`
+  const tipId = `${id}-tip`
+  const describedBy = [hint ? hintId : null, tip ? tipId : null].filter(Boolean).join(' ') || undefined
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
-      {children(id, hint ? hintId : undefined)}
+      <span className="field-label">
+        <label htmlFor={id}>{label}</label>
+        {tip && <Tip label={label} id={tipId}>{tip}</Tip>}
+      </span>
+      {children(id, describedBy)}
       {hint && <p id={hintId} className="hint" aria-live="polite">{hint}</p>}
     </div>
   )
@@ -23,6 +68,7 @@ export function IntInput({
   value,
   onChange,
   hint,
+  tip,
   unit,
   allowNegative = false,
   placeholder = '未設定',
@@ -31,6 +77,7 @@ export function IntInput({
   value: number | null
   onChange: (v: number | null) => void
   hint?: string
+  tip?: string
   unit?: string
   allowNegative?: boolean
   placeholder?: string
@@ -45,7 +92,7 @@ export function IntInput({
     })
   }, [value])
   return (
-    <Field label={label} hint={error ?? hint}>
+    <Field label={label} hint={error ?? hint} tip={tip}>
       {(id, describedBy) => (
         <div className="input-unit">
           <input
@@ -80,9 +127,9 @@ export function IntInput({
   )
 }
 
-export function TextInput({ label, value, onChange, hint, placeholder }: { label: string; value: string; onChange: (v: string) => void; hint?: string; placeholder?: string }) {
+export function TextInput({ label, value, onChange, hint, tip, placeholder }: { label: string; value: string; onChange: (v: string) => void; hint?: string; tip?: string; placeholder?: string }) {
   return (
-    <Field label={label} hint={hint}>
+    <Field label={label} hint={hint} tip={tip}>
       {(id, describedBy) => <input id={id} aria-describedby={describedBy} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />}
     </Field>
   )
@@ -94,15 +141,17 @@ export function Select<T extends string>({
   options,
   onChange,
   hint,
+  tip,
 }: {
   label: string
   value: T
   options: readonly { value: T; label: string }[]
   onChange: (v: T) => void
   hint?: string
+  tip?: string
 }) {
   return (
-    <Field label={label} hint={hint}>
+    <Field label={label} hint={hint} tip={tip}>
       {(id, describedBy) => (
         <select id={id} aria-describedby={describedBy} value={value} onChange={(e) => onChange(e.target.value as T)}>
           {options.map((o) => (
@@ -135,9 +184,9 @@ export function fromLocalInput(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-export function DateTimeInput({ label, value, onChange, hint }: { label: string; value: string | null; onChange: (iso: string | null) => void; hint?: string }) {
+export function DateTimeInput({ label, value, onChange, hint, tip }: { label: string; value: string | null; onChange: (iso: string | null) => void; hint?: string; tip?: string }) {
   return (
-    <Field label={label} hint={hint}>
+    <Field label={label} hint={hint} tip={tip}>
       {(id, describedBy) => <input id={id} aria-describedby={describedBy} type="datetime-local" value={toLocalInput(value)} onChange={(e) => onChange(fromLocalInput(e.target.value))} />}
     </Field>
   )

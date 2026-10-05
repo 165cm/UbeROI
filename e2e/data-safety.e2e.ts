@@ -23,7 +23,7 @@ test('A21：稼働中に再読み込みしても、オフラインでも、記�
   await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
   await expect(page.getByText(/オフライン/).first()).toBeVisible()
   await page.getByRole('button', { name: '🏁 帰宅して精算' }).click()
-  await page.getByLabel('基本報酬（配送料の合計）').fill('1500')
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('1500')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.locator('.list-item').first()).toContainText('確定')
   await context.setOffline(false)
@@ -49,7 +49,7 @@ test('A19：同じCSVを2回取り込んでも二重にならず、途中に不�
   await page.goto('#settings')
   await page.getByRole('tab', { name: 'データ' }).click()
   const card = page.locator('section', { hasText: '📥 CSVから記録を取り込む' })
-  const file = card.getByLabel('CSVファイル（.csv）')
+  const file = card.getByLabel('CSVファイル（.csv）', { exact: true })
 
   await file.setInputFiles(bad)
   await expect(card.getByRole('alert')).toContainText('3行目')
@@ -69,9 +69,9 @@ test('A19：同じCSVを2回取り込んでも二重にならず、途中に不�
 test('A24：デモに切り替えても、合成データが自分の実績に混ざらない', async ({ page }) => {
   await page.goto('#records')
   await page.getByRole('button', { name: /過去の稼働をまとめて入力/ }).click()
-  await page.getByLabel('出発（自宅を出た時刻）').fill('2026-10-01T18:00')
-  await page.getByLabel('帰宅').fill('2026-10-01T20:00')
-  await page.getByLabel('基本報酬（配送料の合計）').fill('3000')
+  await page.getByLabel('出発（自宅を出た時刻）', { exact: true }).fill('2026-10-01T18:00')
+  await page.getByLabel('帰宅', { exact: true }).fill('2026-10-01T20:00')
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('3000')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.locator('.list-item')).toHaveCount(1)
 
@@ -94,9 +94,9 @@ test('A24：デモに切り替えても、合成データが自分の実績に�
 test('A20：対応していない版のバックアップは復元せず、今のデータはそのまま', async ({ page }) => {
   await page.goto('#records')
   await page.getByRole('button', { name: /過去の稼働をまとめて入力/ }).click()
-  await page.getByLabel('出発（自宅を出た時刻）').fill('2026-10-01T18:00')
-  await page.getByLabel('帰宅').fill('2026-10-01T20:00')
-  await page.getByLabel('基本報酬（配送料の合計）').fill('3000')
+  await page.getByLabel('出発（自宅を出た時刻）', { exact: true }).fill('2026-10-01T18:00')
+  await page.getByLabel('帰宅', { exact: true }).fill('2026-10-01T20:00')
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('3000')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
 
   await page.goto('#settings')
@@ -107,7 +107,7 @@ test('A20：対応していない版のバックアップは復元せず、今�
   const future = await tempFile('future.json')
   await writeFile(future, JSON.stringify({ ...backup, schema_version: 99, datasets: { ...backup.datasets, sessions: [] } }))
 
-  await page.getByLabel('バックアップのファイル（.json）').setInputFiles(future)
+  await page.getByLabel(/バックアップのファイル/).setInputFiles(future)
   await expect(page.getByRole('alert')).toContainText('データの版（99）')
   await expect(page.getByRole('button', { name: '♻️ この内容で置き換える' })).toHaveCount(0)
   await page.goto('#records')

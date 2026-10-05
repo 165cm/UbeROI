@@ -29,8 +29,8 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
   const { db } = useData()
   const [s, setS] = useState<SessionRecord>(initial)
   const [problems, setProblems] = useState<string[]>([])
-  // 天気・エリア・メモは、最初から入っている時だけ開いておく（入力中に畳まれないよう、最初に1回だけ決める）
-  const [memoOpen] = useState(() => Boolean(initial.weather || initial.areaLabel || initial.note))
+  // 天気・エリア・メモは、最初から入っている時だけ開いておく。開閉は押した時だけ変え、入力中に畳まれないようにする
+  const [memoOpen, setMemoOpen] = useState(() => Boolean(initial.weather || initial.areaLabel || initial.note))
   const tariffs = useLiveQuery(() => listTariffs(db), [db]) ?? []
   const settings = useLiveQuery(() => db.settings.get('settings'), [db])
   const defaultTariff = pickDefaultTariff(tariffs, settings)
@@ -164,7 +164,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         ))}
       </section>
 
-      <details className="card fold" open={memoOpen}>
+      <details className="card fold" open={memoOpen} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
         <summary>
           <strong>🏷️ 天気・エリア・メモ</strong>
           <span className="hint">{[s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note].filter(Boolean).join('・') || '任意'}</span>

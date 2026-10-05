@@ -45,7 +45,7 @@ const ceilTo = (yen: number, unit: number) => Math.ceil(yen / unit) * unit
  * - 100円・500円・1000円単位に切り上げ
  * - 1000円単位に切り上げ＋端数の小銭（お釣りをお札だけにする払い方。例：4,260円 → 5,260円で1,000円のお釣り）
  * - 5000円札・1万円札
- * 支払い金額以上で重ならないものを、小さい順に並べる
+ * 支払い金額以上で重ならないものを、小さい順に並べる（切り上げで安全な整数を超える額は出さない）
  */
 export function likelyPayments(totalYen: number): number[] {
   assertYen(totalYen, '支払い金額')
@@ -60,5 +60,5 @@ export function likelyPayments(totalYen: number): number[] {
     ceilTo(totalYen, 5000),
     ceilTo(totalYen, 10000),
   ]
-  return [...new Set(candidates)].filter((v) => v >= totalYen).sort((a, b) => a - b)
+  return [...new Set(candidates)].filter((v) => v >= totalYen && Number.isSafeInteger(v)).sort((a, b) => a - b)
 }

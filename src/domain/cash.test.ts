@@ -38,6 +38,13 @@ describe('お釣り', () => {
     expect(likelyPayments(0)).toEqual([])
   })
 
+  it('とても大きな額でも、切り上げで安全な整数を超える候補は出さない（画面が止まらない）', () => {
+    const max = Number.MAX_SAFE_INTEGER
+    const list = likelyPayments(max)
+    expect(list).toEqual([max])
+    for (const paid of list) expect(() => calculateChange(max, paid)).not.toThrow()
+  })
+
   it('負の額・小数は受け付けない', () => {
     expect(() => calculateChange(-1, 100)).toThrow()
     expect(() => likelyPayments(10.5)).toThrow()

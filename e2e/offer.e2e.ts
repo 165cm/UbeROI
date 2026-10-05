@@ -101,3 +101,53 @@ test('設定コードの主なエリアは、届け先の地名が見つから�
   await expect.poll(() => safari.evaluate(() => location.hash)).toMatch(/^#offer\?cfg=[A-Za-z0-9_-]+$/)
   await other.close()
 })
+
+test('Safari で記録した分を持ち帰りコードでアプリへ移せる。地名の評価の一覧に出る', async ({ page, browser }) => {
+  await page.clock.install({ time: new Date('2026-10-05T18:00:00+09:00') })
+  // 地名は、エリアに登録したものだけを探す
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: 'エリア' }).click()
+  await page.getByRole('button', { name: 'エリアを追加' }).click()
+  await page.getByLabel('エリアの名前', { exact: true }).fill('中野・荻窪エリア')
+  await page.getByLabel('このエリアに入る地名（任意）').fill('高円寺、阿佐谷')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.locator('.tag', { hasText: '主なエリア' })).toBeVisible()
+  await page.goto('#offer')
+  await page.getByText('📲 iPhone のショートカットで使う').click()
+  const url = await page.getByLabel('ショートカットに貼る URL', { exact: true }).inputValue()
+
+  // 保存場所が別のブラウザー（Safari と同じ状況）で、2件記録する
+  const other = await browser.newContext({ timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] })
+  const safari = await other.newPage()
+  await safari.clock.install({ time: new Date('2026-10-05T18:00:00+09:00') })
+  await safari.goto(`/UbeROI/${url.slice(url.indexOf('#'))}${encodeURIComponent('¥900 合計 20 分 (2.0 km) 高円寺北2丁目')}`)
+  await safari.getByRole('button', { name: '✅ 受けた' }).click()
+  await expect(safari.getByText('「受けた」と記録しました')).toBeVisible()
+  await safari.clock.setFixedTime(new Date('2026-10-05T18:26:00+09:00'))
+  await safari.goto(`/UbeROI/${url.slice(url.indexOf('#'))}${encodeURIComponent('¥400 合計 15 分 (3.0 km)')}`)
+  await safari.getByRole('button', { name: '❌ 断った' }).click()
+  await expect(safari.getByText('「断った」と記録しました')).toBeVisible()
+  await safari.getByText('📤 アプリへ持ち帰る', { exact: true }).click()
+  await expect(safari.getByText('ここの記録 2件')).toBeVisible()
+  await safari.getByRole('button', { name: '📋 持ち帰りコードをコピー' }).click()
+  await expect(safari.getByText('2件分のコードをコピーしました')).toBeVisible()
+  const code = await safari.evaluate(() => navigator.clipboard.readText())
+  await other.close()
+
+  // ホーム画面のアプリで貼り付ける（2回目は重ならない）
+  await page.getByText('📥 Safari の記録を取り込む', { exact: true }).click()
+  const box = page.getByLabel('持ち帰りコード', { exact: true })
+  await box.fill(code)
+  await page.getByRole('button', { name: '📥 取り込む' }).click()
+  await expect(page.getByText('2件を取り込みました')).toBeVisible()
+  await box.fill(code)
+  await page.getByRole('button', { name: '📥 取り込む' }).click()
+  await expect(page.getByText('0件を取り込みました（2件は取り込み済み）')).toBeVisible()
+
+  // 18:00 高円寺 20分 → 18:20 に終わり、18:26 に次 → 待ち6分（まだ1件なので判定には使わない）
+  await page.getByText('🧠 地名の評価（記録から学習）', { exact: true }).click()
+  await expect(page.getByText('判定に使用 0／1')).toBeVisible()
+  const row = page.getByRole('region', { name: '地名の評価の一覧' }).getByRole('row', { name: /高円寺/ })
+  await expect(row).toContainText('夕方')
+  await expect(row).toContainText('6分')
+})

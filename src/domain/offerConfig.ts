@@ -1,6 +1,7 @@
 // オファー判定の「設定コード」。iPhone のショートカットから開くページは Safari で開き、
 // ホーム画面のアプリとは保存場所が別になるため、判定に使う設定を URL に入れて渡す（外部へは送らない）
 import { isBusynessTable, type BusynessTable } from './busyness'
+import { TIME_BANDS, levelFromWait, type TownRating } from './townLearning'
 
 export interface OfferConfig {
   targetHourlyYen: number | null
@@ -12,20 +13,22 @@ export interface OfferConfig {
   areas: { name: string; towns: string[]; levels: BusynessTable }[]
   /** 届け先の地名が見つからない時に使う主なエリアの名前（なければ null） */
   primaryAreaName: string | null
+  /** 記録から学習した地名の評価（10件以上のものだけ入れる） */
+  learned: TownRating[]
   /** 設定コードを作った日（古くなったら作り直しを促す） */
   createdOn: string
 }
 
 const VERSION = 1
 
-function toBase64Url(text: string): string {
+export function toBase64Url(text: string): string {
   const bytes = new TextEncoder().encode(text)
   let bin = ''
   for (const b of bytes) bin += String.fromCharCode(b)
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-function fromBase64Url(code: string): string {
+export function fromBase64Url(code: string): string {
   const b64 = code.replace(/-/g, '+').replace(/_/g, '/')
   const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)))
@@ -44,6 +47,7 @@ export function encodeOfferConfig(c: OfferConfig): string {
       h: c.minutesToHome,
       a: c.areas.map((a) => ({ n: a.name, t: a.towns, l: a.levels.map((day) => day.join('')).join('') })),
       p: c.primaryAreaName,
+      w: c.learned.map((r) => [r.town, r.band, r.samples, r.medianWaitMinutes]),
       o: c.createdOn,
     }),
   )
@@ -67,6 +71,17 @@ export function decodeOfferConfig(code: string): OfferConfig | null {
   if (typeof o.o !== 'string' || !Array.isArray(o.a)) return null
   // 主なエリア（この項目より前に作った設定コードには無い）
   if (!(o.p === undefined || o.p === null || typeof o.p === 'string')) return null
+  // 学習した地名の評価（この項目より前に作った設定コードには無い）。段階は待ち時間から出し直す
+  const learned: TownRating[] = []
+  if (o.w !== undefined) {
+    if (!Array.isArray(o.w)) return null
+    for (const w of o.w as unknown[]) {
+      if (!Array.isArray(w) || w.length !== 4) return null
+      const [town, band, samples, wait] = w as unknown[]
+      if (typeof town !== 'string' || !Number.isInteger(band) || (band as number) < 0 || (band as number) >= TIME_BANDS.length || !Number.isSafeInteger(samples) || (samples as number) < 1 || !isNum(wait)) return null
+      learned.push({ town, band: band as number, samples: samples as number, medianWaitMinutes: wait as number, level: levelFromWait(wait as number) })
+    }
+  }
   const areas: OfferConfig['areas'] = []
   for (const a of o.a as unknown[]) {
     if (typeof a !== 'object' || a === null) return null
@@ -85,6 +100,7 @@ export function decodeOfferConfig(code: string): OfferConfig | null {
     minutesToHome: o.h as number,
     areas,
     primaryAreaName: (o.p as string | null | undefined) ?? null,
+    learned,
     createdOn: o.o,
   }
 }

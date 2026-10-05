@@ -171,7 +171,7 @@ export function Plan() {
             <div><dt>毎月の固定費（この週の日数分）</dt><dd>−{formatYen(plan.fixedCostYen)}</dd></div>
           )}
         </dl>
-        <div className="table-scroll">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="見込みごとの営業利益と時給">
           <table className="breakdown">
             <thead>
               <tr><th scope="col">見込み</th><th scope="col">営業利益</th><th scope="col">時給</th></tr>

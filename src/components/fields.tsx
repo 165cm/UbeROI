@@ -1,13 +1,18 @@
 // 入力欄の共通部品。金額は整数円、空欄は「未設定」（null）として0と区別する
 import { useEffect, useId, useState, type ReactNode } from 'react'
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: (id: string) => ReactNode }) {
+/**
+ * ラベルと説明つきの入力欄。説明（入力の誤りを含む）は aria-describedby で入力欄に結びつけ、
+ * 読み上げソフトでも欄と一緒に読まれるようにする
+ */
+export function Field({ label, hint, children }: { label: string; hint?: string; children: (id: string, describedBy: string | undefined) => ReactNode }) {
   const id = useId()
+  const hintId = `${id}-hint`
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      {children(id)}
-      {hint && <p className="hint">{hint}</p>}
+      {children(id, hint ? hintId : undefined)}
+      {hint && <p id={hintId} className="hint" aria-live="polite">{hint}</p>}
     </div>
   )
 }
@@ -41,10 +46,11 @@ export function IntInput({
   }, [value])
   return (
     <Field label={label} hint={error ?? hint}>
-      {(id) => (
+      {(id, describedBy) => (
         <div className="input-unit">
           <input
             id={id}
+            aria-describedby={describedBy}
             inputMode={allowNegative ? 'text' : 'numeric'}
             value={text}
             placeholder={placeholder}
@@ -77,7 +83,7 @@ export function IntInput({
 export function TextInput({ label, value, onChange, hint, placeholder }: { label: string; value: string; onChange: (v: string) => void; hint?: string; placeholder?: string }) {
   return (
     <Field label={label} hint={hint}>
-      {(id) => <input id={id} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />}
+      {(id, describedBy) => <input id={id} aria-describedby={describedBy} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />}
     </Field>
   )
 }
@@ -97,8 +103,8 @@ export function Select<T extends string>({
 }) {
   return (
     <Field label={label} hint={hint}>
-      {(id) => (
-        <select id={id} value={value} onChange={(e) => onChange(e.target.value as T)}>
+      {(id, describedBy) => (
+        <select id={id} aria-describedby={describedBy} value={value} onChange={(e) => onChange(e.target.value as T)}>
           {options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -132,7 +138,7 @@ export function fromLocalInput(value: string): string | null {
 export function DateTimeInput({ label, value, onChange, hint }: { label: string; value: string | null; onChange: (iso: string | null) => void; hint?: string }) {
   return (
     <Field label={label} hint={hint}>
-      {(id) => <input id={id} type="datetime-local" value={toLocalInput(value)} onChange={(e) => onChange(fromLocalInput(e.target.value))} />}
+      {(id, describedBy) => <input id={id} aria-describedby={describedBy} type="datetime-local" value={toLocalInput(value)} onChange={(e) => onChange(fromLocalInput(e.target.value))} />}
     </Field>
   )
 }

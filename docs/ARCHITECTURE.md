@@ -42,7 +42,7 @@
 | `src/features/Plan.tsx` | 計画：週の候補枠の入力・おすすめの組み合わせ・3つの見込みの比較・装備の回収の目安 |
 | `src/features/Analytics.tsx` | 分析：期間の成績、売上→利益の内訳、回収の推移、買うか借りるか、所得の目安、内訳表、CSV |
 | `src/components/charts.tsx` | 折れ線（なぞると値が出る）と横棒の部品 |
-| `src/components/fields.tsx` | 入力欄（整数円・未設定の区別）、エラー表示、「元に戻す」つきのお知らせ |
+| `src/components/fields.tsx` | 入力欄（整数円・未設定の区別。説明と誤りは読み上げで欄と一緒に読まれる）、エラー表示、「元に戻す」つきのお知らせ |
 | `src/format.ts` | 円・時間の表示用の整形（計算はしない） |
 | `src/storage/db.ts` | IndexedDB（Dexie）の定義。実績 `deli-kan` とデモ `deli-kan-demo` を分ける |
 | `src/storage/schema.ts` | 保存データの形と表示名 |
@@ -53,6 +53,7 @@
 | `src/storage/csvImport.ts` | 独自CSV（v1）の検証・取込済みの判定（external_id と中身）・1回の書き込みでの保存 |
 | `src/storage/context.tsx` | 画面からデータベースを使う入口 |
 | `src/storage/storage.test.ts` `backup.test.ts` `csvImport.test.ts` | 保存・検証・装備と実績の分離、バックアップと復元、CSVの取り込み（A19）のテスト |
+| `e2e/` `playwright.config.ts` | 通しのテスト（Playwright）：主な流れ、データを守る場面、使いやすさ（A23） |
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
 | `src/pwa.ts` | Service Worker の登録、新しい版の知らせ、オフライン判定、ホーム画面に追加、消えにくい保存の依頼 |
 | `src/features/InstallHelp.tsx` | 「アプリとして使う」の案内（設定 → データ） |

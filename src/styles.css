@@ -646,3 +646,18 @@ details summary {
   cursor: pointer;
   color: var(--accent);
 }
+
+/* ---- クエスト ---- */
+.meter {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--grid);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--chart);
+  border-radius: 999px;
+}

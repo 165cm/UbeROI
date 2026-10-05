@@ -2,12 +2,12 @@
 import type { Tariff } from '../domain'
 import type { DeliKanDB, DataMode } from './db'
 import { parseInstant } from '../domain'
-import { initialRecords, sessionRecordProblems, sessionSetProblems } from './repo'
-import { SCHEMA_VERSION, type SessionRecord } from './schema'
+import { initialRecords, questProblems, sessionRecordProblems, sessionSetProblems } from './repo'
+import { SCHEMA_VERSION, type QuestRecord, type SessionRecord } from './schema'
 
 export const APP_VERSION = '0.1.0'
 
-const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots'] as const
+const TABLES = ['settings', 'tariffs', 'sessions', 'recurringExpenses', 'plans', 'assets', 'slots', 'quests'] as const
 type TableName = (typeof TABLES)[number]
 
 export const TABLE_LABELS: Record<TableName, string> = {
@@ -18,6 +18,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   plans: '装備プラン',
   assets: '登録済みの装備',
   slots: '計画の候補枠',
+  quests: 'クエスト',
 }
 
 export interface Backup {
@@ -241,6 +242,24 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.str(r, 'tariffId', path, { nullable: true })
     c.stamped(r, path)
   },
+  quests(c, r, path) {
+    c.str(r, 'label', path)
+    c.oneOf(r, 'platform', path, ['uber', 'demaecan', 'rocketnow', 'other'])
+    c.instant(r, 'startsAt', path)
+    c.instant(r, 'endsAt', path)
+    if (typeof r.startsAt === 'string' && typeof r.endsAt === 'string' && Date.parse(r.endsAt) <= Date.parse(r.startsAt)) {
+      c.add(`${path}.endsAt`, '終了が開始より後になっていません')
+    }
+    c.oneOf(r, 'rewardMode', path, ['cumulative', 'incremental'])
+    c.arr(r, 'tiers', path).forEach((t, i) => {
+      const p = `${path}.tiers[${i}]`
+      if (!c.obj(t, p)) return
+      c.int(t, 'count', p, { min: 1 })
+      c.int(t, 'rewardYen', p)
+    })
+    c.int(r, 'manualOffset', path, { min: null })
+    c.stamped(r, path)
+  },
 }
 
 export type ParseResult =
@@ -257,9 +276,9 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 版1（計画の候補枠がない頃）のバックアップは、候補枠を空として読み込む
-  if (raw.schema_version === 1 && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
-    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], ...(raw.datasets as object) } }
+  // 古い版（1：候補枠なし、2：クエストなし）のバックアップは、足りない一覧を空として読み込む
+  if ((raw.schema_version === 1 || raw.schema_version === 2) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+    raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
   if (raw.schema_version !== SCHEMA_VERSION) {
@@ -293,6 +312,8 @@ export function parseBackup(text: string): ParseResult {
   const sessions = datasets.sessions as SessionRecord[]
   sessions.forEach((s, i) => sessionRecordProblems(s).forEach((p) => c.add(`${TABLE_LABELS.sessions}[${i + 1}]`, p)))
   sessionSetProblems(sessions).forEach((p) => c.add(TABLE_LABELS.sessions, p))
+  // クエストも保存時と同じ制約（段階が空・同じ件数・累積の減少）で確かめる
+  ;(datasets.quests as QuestRecord[]).forEach((q, i) => questProblems(q).forEach((p) => c.add(`${TABLE_LABELS.quests}[${i + 1}]`, p)))
   if (c.problems.length) return { ok: false, problems: c.problems }
   return { ok: true, backup: raw as unknown as Backup, counts }
 }
@@ -322,7 +343,7 @@ async function replaceAll(db: DeliKanDB, datasets: Record<TableName, unknown[]>)
 /** すべて消して、初期状態（料金プリセット・空の設定・3プラン）に戻す */
 export async function deleteAllData(db: DeliKanDB): Promise<void> {
   const initial = initialRecords()
-  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [] })
+  await replaceAll(db, { settings: [initial.settings], tariffs: initial.tariffs, sessions: [], recurringExpenses: [], plans: initial.plans, assets: [], slots: [], quests: [] })
 }
 
 /** バックアップを書き出した日時を設定に残す（ホームでの声かけに使う） */

@@ -2,8 +2,11 @@
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
 import type { EquipmentCategory, Platform, Tariff } from '../domain'
 
-/** 2：計画の候補枠（slots）を追加。版1のバックアップは slots を空として読み込む */
-export const SCHEMA_VERSION = 2
+/**
+ * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。
+ * 古い版のバックアップは、足りない一覧を空として読み込む
+ */
+export const SCHEMA_VERSION = 3
 
 interface Stamped {
   createdAt: string
@@ -166,4 +169,17 @@ export interface SlotRecord extends Stamped {
   rentalOverrideYen: number | null
   expenseYen: number
   tariffId: string | null
+}
+
+/** クエスト（見込みの管理用）。達成して確定した額は、精算の「確定したクエスト」に入れる */
+export interface QuestRecord extends Stamped {
+  id: string
+  label: string
+  /** 対象のサービス（このサービスの確定記録の件数を数える） */
+  platform: Platform
+  startsAt: string
+  endsAt: string
+  rewardMode: 'cumulative' | 'incremental'
+  tiers: { count: number; rewardYen: number }[]
+  manualOffset: number
 }

@@ -179,6 +179,11 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
       c.int(e, 'amountYen', p)
       c.str(e, 'memo', p)
     })
+    if (r.imported !== undefined && r.imported !== null && c.obj(r.imported, `${path}.imported`)) {
+      c.oneOf(r.imported, 'source', `${path}.imported`, ['csv-v1'])
+      c.str(r.imported, 'externalId', `${path}.imported`)
+      c.str(r.imported, 'fingerprint', `${path}.imported`)
+    }
     c.stamped(r, path)
   },
   recurringExpenses(c, r, path) {

@@ -75,6 +75,15 @@ export interface SessionRecord extends Stamped {
   rentals: RentalRecord[]
   directExpenses: DirectExpenseRecord[]
   note: string
+  /** CSVから取り込んだ記録の出どころ。手入力の記録は無い（または null） */
+  imported?: ImportedFrom | null
+}
+
+/** 取り込み元の行。同じ externalId で中身（fingerprint）が違う行は、黙って上書きせず競合として止める */
+export interface ImportedFrom {
+  source: 'csv-v1'
+  externalId: string
+  fingerprint: string
 }
 
 /** 毎月かかる固定費（通信・保険など）。開始月〜終了月の各月に計上する */

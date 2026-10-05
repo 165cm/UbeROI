@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Notice, Problems, errorMessages, localToday } from '../components/fields'
 import { useData } from '../storage/context'
 import { InstallHelp } from './InstallHelp'
+import { CsvImport } from './CsvImport'
 import {
   TABLE_LABELS,
   backupFileName,
@@ -138,6 +139,8 @@ export function DataSettings() {
       </section>
 
       <Problems items={problems} />
+
+      <CsvImport />
 
       <section className="card stack">
         <h3>🗑️ すべて削除</h3>

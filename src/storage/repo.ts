@@ -152,7 +152,7 @@ export function pickDefaultTariff(tariffs: readonly TariffRecord[], settings: Se
 
 // ---- 稼働の記録 ----
 
-function sessionEndMs(s: SessionRecord): number {
+export function sessionEndMs(s: SessionRecord): number {
   return s.returnedAt ? parseInstant(s.returnedAt) : s.status === 'active' ? Date.now() : parseInstant(s.departedAt)
 }
 

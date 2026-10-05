@@ -9,7 +9,11 @@ import {
   applyPreset,
   deleteAsset,
   deleteSession,
+  deleteArea,
   departNow,
+  primaryArea,
+  saveArea,
+  saveSettings,
   emptySession,
   endRental,
   ensureInitialData,
@@ -21,7 +25,7 @@ import {
   startRental,
 } from './repo'
 import { EQUIPMENT_PRESETS } from './presets'
-import { questProgress } from '../domain'
+import { emptyBusyness, questProgress } from '../domain'
 import { errorMessages } from '../components/fields'
 import type { SessionRecord } from './schema'
 import { periodFor, recoveryFor } from './toDomain'
@@ -255,5 +259,36 @@ describe('A28 保存容量が足りない時', () => {
   it('成功とは言わず、バックアップの書き出しと再試行を案内する', () => {
     const quota = Object.assign(new Error('quota'), { name: 'AbortError', inner: { name: 'QuotaExceededError' } })
     expect(errorMessages(quota)).toEqual([expect.stringMatching(/保存容量が足りない.*バックアップを書き出し.*もう一度/)])
+  })
+})
+
+describe('エリアの混み具合', () => {
+  const area = (over: Record<string, unknown> = {}) => ({
+    id: 'a1',
+    name: ' 中野・荻窪エリア ',
+    levels: emptyBusyness(),
+    towns: [' 高円寺', '阿佐谷', '高円寺 '],
+    checkedAt: '2026-10-05',
+    createdAt: '',
+    updatedAt: '',
+    revision: 0,
+    ...over,
+  })
+
+  it('名前と地名の空白を除き、重なった地名を1つにして保存する。名前が空なら保存しない', async () => {
+    await saveArea(db, area())
+    expect(await db.areas.get('a1')).toMatchObject({ name: '中野・荻窪エリア', towns: ['高円寺', '阿佐谷'] })
+    await expect(saveArea(db, area({ id: 'a2', name: ' ' }))).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  it('主なエリア：指定したものを使い、指定がなく1つだけならそれを使う。消すと指定も外れる', async () => {
+    await saveArea(db, area())
+    expect(primaryArea(await db.areas.toArray(), await db.settings.get('settings'))?.id).toBe('a1')
+    await saveArea(db, area({ id: 'a2', name: '新宿' }))
+    expect(primaryArea(await db.areas.toArray(), await db.settings.get('settings'))).toBeUndefined()
+    await saveSettings(db, { primaryAreaId: 'a2' })
+    expect(primaryArea(await db.areas.toArray(), await db.settings.get('settings'))?.id).toBe('a2')
+    await deleteArea(db, 'a2')
+    expect((await db.settings.get('settings'))?.primaryAreaId).toBeNull()
   })
 })

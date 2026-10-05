@@ -1,6 +1,7 @@
 // 週の計画（仕様 S05・§5）：候補枠ごとの見込み利益と、週の時間内で利益が最大になる組み合わせ
 import { divide, monthRange, parseInstant } from './core'
 import { MIN_SAMPLE, timeSlotOf, type TimeSlot } from './analytics'
+import { averageBusyFactor, weightedBusyHours, type BusynessTable } from './busyness'
 
 export type Scenario = 'pessimistic' | 'standard' | 'optimistic'
 export const SCENARIOS: Scenario[] = ['pessimistic', 'standard', 'optimistic']
@@ -27,7 +28,7 @@ export const MONTH_FACTORS = [1.1, 0.9, 1.0, 0.9, 0.95, 1.05, 1.1, 1.1, 1.05, 0.
 export interface RevenueEstimate {
   /** 標準シナリオの売上見込み（整数円） */
   revenueYen: number
-  source: 'personal_slot' | 'personal' | 'reference'
+  source: 'personal_slot' | 'personal' | 'reference' | 'busyness'
   sampleSize: number
   note: string
 }
@@ -38,28 +39,67 @@ export interface PastSession {
   revenueYen: number
 }
 
+/** 自分の平均を、混み具合の比で補正する時の上限・下限（偶然の偏りで極端にしない） */
+const BUSY_RATIO_MIN = 0.5
+const BUSY_RATIO_MAX = 2
+
 /**
  * 候補枠の売上見込み。本人の実績が10回以上ある時は本人の平均（同じ時間帯が10回以上ならその平均）、
- * それ未満は参考資料の推計を使い、どちらを使ったかを返す。
+ * それ未満は推計を使い、どちらを使ったかを返す。
+ * busyness（エリアの混み具合）があれば：
+ * - 推計は、時間帯の倍率の代わりに混み具合の段階の倍率を使う（未入力の時間は時間帯の倍率）
+ * - 本人の平均は「この枠の混み具合 ÷ 平均に使った実績の混み具合」の比で補正する
  */
-export function estimateRevenue(startsAt: string, endsAt: string, past: readonly PastSession[]): RevenueEstimate {
+export function estimateRevenue(startsAt: string, endsAt: string, past: readonly PastSession[], busyness?: BusynessTable | null): RevenueEstimate {
   const hours = (parseInstant(endsAt) - parseInstant(startsAt)) / 3_600_000
   if (hours <= 0) return { revenueYen: 0, source: 'reference', sampleSize: 0, note: '時間が0以下です' }
+  const startMs = parseInstant(startsAt)
+  const endMs = parseInstant(endsAt)
   const slot = timeSlotOf(startsAt)
   const perHour = (rows: readonly PastSession[]) =>
     divide(rows.reduce((a, r) => a + r.revenueYen, 0), rows.reduce((a, r) => a + r.hours, 0))
+  // 実績の平均を、この枠と実績の混み具合の比で補正する（どちらかが未入力なら補正しない）
+  const adjust = (rows: readonly PastSession[]): { ratio: number; note: string } => {
+    if (!busyness) return { ratio: 1, note: '' }
+    const here = averageBusyFactor(busyness, startMs, endMs)
+    let weighted = 0
+    let hoursCovered = 0
+    for (const r of rows) {
+      const s = parseInstant(r.departedAt)
+      const f = averageBusyFactor(busyness, s, s + r.hours * 3_600_000)
+      if (f === null) continue
+      weighted += f * r.hours
+      hoursCovered += r.hours
+    }
+    if (here === null || hoursCovered === 0) return { ratio: 1, note: '' }
+    const ratio = Math.min(BUSY_RATIO_MAX, Math.max(BUSY_RATIO_MIN, here / (weighted / hoursCovered)))
+    return { ratio, note: `・混み具合で×${ratio.toFixed(2)}` }
+  }
   const sameSlot = past.filter((p) => timeSlotOf(p.departedAt) === slot)
   const slotRate = sameSlot.length >= MIN_SAMPLE ? perHour(sameSlot) : null
   if (slotRate !== null) {
-    return { revenueYen: Math.round(slotRate * hours), source: 'personal_slot', sampleSize: sameSlot.length, note: `同じ時間帯の自分の実績${sameSlot.length}回の平均` }
+    const a = adjust(sameSlot)
+    return { revenueYen: Math.round(slotRate * hours * a.ratio), source: 'personal_slot', sampleSize: sameSlot.length, note: `同じ時間帯の自分の実績${sameSlot.length}回の平均${a.note}` }
   }
   const allRate = past.length >= MIN_SAMPLE ? perHour(past) : null
   if (allRate !== null) {
-    return { revenueYen: Math.round(allRate * hours), source: 'personal', sampleSize: past.length, note: `自分の実績${past.length}回の平均（時間帯は区別していません）` }
+    const a = adjust(past)
+    return { revenueYen: Math.round(allRate * hours * a.ratio), source: 'personal', sampleSize: past.length, note: `自分の実績${past.length}回の平均${a.note || '（時間帯は区別していません）'}` }
+  }
+  const lacking = past.length < MIN_SAMPLE ? `自分の実績が${past.length}回で10回未満のため` : ''
+  if (busyness) {
+    // 混み具合は今の傾向なので、月の倍率は掛けない。未入力の時間だけ時間帯の倍率を使う
+    const { weighted: w, coveredHours } = weightedBusyHours(busyness, startMs, endMs, (ms) => TIME_SLOT_FACTORS[timeSlotOf(new Date(ms).toISOString())])
+    if (coveredHours > 0) {
+      return {
+        revenueYen: Math.round(REFERENCE_HOURLY_REVENUE_YEN * w),
+        source: 'busyness',
+        sampleSize: past.length,
+        note: `推計（${lacking}エリアの混み具合を使用）`,
+      }
+    }
   }
   // 時間帯が切り替わる時刻で区切り、それぞれの長さ × 倍率を足し合わせる
-  const startMs = parseInstant(startsAt)
-  const endMs = parseInstant(endsAt)
   let weighted = 0
   for (let t = startMs; t < endMs; ) {
     const segmentEnd = Math.min(endMs, nextSlotBoundary(t))
@@ -72,7 +112,7 @@ export function estimateRevenue(startsAt: string, endsAt: string, past: readonly
     revenueYen,
     source: 'reference',
     sampleSize: past.length,
-    note: past.length < MIN_SAMPLE ? `推計（自分の実績が${past.length}回で10回未満のため参考資料を使用）` : '推計（参考資料）',
+    note: lacking ? `推計（${lacking}参考資料を使用）` : '推計（参考資料）',
   }
 }
 

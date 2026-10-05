@@ -1,9 +1,19 @@
 // デモ用の合成データ。実配達の記録ではない。デモ用データベースにだけ入れる
 import type { DeliKanDB } from './db'
-import { emptySession, newId } from './repo'
+import { emptySession, newId, saveArea } from './repo'
 import type { SessionRecord } from './schema'
 
+/** デモのエリア（合成の傾向。配達アプリの実際の表ではない）：昼と夜が混み、昼下がりと深夜は空く */
+function demoBusyness(): number[][] {
+  const byHour = [2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 3, 4, 4, 3, 2, 2, 2, 3, 4, 4, 4, 3, 3, 2]
+  return Array.from({ length: 7 }, () => [...byHour])
+}
+
 export async function seedDemo(db: DeliKanDB): Promise<void> {
+  if ((await db.areas.count()) === 0) {
+    const today = new Date().toISOString().slice(0, 10)
+    await saveArea(db, { id: newId(), name: 'サンプルエリア', levels: demoBusyness(), towns: ['サンプル町'], checkedAt: today, createdAt: '', updatedAt: '', revision: 0 })
+  }
   if ((await db.sessions.count()) > 0) return
   const tariff = (await db.tariffs.toArray()).find((t) => t.tariff.kind === 'tiered')
   const now = new Date()

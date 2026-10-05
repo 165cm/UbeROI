@@ -911,3 +911,69 @@ a {
   border-radius: 8px;
   padding-inline: 6px;
 }
+
+/* ---- エリアの混み具合 ---- */
+/* 24マスを12マス×2段に並べる（押せる幅は約26px以上） */
+.busy-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px;
+}
+
+button.busy-cell {
+  min-height: 64px;
+  padding: 2px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  border-radius: 6px;
+  gap: 1px;
+  position: relative;
+}
+
+.busy-bar {
+  display: block;
+  flex: none;
+  margin: 0 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--chart);
+}
+
+/* 濃さでも段階を示す（数字でも読める） */
+.level-1 .busy-bar { opacity: 0.35; }
+.level-2 .busy-bar { opacity: 0.55; }
+.level-3 .busy-bar { opacity: 0.8; }
+.level-4 .busy-bar { opacity: 1; }
+
+
+.busy-level {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.busy-hour {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.1;
+}
+
+textarea {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+input.check {
+  width: 24px;
+  min-height: 24px;
+  height: 24px;
+  flex: none;
+}

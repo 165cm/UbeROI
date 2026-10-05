@@ -1,11 +1,11 @@
 // ホーム（S02）：今日の状態・稼働中のレンタル料金・今月の成績
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { breakAdvice, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
+import { breakAdvice, busyLevelAt, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
 import { CardTitle, IntInput, Problems, Tip, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
-import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, startRental } from '../storage/repo'
+import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, primaryArea, startRental } from '../storage/repo'
 import { pastSessionsFor, periodFor } from '../storage/toDomain'
 import { CashChange } from './CashChange'
 import { ContinueCard } from './ContinueCard'
@@ -31,6 +31,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
     assets: await db.assets.toArray(),
     tariffs: await listTariffs(db),
     settings: await db.settings.get('settings'),
+    areas: await db.areas.toArray(),
   }), [db])
   const active = data?.sessions.find((s) => s.status === 'active')
   const now = useNow(Boolean(active))
@@ -60,6 +61,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
   const selectedTariff =
     data.tariffs.find((t) => t.id === tariffId) ?? pickDefaultTariff(data.tariffs, data.settings)
   const target = data.settings?.targetHourlyYen ?? null
+  const area = primaryArea(data.areas, data.settings)
   // 確定した記録があるのに、7日以上バックアップしていなければ声をかける
   const lastBackup = data.settings?.lastBackupAt
   const backupAgeDays = lastBackup ? Math.floor((Date.parse(now) - Date.parse(lastBackup)) / 86_400_000) : null
@@ -79,6 +81,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
     <div className="stack">
       <section className="card" aria-labelledby="today-title">
         <h3 id="today-title">今日の状態：{status}</h3>
+        {area && <BusyNow levels={area.levels} name={area.name} now={now} />}
         {!active ? (
           <button type="button" className="primary" onClick={() => void run(() => departNow(db))}>
             🏠 自宅を出発
@@ -132,6 +135,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           past={pastSessionsFor(data.sessions)}
           targetHourlyYen={target}
           homeDeadline={data.settings?.homeDeadline ?? null}
+          busyness={area?.levels ?? null}
         />
       )}
 
@@ -243,5 +247,21 @@ function BreakAdviceBox({ tariff, startAt, now }: { tariff: Tariff; startAt: str
         </div>
       </div>
     </details>
+  )
+}
+
+const BUSY_WORDS = ['', '空き', 'やや空き', 'やや混む', '混む'] as const
+
+/** 主なエリアの、今と1時間後の混み具合（配達アプリの傾向を写したもの） */
+function BusyNow({ levels, name, now }: { levels: number[][]; name: string; now: string }) {
+  const t = Date.parse(now)
+  const nowLevel = busyLevelAt(levels, t)
+  const nextLevel = busyLevelAt(levels, t + 3_600_000)
+  if (nowLevel === null && nextLevel === null) return null
+  const word = (l: number | null) => (l === null ? '未入力' : `${'▮'.repeat(l)}${'▯'.repeat(4 - l)} ${BUSY_WORDS[l]}`)
+  return (
+    <p className="hint busy-now">
+      📈 {name}：今 {word(nowLevel)} → 1時間後 {word(nextLevel)}
+    </p>
   )
 }

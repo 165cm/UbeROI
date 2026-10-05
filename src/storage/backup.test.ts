@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DeliKanDB } from './db'
 import { backupFileName, createBackup, deleteAllData, markBackedUp, parseBackup, restoreBackup } from './backup'
 import { acquirePlanItem, emptySession, ensureInitialData, saveRecurringExpense, saveSession } from './repo'
+import { SCHEMA_VERSION } from './schema'
 import { periodFor, recoveryFor } from './toDomain'
 
 let db: DeliKanDB
@@ -207,7 +208,7 @@ describe('データの版の移行（版3）', () => {
     const parsed = parseBackup(JSON.stringify(v3))
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
-    expect(parsed.backup.schema_version).toBe(4)
+    expect(parsed.backup.schema_version).toBe(SCHEMA_VERSION)
     await restoreBackup(db, parsed.backup)
     expect((await db.sessions.toArray()).every((s) => !s.imported)).toBe(true)
   })
@@ -220,5 +221,25 @@ describe('最終バックアップ日時', () => {
     const parsed = parseBackup(JSON.stringify(await createBackup(db, 'demo')))
     expect(parsed.ok).toBe(true)
     expect(backupFileName('demo', '2026-10-05')).toBe('deli-kan-demo-2026-10-05.json')
+  })
+})
+
+describe('データの版の移行（版4）とエリアの検証', () => {
+  it('版4（エリアがない頃）のバックアップは、エリアを空として復元できる', async () => {
+    await seed()
+    const { areas: _omit, ...v4Datasets } = (await createBackup(db, 'real')).datasets
+    const v4 = { ...(await createBackup(db, 'real')), schema_version: 4, datasets: v4Datasets }
+    const parsed = parseBackup(JSON.stringify(v4))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.counts.areas).toBe(0)
+  })
+
+  it('混み具合の表の形が壊れたエリアは復元しない', async () => {
+    const now = new Date().toISOString()
+    const b = await createBackup(db, 'real')
+    b.datasets.areas = [{ id: 'a1', name: '中野', levels: [[9]], towns: [], checkedAt: '2026-10-05', createdAt: now, updatedAt: now, revision: 1 }]
+    const parsed = parseBackup(JSON.stringify(b))
+    expect(parsed.ok).toBe(false)
   })
 })

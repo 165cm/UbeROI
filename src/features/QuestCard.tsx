@@ -38,10 +38,10 @@ export function QuestCard({ now }: { now: string }) {
   if (!data) return null
 
   const nowMs = Date.parse(now)
-  // 今の期間のものと、終わってから1日以内のもの（達成分の入れ忘れ防止）を出す
+  // 今の期間のもの・これから始まるもの（入力の誤りを直せるように）・終わってから1日以内のもの（達成分の入れ忘れ防止）を出す
   const visible = data.quests
-    .filter((q) => Date.parse(q.startsAt) <= nowMs && nowMs < Date.parse(q.endsAt) + 86_400_000)
-    .sort((a, b) => a.endsAt.localeCompare(b.endsAt))
+    .filter((q) => nowMs < Date.parse(q.endsAt) + 86_400_000)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.endsAt.localeCompare(b.endsAt))
 
   return (
     <section className="card stack" aria-labelledby="quest-title">
@@ -67,11 +67,12 @@ export function QuestCard({ now }: { now: string }) {
               now,
             )
             const target = p.next ? p.count + p.next.remaining : q.tiers[q.tiers.length - 1]?.count ?? p.count
+            const upcoming = nowMs < Date.parse(q.startsAt)
             return (
               <div key={q.id} className="subcard stack">
                 <div className="row-between">
                   <strong>{q.label}</strong>
-                  <span className="tag">{p.ended ? '⌛ 終了' : PLATFORM_LABELS[q.platform]}</span>
+                  <span className="tag">{p.ended ? '⌛ 終了' : upcoming ? '🕒 これから' : PLATFORM_LABELS[q.platform]}</span>
                 </div>
                 <p className="hint">{periodText(q)}</p>
                 <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={target} aria-valuenow={p.count} aria-label="クエストの件数">

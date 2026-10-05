@@ -13,10 +13,10 @@ import { QuestCard } from './QuestCard'
 function useNow(active: boolean): string {
   const [now, setNow] = useState(() => new Date().toISOString())
   // 経過時間はタイマーの回数ではなく、保存した開始日時との差で毎回計算する（再読み込み・休止後も正しい）
+  // 稼働中は1秒ごと、そうでない時も1分ごとに進める（クエストの期間の切り替わりなどに追いつくため）
   useEffect(() => {
-    if (!active) return
     setNow(new Date().toISOString())
-    const id = window.setInterval(() => setNow(new Date().toISOString()), 1000)
+    const id = window.setInterval(() => setNow(new Date().toISOString()), active ? 1000 : 60_000)
     return () => window.clearInterval(id)
   }, [active])
   return now

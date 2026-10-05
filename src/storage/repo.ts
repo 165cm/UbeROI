@@ -464,7 +464,8 @@ export async function saveSlot(db: DeliKanDB, slot: SlotRecord): Promise<void> {
 
 // ---- クエスト ----
 
-export async function saveQuest(db: DeliKanDB, quest: QuestRecord): Promise<void> {
+/** クエストの制約。保存時と復元時の両方で使う */
+export function questProblems(quest: QuestRecord): string[] {
   const problems: string[] = []
   if (!quest.label.trim()) problems.push('名前を入力してください')
   try {
@@ -478,6 +479,18 @@ export async function saveQuest(db: DeliKanDB, quest: QuestRecord): Promise<void
   if (quest.tiers.some((t) => !Number.isSafeInteger(t.rewardYen) || t.rewardYen < 0)) problems.push('報酬は0以上の整数円で入力してください')
   if (new Set(counts).size !== counts.length) problems.push('同じ件数の段階が2つあります')
   if (!Number.isSafeInteger(quest.manualOffset)) problems.push('件数の調整は整数で入力してください')
+  if (quest.rewardMode === 'cumulative') {
+    // 累積（達成時の合計額）は、件数が増えるほど同じか増えていないとおかしい
+    const sorted = [...quest.tiers].sort((a, b) => a.count - b.count)
+    if (sorted.some((t, i) => i > 0 && t.rewardYen < sorted[i - 1]!.rewardYen)) {
+      problems.push('累積（達成時の合計額）の報酬が、前の段階より少なくなっています。各段階の上乗せ額なら「段階ごとに上乗せされる額」を選んでください')
+    }
+  }
+  return problems
+}
+
+export async function saveQuest(db: DeliKanDB, quest: QuestRecord): Promise<void> {
+  const problems = questProblems(quest)
   if (problems.length) throw new ValidationError(problems)
   await db.quests.put(stamp({ ...quest, tiers: [...quest.tiers].sort((a, b) => a.count - b.count) }))
 }

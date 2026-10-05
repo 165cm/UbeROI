@@ -2,8 +2,8 @@
 import type { Tariff } from '../domain'
 import type { DeliKanDB, DataMode } from './db'
 import { parseInstant } from '../domain'
-import { initialRecords, sessionRecordProblems, sessionSetProblems } from './repo'
-import { SCHEMA_VERSION, type SessionRecord } from './schema'
+import { initialRecords, questProblems, sessionRecordProblems, sessionSetProblems } from './repo'
+import { SCHEMA_VERSION, type QuestRecord, type SessionRecord } from './schema'
 
 export const APP_VERSION = '0.1.0'
 
@@ -312,6 +312,8 @@ export function parseBackup(text: string): ParseResult {
   const sessions = datasets.sessions as SessionRecord[]
   sessions.forEach((s, i) => sessionRecordProblems(s).forEach((p) => c.add(`${TABLE_LABELS.sessions}[${i + 1}]`, p)))
   sessionSetProblems(sessions).forEach((p) => c.add(TABLE_LABELS.sessions, p))
+  // クエストも保存時と同じ制約（段階が空・同じ件数・累積の減少）で確かめる
+  ;(datasets.quests as QuestRecord[]).forEach((q, i) => questProblems(q).forEach((p) => c.add(`${TABLE_LABELS.quests}[${i + 1}]`, p)))
   if (c.problems.length) return { ok: false, problems: c.problems }
   return { ok: true, backup: raw as unknown as Backup, counts }
 }

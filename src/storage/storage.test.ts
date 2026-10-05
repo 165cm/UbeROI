@@ -14,6 +14,7 @@ import {
   endRental,
   ensureInitialData,
   restoreSession,
+  saveQuest,
   saveRecurringExpense,
   saveSession,
   saveTariff,
@@ -196,5 +197,30 @@ describe('レビュー指摘', () => {
     expect(s.rentals[0]!.endAt).toBe('2026-10-04T12:00:00Z')
     // 稼働中が残らないので、次の出発ができる
     await expect(departNow(db, '2026-10-05T09:00:00Z')).resolves.toBeTypeOf('string')
+  })
+})
+
+describe('クエストの保存の制約（レビュー指摘）', () => {
+  const quest = (over: Record<string, unknown> = {}) => ({
+    id: 'q',
+    label: '選択制',
+    platform: 'uber' as const,
+    startsAt: '2026-10-04T19:00:00Z',
+    endsAt: '2026-10-08T19:00:00Z',
+    rewardMode: 'cumulative' as const,
+    tiers: [
+      { count: 10, rewardYen: 1000 },
+      { count: 20, rewardYen: 500 },
+    ],
+    manualOffset: 0,
+    createdAt: '',
+    updatedAt: '',
+    revision: 0,
+    ...over,
+  })
+
+  it('累積の報酬が前の段階より減る入力は保存しない（上乗せの書き方なら可）', async () => {
+    await expect(saveQuest(db, quest())).rejects.toThrow(/累積/)
+    await expect(saveQuest(db, quest({ rewardMode: 'incremental' }))).resolves.toBeUndefined()
   })
 })

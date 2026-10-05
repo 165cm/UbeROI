@@ -170,6 +170,21 @@ describe('候補枠の検証', () => {
   })
 })
 
+describe('クエストの検証', () => {
+  it('段階が空・同じ件数の段階・累積の減少は復元しない', async () => {
+    const now = new Date().toISOString()
+    const base = { id: 'q1', label: 'x', platform: 'uber', startsAt: '2026-10-04T19:00:00Z', endsAt: '2026-10-08T19:00:00Z', rewardMode: 'incremental', manualOffset: 0, createdAt: now, updatedAt: now, revision: 1 }
+    for (const tiers of [[], [{ count: 10, rewardYen: 100 }, { count: 10, rewardYen: 200 }]]) {
+      const b = await createBackup(db, 'real')
+      b.datasets.quests = [{ ...base, tiers }]
+      expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+    }
+    const b = await createBackup(db, 'real')
+    b.datasets.quests = [{ ...base, rewardMode: 'cumulative', tiers: [{ count: 10, rewardYen: 1000 }, { count: 20, rewardYen: 500 }] }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
+})
+
 describe('データの版の移行', () => {
   it('版1（計画の候補枠がない頃）のバックアップも、候補枠を空として復元できる', async () => {
     await seed()

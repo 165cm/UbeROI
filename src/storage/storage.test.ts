@@ -1,4 +1,4 @@
-// 保存・検証・装備と実績の分離（受入 A11〜A13・A22・A24・A30）
+// 保存・検証・装備と実績の分離（受入 A11〜A13・A18・A22・A24・A28・A30）
 import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DeliKanDB } from './db'
@@ -21,6 +21,8 @@ import {
   startRental,
 } from './repo'
 import { EQUIPMENT_PRESETS } from './presets'
+import { questProgress } from '../domain'
+import { errorMessages } from '../components/fields'
 import type { SessionRecord } from './schema'
 import { periodFor, recoveryFor } from './toDomain'
 
@@ -222,5 +224,36 @@ describe('クエストの保存の制約（レビュー指摘）', () => {
   it('累積の報酬が前の段階より減る入力は保存しない（上乗せの書き方なら可）', async () => {
     await expect(saveQuest(db, quest())).rejects.toThrow(/累積/)
     await expect(saveQuest(db, quest({ rewardMode: 'incremental' }))).resolves.toBeUndefined()
+  })
+})
+
+describe('A18 クエストの見込みは実績に入れない', () => {
+  it('達成見込み1,000円のクエストがあっても、実績の売上は確定した5,000円のまま', async () => {
+    await saveSession(db, completed({ baseYen: 5000, adjustments: [], directExpenses: [] }))
+    await saveQuest(db, {
+      id: 'q-ev',
+      label: '選択制',
+      platform: 'uber',
+      startsAt: '2026-10-01T00:00:00Z',
+      endsAt: '2026-10-08T00:00:00Z',
+      rewardMode: 'incremental',
+      tiers: [{ count: 10, rewardYen: 1000 }],
+      manualOffset: 0,
+      createdAt: '',
+      updatedAt: '',
+      revision: 0,
+    })
+    const quests = await db.quests.toArray()
+    const sessions = await db.sessions.toArray()
+    const progress = questProgress(quests[0]!, sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: true })), '2026-10-05T00:00:00Z')
+    expect(progress.earnedYen).toBe(1000)
+    expect(periodFor(await snapshot(), '2026-10-04', '2026-10-04').totals.revenueYen).toBe(5000)
+  })
+})
+
+describe('A28 保存容量が足りない時', () => {
+  it('成功とは言わず、バックアップの書き出しと再試行を案内する', () => {
+    const quota = Object.assign(new Error('quota'), { name: 'AbortError', inner: { name: 'QuotaExceededError' } })
+    expect(errorMessages(quota)).toEqual([expect.stringMatching(/保存容量が足りない.*バックアップを書き出し.*もう一度/)])
   })
 })

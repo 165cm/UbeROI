@@ -113,3 +113,30 @@ test('A20：対応していない版のバックアップは復元せず、今�
   await page.goto('#records')
   await expect(page.locator('.list-item')).toHaveCount(1)
 })
+
+test('A28：バックアップのファイルを作れなかった時は、成功と表示せず、もう一度試せる', async ({ page }) => {
+  // ファイルを作る処理を1回だけ失敗させる（端末の容量不足などの代わり）
+  await page.addInitScript(() => {
+    const original = URL.createObjectURL.bind(URL)
+    let failed = false
+    URL.createObjectURL = (obj: Blob | MediaSource) => {
+      if (!failed) {
+        failed = true
+        throw new DOMException('quota', 'QuotaExceededError')
+      }
+      return original(obj)
+    }
+  })
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: 'データ' }).click()
+  await page.getByRole('button', { name: '⬇️ バックアップを書き出す' }).click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByText('ファイルを作りました')).toHaveCount(0)
+  await expect(page.getByText('最後のバックアップ：まだありません')).toBeVisible()
+
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: '⬇️ バックアップを書き出す' }).click()
+  await downloading
+  await expect(page.getByText('ファイルを作りました')).toBeVisible()
+  await expect(page.getByText('最後のバックアップ：まだありません')).toHaveCount(0)
+})

@@ -106,9 +106,23 @@ export function QuestWeek({
               今 <strong>{progress.count}件</strong> → 計画（{plan.plannedHours}h）どおりなら <strong>{plan.expectedCount}件</strong>
               {plan.expectedTier > 0 ? `（第${plan.expectedTier}段階まで${plan.expectedBonusYen > 0 ? `・+${formatYen(plan.expectedBonusYen)}` : ''}）` : '（段階に届かない）'}
             </p>
+            {(() => {
+              // 次に目指す段階（計画で届かない最初の段階、なければ一番上）までのバー：濃い＝今、色＝計画で増える分
+              const goal = plan.tiers.find((t) => !t.reachedByPlan) ?? plan.tiers[plan.tiers.length - 1]
+              if (!goal) return null
+              const pct = (n: number) => `${Math.min(100, (n / goal.count) * 100)}%`
+              return (
+                <div className="amount-bar" role="img" aria-label={`今${progress.count}件、計画どおりなら${plan.expectedCount}件、第${goal.tier}段階は${goal.count}件`}>
+                  <span className="amount-done" style={{ width: pct(progress.count) }} />
+                  <span className="amount-plan" style={{ width: `calc(${pct(plan.expectedCount)} - ${pct(progress.count)})` }} />
+                </div>
+              )
+            })()}
             {plan.tiers.length === 0 ? (
               <p className="hint">🎉 全段階を達成しています</p>
             ) : (
+              <details>
+                <summary>段階ごとの見込み（{plan.tiers.length}段階）</summary>
               <div className="table-scroll" tabIndex={0} role="region" aria-label={`${q.label}の段階ごとの見込み`}>
                 <table className="breakdown">
                   <thead>
@@ -126,6 +140,7 @@ export function QuestWeek({
                   </tbody>
                 </table>
               </div>
+              </details>
             )}
             {plan.worthIt ? (
               <div className="stack">

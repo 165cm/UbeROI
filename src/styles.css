@@ -1218,3 +1218,235 @@ select.inline-select {
 .cap-line.capped {
   font-weight: 700;
 }
+
+/* ---- 計画：この週の稼働（量のバー）と、7日の帯 ---- */
+.week-amount {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.stats .big.accent {
+  color: var(--accent);
+}
+
+.amount-bar {
+  position: relative;
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--grid);
+  overflow: hidden;
+}
+
+.amount-done {
+  background: var(--text-muted);
+}
+
+.amount-plan {
+  background: var(--accent);
+}
+
+.amount-over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--danger);
+}
+
+.wb {
+  display: grid;
+  gap: 2px;
+}
+
+/* 時刻の目盛りは帯と同じ横幅に置く（左に曜日、右に時間と＋の分をあける） */
+.wb-axis {
+  position: relative;
+  height: 14px;
+  margin: 0 calc(2.6rem + 40px + 4px) 0 calc(2.4rem + 4px);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.wb-axis > span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.wb-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.wb-day {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr 2.6rem 40px;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+}
+
+.wb-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wb-day.today .wb-label {
+  color: var(--accent);
+}
+
+.wb-day.past .wb-label,
+.wb-day.past .wb-hours {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* 帯は角を丸めるが、はみ出しを切らない（四角の押せる範囲を帯の外まで広げるため） */
+.wb-track {
+  position: relative;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--grid);
+}
+
+.wb-heat {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  opacity: 0.45;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.wb-heat > span {
+  flex: 1;
+}
+
+.wb-past {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  background: var(--surface);
+  opacity: 0.7;
+  border-radius: 6px 0 0 6px;
+}
+
+.wb-day.past .wb-past {
+  border-radius: 6px;
+}
+
+.wb-done {
+  position: absolute;
+  top: 9px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--text-muted);
+}
+
+.wb-track > button.wb-slot {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-height: 0;
+  min-width: 10px;
+  padding: 0;
+  border-radius: 4px;
+  border: 2px dashed var(--accent);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+/* 見た目の四角は小さいが、押せる範囲は上下左右に広げて高さ40px・幅は左右に14pxずつ足す */
+.wb-track > button.wb-slot::before {
+  content: '';
+  position: absolute;
+  inset: -9px -14px;
+}
+
+.wb-track > button.wb-slot.chosen {
+  border-style: solid;
+  background: var(--accent);
+}
+
+.wb-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--danger);
+}
+
+.wb-hours {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+
+.wb-legend .key {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: -2px;
+  vertical-align: middle;
+}
+
+.wb-legend .key.chosen {
+  background: var(--accent);
+}
+
+.wb-legend .key.cand {
+  border: 2px dashed var(--accent);
+}
+
+.wb-legend .key.done {
+  background: var(--text-muted);
+}
+
+/* おすすめの時間の、各時間の段階 */
+.levels {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.levels .lv {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: #1c1f1d;
+}
+
+/* 計画：くわしく見る（比べ方・一覧・エリアの順番・装備）は畳んでおく */
+details.more > summary {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+details.more > summary .hint {
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+details.more[open] > summary {
+  margin-bottom: 8px;
+}

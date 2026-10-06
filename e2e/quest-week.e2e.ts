@@ -11,7 +11,7 @@ test('毎週のクエストと候補枠から、届く段階と、足す価値�
 
   // クエストがなければ、計画にカードは出ない
   await page.goto('#plan')
-  await expect(page.getByRole('heading', { name: /この週のおすすめ/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /この週の稼働/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: /クエストから見たこの週/ })).toHaveCount(0)
 
   await page.goto('#home')
@@ -31,11 +31,12 @@ test('毎週のクエストと候補枠から、届く段階と、足す価値�
   await page.getByLabel('帰宅', { exact: true }).fill('21:00')
   await page.getByRole('button', { name: '🔮 見込みを自動で入れる' }).click()
   await page.getByRole('button', { name: '💾 保存' }).click()
-  await expect(page.getByText(/✅ おすすめ・4\.0h・🚲2,400円/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /17:00〜21:00（✅ おすすめ）を編集/ })).toBeVisible()
 
   const card = page.locator('section', { has: page.getByRole('heading', { name: /クエストから見たこの週/ }) })
   // 目安 2件/時 × 4時間 = 8件 → 4 + 8 = 12件（第1段階の20件には届かない）
   await expect(card).toContainText('今 4件 → 計画（4h）どおりなら 12件（段階に届かない）')
+  await card.getByText('段階ごとの見込み（1段階）').click()
   const table = card.getByRole('region', { name: '平日クエストの段階ごとの見込み' })
   const row = table.getByRole('row', { name: /第1段階/ })
   // あと8件 = 4時間。費用はレンタル代 2,400円 ÷ 4時間 = 600円/時 → ((1,400 − 600) × 4 + 3,000) ÷ 4 = 1,550円/時
@@ -67,7 +68,7 @@ test('毎日のクエストは、表示している週のこれからの回を�
 
   await page.goto('#plan')
   const card = page.getByRole('region', { name: '🎯 クエストから見たこの週' })
-  await expect(card.getByRole('region', { name: '毎日クエストの段階ごとの見込み' })).toHaveCount(3)
+  await expect(card.getByText('段階ごとの見込み（1段階）')).toHaveCount(3)
   await expect(card).toContainText(/10\/9.*〜10\/10/)
   await expect(card).toContainText(/10\/11.*〜10\/12/)
 })

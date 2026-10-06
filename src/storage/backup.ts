@@ -277,6 +277,7 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
       if (typeof t !== 'string') c.add(`${path}.towns[${i}]`, '文字ではありません')
     })
     if (r.moveMinutes !== undefined) c.int(r, 'moveMinutes', path, { nullable: true, min: 1 })
+    if (r.moveFromAreaId !== undefined) c.str(r, 'moveFromAreaId', path, { nullable: true })
     c.stamped(r, path)
   },
   offers(c, r, path) {

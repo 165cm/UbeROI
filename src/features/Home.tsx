@@ -142,7 +142,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           allOffers={data.offers}
           targetHourlyYen={target}
           homeDeadline={data.settings?.homeDeadline ?? null}
-          moveAreas={data.areas.filter((a) => a.id !== area?.id && a.moveMinutes).map((a) => ({ name: a.name, minutes: a.moveMinutes!, levels: a.levels }))}
+          moveAreas={data.areas.filter((a) => area && a.id !== area.id && a.moveMinutes && a.moveFromAreaId === area.id).map((a) => ({ name: a.name, minutes: a.moveMinutes!, levels: a.levels }))}
         />
       )}
 

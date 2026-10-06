@@ -217,6 +217,8 @@ export interface AreaRecord extends Stamped {
   checkedAt: string
   /** 主なエリアからこのエリアへの移動の分（終了までの見通しで「移動」を候補にする。版7で追加。未設定なら候補にしない） */
   moveMinutes?: number | null
+  /** 移動の分をどのエリア（その時の主なエリア）から測ったか。主なエリアが変わったら、その分は使わない（版7で追加） */
+  moveFromAreaId?: string | null
 }
 
 /**

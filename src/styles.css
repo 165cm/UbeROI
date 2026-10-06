@@ -961,7 +961,9 @@ button.busy-cell {
 }
 
 .busy-bar {
-  display: block;
+  position: relative;
+  display: flex;
+  justify-content: center;
   width: 100%;
   border-radius: 3px 3px 0 0;
   background: var(--chart);
@@ -974,15 +976,21 @@ button.busy-cell {
 .level-4 .busy-bar { background: var(--busy-4); }
 
 .busy-level {
+  /* 棒の根元に重ねる（数字が一列にそろい、短い棒でも必ず棒に重なる） */
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 1px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  line-height: 1.2;
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text);
   text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);
+}
+
+.busy-level.busy-empty {
+  bottom: 2px;
 }
 
 .busy-hour {
@@ -1125,13 +1133,21 @@ select.shot-day {
   bottom: 0;
   background: var(--chart);
 }
+/* 数字は棒の根元に置き、短い棒でも重なるようにする */
+.ahead-bar .ahead-num {
+  position: absolute;
+  bottom: 1px;
+  left: 0;
+  right: 0;
+  line-height: 1.2;
+}
 .ahead-cell.level-1 .ahead-bar { background: var(--busy-1); }
 .ahead-cell.level-2 .ahead-bar { background: var(--busy-2); }
 .ahead-cell.level-3 .ahead-bar { background: var(--busy-3); }
 .ahead-cell.level-4 .ahead-bar { background: var(--busy-4); }
 .ahead-num {
   position: relative;
-  align-self: center;
+  align-self: flex-end;
   font-weight: 700;
   color: var(--text);
   text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);

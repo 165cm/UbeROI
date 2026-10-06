@@ -203,8 +203,14 @@ function AreaForm({
                     onClick={() => cycle(hour)}
                   >
                     <span className="busy-plot" aria-hidden="true">
-                      <span className="busy-bar" style={{ height: `${level * 25}%` }} />
-                      <span className="busy-level">{level || '·'}</span>
+                      {/* 数字は棒の中（根元）に置き、短い棒でも重なるようにする */}
+                      {level > 0 ? (
+                        <span className="busy-bar" style={{ height: `${level * 25}%` }}>
+                          <span className="busy-level">{level}</span>
+                        </span>
+                      ) : (
+                        <span className="busy-level busy-empty">·</span>
+                      )}
                     </span>
                     <span className="busy-hour" aria-hidden="true">{hour}</span>
                   </button>

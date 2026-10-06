@@ -1,12 +1,13 @@
 // ホームの「🎯 クエスト」：今の期間のクエストの進み具合（見込みの管理用。実績の売上には自動で入れない）
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { QUEST_REPEAT_LABELS, questOccurrencesNow, questProgress, selectiveQuestPeriod, type Platform, type QuestRepeat } from '../domain'
+import { QUEST_REPEAT_LABELS, parseQuestText, questOccurrencesNow, questProgress, selectiveQuestPeriod, type Platform, type QuestRepeat } from '../domain'
 import { CardTitle, DateTimeInput, IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { newId, saveQuest } from '../storage/repo'
 import { PLATFORM_LABELS, type QuestRecord } from '../storage/schema'
+import { recognizeImages } from './ocr'
 
 function periodText(q: { startsAt: string; endsAt: string }): string {
   const f = (iso: string) => new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })
@@ -134,7 +135,40 @@ export function QuestCard({ now }: { now: string }) {
 function QuestForm({ initial, index, onSave, onCancel }: { initial: QuestRecord; index: number; onSave: (q: QuestRecord) => Promise<void>; onCancel: () => void }) {
   const [q, setQ] = useState(initial)
   const [problems, setProblems] = useState<string[]>([])
+  const [reading, setReading] = useState<{ busy: boolean; message: string } | null>(null)
   const today = localToday()
+
+  /** 配達アプリの「クエストの進捗」の画面のスクショから、期間と段階を入力欄に入れる（保存は利用者が確かめてから） */
+  const readShots = async (files: File[]) => {
+    if (files.length === 0) return
+    setReading({ busy: true, message: `📷 ${files.length}枚を読み取り中…（初めての時は読み取りの準備に少しかかります）` })
+    try {
+      const r = parseQuestText(await recognizeImages(files), new Date().toISOString())
+      const next = { ...q, rewardMode: 'incremental' as const }
+      if (r.startsAt) next.startsAt = r.startsAt
+      if (r.endsAt) next.endsAt = r.endsAt
+      if (r.tiers.length > 0) next.tiers = r.tiers
+      const days = r.startsAt && r.endsAt ? (Date.parse(r.endsAt) - Date.parse(r.startsAt)) / 86_400_000 : null
+      if (r.startsAt && (q.label === initial.label || !q.label.trim())) next.label = days !== null && days >= 1 ? '日跨ぎクエスト' : 'ピークタイムクエスト'
+      setQ(next)
+      const fmt = (iso: string) => new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      const got = [
+        r.startsAt && `開始 ${fmt(r.startsAt)}`,
+        r.endsAt && `終了 ${fmt(r.endsAt)}`,
+        r.tiers.length > 0 && `段階${r.tiers.length}つ（最後は${r.tiers[r.tiers.length - 1]!.count}件）`,
+      ].filter(Boolean)
+      const miss = r.missing.map((m) => ({ start: '開始', end: '終了の時刻', tiers: '段階' })[m])
+      setReading({
+        busy: false,
+        message:
+          got.length === 0
+            ? '⚠️ クエストの期間や段階を読み取れませんでした。手で入れてください'
+            : `📷 読み取りました：${got.join('・')}。${miss.length ? `${miss.join('・')}は読み取れなかったので、手で入れてください。` : ''}確かめてから保存してください`,
+      })
+    } catch {
+      setReading({ busy: false, message: '⚠️ 読み取れませんでした。初めて使う時は、電波のある所で試してください' })
+    }
+  }
   // 調整を入れる回：くり返さないクエストは常に最初の回（manualOffset）
   const slot = (q.repeat ?? 'none') === 'none' ? 0 : index
   const peak = (start: string, end: string, label: string) => {
@@ -153,6 +187,27 @@ function QuestForm({ initial, index, onSave, onCancel }: { initial: QuestRecord;
         }
       }}
     >
+      <div className="stack">
+        <label className="button-link">
+          📷 スクショから読み取る
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="visually-hidden"
+            disabled={reading?.busy}
+            aria-describedby="quest-shot-tip"
+            onChange={(e) => {
+              void readShots([...(e.target.files ?? [])])
+              e.target.value = ''
+            }}
+          />
+        </label>
+        <p id="quest-shot-tip" className="hint">
+          配達アプリの「クエストの進捗」の画面（1つのクエストを2枚に分けてもよい）。配達中の画面は撮らないでください。画像は端末の中で読むだけで、保存・送信しません
+        </p>
+        {reading && <p role="status">{reading.message}</p>}
+      </div>
       <div className="row">
         <TextInput label="名前" value={q.label} onChange={(v) => setQ({ ...q, label: v })} />
         <Select

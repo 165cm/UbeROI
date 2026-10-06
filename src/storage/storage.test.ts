@@ -21,13 +21,14 @@ import {
   saveQuest,
   saveRecurringExpense,
   saveSession,
+  saveSlots,
   saveTariff,
   startRental,
 } from './repo'
 import { EQUIPMENT_PRESETS } from './presets'
 import { emptyBusyness, questProgress } from '../domain'
 import { errorMessages } from '../components/fields'
-import type { SessionRecord } from './schema'
+import type { SessionRecord, SlotRecord } from './schema'
 import { periodFor, recoveryFor } from './toDomain'
 
 let db: DeliKanDB
@@ -307,3 +308,29 @@ describe('エリアの混み具合', () => {
     expect((await db.settings.get('settings'))?.primaryAreaId).toBeNull()
   })
 })
+
+describe('候補枠をまとめて保存', () => {
+  const slot = (id: string, startsAt: string, endsAt: string): SlotRecord => ({
+    id,
+    startsAt,
+    endsAt,
+    areaLabel: '',
+    revenueYen: { pessimistic: 4000, standard: 5000, optimistic: 6000 },
+    estimateNote: '',
+    rentalOverrideYen: null,
+    expenseYen: 0,
+    tariffId: null,
+    createdAt: '',
+    updatedAt: '',
+    revision: 0,
+  })
+
+  it('全部保存できる時は全部入る。1つでも保存できなければ、どれも入らない', async () => {
+    await saveSlots(db, [slot('a', '2026-10-06T08:00:00Z', '2026-10-06T12:00:00Z'), slot('b', '2026-10-07T08:00:00Z', '2026-10-07T11:00:00Z')])
+    expect((await db.slots.toArray()).map((s) => s.id).sort()).toEqual(['a', 'b'])
+    // 2つ目の帰宅が出発より前（保存できない）なら、1つ目の c も入らない
+    await expect(saveSlots(db, [slot('c', '2026-10-08T08:00:00Z', '2026-10-08T11:00:00Z'), slot('d', '2026-10-09T11:00:00Z', '2026-10-09T08:00:00Z')])).rejects.toThrow()
+    expect((await db.slots.toArray()).map((s) => s.id).sort()).toEqual(['a', 'b'])
+  })
+})
+

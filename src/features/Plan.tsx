@@ -27,7 +27,7 @@ import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, l
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
-import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot } from '../storage/repo'
+import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot, saveSlots } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 import { QuestWeek, questWeekItems } from './QuestWeek'
@@ -174,7 +174,9 @@ export function Plan() {
   }
   const questTargets: QuestTarget[] = []
   const taken: { startsAt: string; endsAt: string }[] = [...inWeek, ...done]
-  for (const { q, occ, plan: qp } of questWeekItems(questInput).items) {
+  // 先に終わる回から（§5.8）
+  const questItems = [...questWeekItems(questInput).items].sort((a, b) => a.occ.endsAt.localeCompare(b.occ.endsAt))
+  for (const { q, occ, plan: qp } of questItems) {
     const goal = qp.tiers.find((t) => !t.reachedByPlan && t.possible)
     if (!goal || goal.extraHours <= 0 || questTargets.length >= MAX_QUEST_TARGETS) continue
     const found = busyness
@@ -260,7 +262,12 @@ export function Plan() {
         questTargets={questTargets}
         onAddQuestWindows={async (windows) => {
           const slots = windows.map(fromSuggestion)
-          for (const slot of slots) await saveSlot(db, slot)
+          try {
+            await saveSlots(db, slots)
+          } catch (e) {
+            setNotice({ message: `⚠️ 候補枠を保存できませんでした（1つも入れていません）：${errorMessages(e).join('・')}` })
+            return
+          }
           setNotice({
             message: `🎯 ${slots.length}つの候補枠を入れました`,
             undo: () => void db.slots.bulkDelete(slots.map((x) => x.id)).then(() => setNotice(null)),

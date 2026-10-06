@@ -470,6 +470,13 @@ export async function saveSlot(db: DeliKanDB, slot: SlotRecord): Promise<void> {
   await db.slots.put(stamp(slot))
 }
 
+/** 候補枠をまとめて保存する。1つでも保存できなければ、どれも保存しない */
+export async function saveSlots(db: DeliKanDB, slots: readonly SlotRecord[]): Promise<void> {
+  await db.transaction('rw', db.slots, async () => {
+    for (const slot of slots) await saveSlot(db, slot)
+  })
+}
+
 // ---- クエスト ----
 
 /** クエストの制約。保存時と復元時の両方で使う */

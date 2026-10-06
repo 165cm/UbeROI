@@ -18,20 +18,9 @@ function periodText(o: { startsAt: string; endsAt: string }): string {
   return `${f(o.startsAt)}〜${f(o.endsAt)}`
 }
 
-export function QuestWeek({
-  now,
-  weekStart,
-  weekEnd,
-  quests,
-  sessions,
-  past,
-  chosenSlots,
-  costPerHourYen,
-  targetHourlyYen,
-  onAddSlot,
-}: {
+export interface QuestWeekInput {
   now: string
-  /** 表示している週（日本時間の月曜0時〜翌週月曜0時） */
+  /** 表示している週（月曜4時〜翌週の月曜4時） */
   weekStart: string
   weekEnd: string
   quests: QuestRecord[]
@@ -42,14 +31,15 @@ export function QuestWeek({
   /** 1時間あたりの費用の見込み（選んだ枠のレンタル代・経費の平均） */
   costPerHourYen: number
   targetHourlyYen: number | null
-  onAddSlot: () => void
-}) {
-  const ws = Date.parse(weekStart)
-  const we = Date.parse(weekEnd)
-  const nowMs = Date.parse(now)
-  // 表示している週に重なる、これからの回をすべて（毎日のクエストなら週の各日の回）
-  const from = Math.max(nowMs, ws)
-  const items = quests.flatMap((q) => {
+}
+
+/** 表示している週に重なる、これからのクエストの回（毎日のクエストなら週の各日の回）と、それぞれの見込み */
+export function questWeekItems(input: QuestWeekInput) {
+  const { now, quests, sessions, past, chosenSlots, costPerHourYen, targetHourlyYen } = input
+  const ws = Date.parse(input.weekStart)
+  const we = Date.parse(input.weekEnd)
+  const from = Math.max(Date.parse(now), ws)
+  const occs = quests.flatMap((q) => {
     const first = questOccurrencesNow(q, new Date(from).toISOString()).current
     const out: { q: QuestRecord; occ: { startsAt: string; endsAt: string; index: number } }[] = []
     for (let k = first.index; ; k++) {
@@ -60,13 +50,40 @@ export function QuestWeek({
     }
     return out
   })
-  if (items.length === 0) return null
-
   const rate = ordersPerHour(
     sessions.filter((s) => s.status === 'completed').map((s) => ({ hours: (Date.parse(s.returnedAt ?? s.departedAt) - Date.parse(s.departedAt)) / 3_600_000, completedCount: s.completedCount })),
   )
   const pastHours = past.reduce((a, p) => a + p.hours, 0)
   const revenuePerHour = past.length >= 10 && pastHours > 0 ? Math.round(past.reduce((a, p) => a + p.revenueYen, 0) / pastHours) : REFERENCE_HOURLY_REVENUE_YEN
+  const items = occs.map(({ q, occ }) => {
+    const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
+    const progress = questProgress(
+      { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
+      sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
+      now,
+    )
+    const plan = planQuest({
+      now,
+      startsAt: occ.startsAt,
+      endsAt: occ.endsAt,
+      rewardMode: q.rewardMode,
+      tiers: q.tiers,
+      count: progress.count,
+      slots: chosenSlots,
+      ordersPerHour: rate.rate,
+      revenuePerHourYen: revenuePerHour,
+      costPerHourYen,
+      targetHourlyYen,
+    })
+    return { q, occ, progress, plan }
+  })
+  return { items, rate, revenuePerHour }
+}
+
+export function QuestWeek({ onAddSlot, ...input }: QuestWeekInput & { onAddSlot: () => void }) {
+  const { past, costPerHourYen, targetHourlyYen } = input
+  const { items, rate } = questWeekItems(input)
+  if (items.length === 0) return null
 
   return (
     <section className="card stack" aria-labelledby="quest-week-title">
@@ -76,26 +93,7 @@ export function QuestWeek({
       >
         🎯 クエストから見たこの週
       </CardTitle>
-      {items.map(({ q, occ }) => {
-        const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
-        const progress = questProgress(
-          { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
-          sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
-          now,
-        )
-        const plan = planQuest({
-          now,
-          startsAt: occ.startsAt,
-          endsAt: occ.endsAt,
-          rewardMode: q.rewardMode,
-          tiers: q.tiers,
-          count: progress.count,
-          slots: chosenSlots,
-          ordersPerHour: rate.rate,
-          revenuePerHourYen: revenuePerHour,
-          costPerHourYen,
-          targetHourlyYen,
-        })
+      {items.map(({ q, occ, progress, plan }) => {
         return (
           <div key={`${q.id}-${occ.index}`} className="subcard stack">
             <div className="line">

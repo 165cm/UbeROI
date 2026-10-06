@@ -36,9 +36,8 @@ const HOUR = 3_600_000
 /** 日本時間の4時で区切った日（配達の1日） */
 const businessDay = (ms: number) => Math.floor((ms + 9 * HOUR - 4 * HOUR) / (24 * HOUR))
 
-export function suggestWindows(input: SuggestInput): SuggestedWindow[] {
-  const hours = input.hours ?? SUGGEST_WINDOW_HOURS
-  const count = input.count ?? SUGGEST_COUNT
+/** 正時から始まる長さ hours の枠のうち、予定と重ならず、混み具合がすべて入っていて、帰宅締切を過ぎないもの */
+function windowCandidates(input: SuggestInput, hours: number): SuggestedWindow[] {
   const now = parseInstant(input.now)
   const from = Math.ceil(Math.max(now, parseInstant(input.from)) / HOUR) * HOUR
   const to = parseInstant(input.to)
@@ -61,8 +60,17 @@ export function suggestWindows(input: SuggestInput): SuggestedWindow[] {
     if (input.deadline && e > input.deadline(startsAt)) continue
     candidates.push({ startsAt, endsAt, revenueYen: input.estimate(startsAt, endsAt), levels })
   }
+  return candidates
+}
+
+const byRevenue = (a: SuggestedWindow, b: SuggestedWindow) => b.revenueYen - a.revenueYen || a.startsAt.localeCompare(b.startsAt)
+
+export function suggestWindows(input: SuggestInput): SuggestedWindow[] {
+  const hours = input.hours ?? SUGGEST_WINDOW_HOURS
+  const count = input.count ?? SUGGEST_COUNT
+  const candidates = windowCandidates(input, hours)
   // 見込みの大きい順（同じなら早い順）に、ほかと重ならず、1日1つまで選ぶ
-  const ordered = [...candidates].sort((a, b) => b.revenueYen - a.revenueYen || a.startsAt.localeCompare(b.startsAt))
+  const ordered = [...candidates].sort(byRevenue)
   const picked: SuggestedWindow[] = []
   for (const c of ordered) {
     if (picked.length >= count) break
@@ -73,3 +81,35 @@ export function suggestWindows(input: SuggestInput): SuggestedWindow[] {
   }
   return picked.sort((a, b) => a.startsAt.localeCompare(b.startsAt))
 }
+
+/** クエストのための時間で、1つの枠の長さの上限（時間） */
+export const QUEST_WINDOW_MAX_HOURS = 3
+/** クエストのための時間で、出す枠の数の上限 */
+export const QUEST_WINDOW_MAX_COUNT = 5
+
+/**
+ * 必要な時間（例：クエストの次の段階まで、計画の後に足す時間）を、空いている時間の中から、
+ * 見込みの大きい枠で埋める。枠の長さは残りの時間（切り上げ）と3時間の小さい方。入る枠がなければ短くして探す
+ */
+export function suggestHours(input: Omit<SuggestInput, 'hours' | 'count'> & { hoursNeeded: number }): { windows: SuggestedWindow[]; hours: number; shortHours: number } {
+  const windows: SuggestedWindow[] = []
+  let got = 0
+  while (got < input.hoursNeeded - 1e-9 && windows.length < QUEST_WINDOW_MAX_COUNT) {
+    let pick: SuggestedWindow | undefined
+    for (let len = Math.min(QUEST_WINDOW_MAX_HOURS, Math.ceil(input.hoursNeeded - got - 1e-9)); len >= 1 && !pick; len--) {
+      pick = windowCandidates({ ...input, busy: [...input.busy, ...windows] }, len).sort(byRevenue)[0]
+    }
+    if (!pick) break
+    windows.push(pick)
+    got += pick.levels.length
+  }
+  // 続いている枠（例：17〜20時と20〜21時）は1つにまとめる
+  const merged: SuggestedWindow[] = []
+  for (const w of windows.sort((a, b) => a.startsAt.localeCompare(b.startsAt))) {
+    const last = merged[merged.length - 1]
+    if (last && last.endsAt === w.startsAt) merged[merged.length - 1] = { ...last, endsAt: w.endsAt, revenueYen: last.revenueYen + w.revenueYen, levels: [...last.levels, ...w.levels] }
+    else merged.push(w)
+  }
+  return { windows: merged, hours: got, shortHours: Math.max(0, Math.round((input.hoursNeeded - got) * 10) / 10) }
+}
+

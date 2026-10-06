@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { BUSINESS_HOURS, emptyBusyness, filledCount, readBusyChart, WEEKDAY_LABELS, type BusynessTable, type Pixels } from '../domain'
-import { CardTitle, Notice, Problems, TextInput, Tip, errorMessages, localToday } from '../components/fields'
+import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, localToday } from '../components/fields'
 import { useData } from '../storage/context'
 import { deleteArea, newId, primaryArea, saveArea, saveSettings } from '../storage/repo'
 import type { AreaRecord } from '../storage/schema'
@@ -34,6 +34,7 @@ export function AreaSettings() {
       <AreaForm
         initial={editing.area}
         initialPrimary={editing.primary}
+        primaryId={primary?.id ?? null}
         onCancel={() => setEditing(null)}
         onSave={async (area, makePrimary) => {
           // エリアと主なエリアの指定は、同じ1回の書き込みで保存する
@@ -69,7 +70,7 @@ export function AreaSettings() {
                   <strong>{a.name}</strong> {primary?.id === a.id && <span className="tag">主なエリア</span>}
                   <br />
                   <span className="hint">
-                    {filledCount(a.levels)}/168マス・地名{a.towns.length}・確認 {a.checkedAt}
+                    {filledCount(a.levels)}/168マス・地名{a.towns.length}{a.moveMinutes && primary?.id !== a.id ? (a.moveFromAreaId === primary?.id ? `・移動${a.moveMinutes}分` : '・移動の分は入れ直し') : ''}・確認 {a.checkedAt}
                     {age >= AREA_REVIEW_DAYS && <strong>（⚠️ {age}日たちました。見直しましょう）</strong>}
                   </span>
                 </span>
@@ -109,11 +110,14 @@ export function AreaSettings() {
 function AreaForm({
   initial,
   initialPrimary,
+  primaryId,
   onSave,
   onCancel,
 }: {
   initial: AreaRecord
   initialPrimary: boolean
+  /** 今の主なエリア（移動の分をどこから測ったかとして保存する） */
+  primaryId: string | null
   onSave: (area: AreaRecord, primary: boolean) => Promise<void>
   onCancel: () => void
 }) {
@@ -136,7 +140,9 @@ function AreaForm({
       onSubmit={async (e) => {
         e.preventDefault()
         try {
-          await onSave({ ...area, towns: townsText.split(/[、,，\n]/) }, primary)
+          // 移動の分は「今の主なエリアから」として保存する（主なエリアにする時・主なエリアがない時は使わない）
+          const from = !primary && area.moveMinutes != null && primaryId && primaryId !== area.id ? primaryId : null
+          await onSave({ ...area, towns: townsText.split(/[、,，\n]/), moveMinutes: from ? area.moveMinutes : null, moveFromAreaId: from }, primary)
         } catch (err) {
           setProblems(errorMessages(err))
         }
@@ -154,6 +160,18 @@ function AreaForm({
           <input type="checkbox" className="check" checked={primary} onChange={(e) => setPrimary(e.target.checked)} />
           <span>主なエリアにする（計画と「続ける？帰る？」の見込みに使う）</span>
         </label>
+        {!primary && (
+          <IntInput
+            label="主なエリアからの移動（任意）"
+            unit="分"
+            value={area.moveMinutes ?? null}
+            onChange={(v) => setArea({ ...area, moveMinutes: v })}
+            tip="入れると、稼働中の「終了までの見通し」で、このエリアへ移動する案も比べます。移動している間は稼げない時間として数えます。主なエリアを変えたら、入れ直してください"
+          />
+        )}
+        {!primary && area.moveMinutes != null && area.moveFromAreaId && area.moveFromAreaId !== primaryId && (
+          <p className="hint" role="status">⚠️ この移動の分は、前の主なエリアから測った値です。今の主なエリアからの分に直して保存してください</p>
+        )}
       </section>
 
       <section className="card stack">

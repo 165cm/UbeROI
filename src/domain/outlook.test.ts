@@ -108,3 +108,42 @@ describe('終了予定の時刻', () => {
     expect(evaluateOutlook({ ...base, now, endAt: new Date(endTimeMs(now, '20:45')).toISOString() })).toMatchObject({ minutesLeft: 0, recommended: 'stop' })
   })
 })
+
+describe('エリアの移動', () => {
+  const at = (rate: number) => (start: string, end: string) => Math.round(((Date.parse(end) - Date.parse(start)) / 3_600_000) * rate)
+
+  it('移動の時間を引いても200円以上良い時だけ移動を勧める。移動の間もレンタル代はかかる', () => {
+    const busy = emptyBusyness()
+    busy[1]![19] = 4
+    // ここは1時間1,500円、新宿は2,500円（移動20分）、吉祥寺は1,600円（移動10分）
+    const r = evaluateOutlook({
+      ...base,
+      moves: [
+        { name: '新宿エリア', minutes: 20, estimate: at(2500), busyness: busy },
+        { name: '吉祥寺エリア', minutes: 10, estimate: at(1600) },
+      ],
+    })
+    const move = r.options.find((o) => o.action === 'move')!
+    // 新宿：1時間40分 × 2,500円 = 4,167円（目標を上回る分 4,167 − 2,000 = 2,167）
+    expect(move).toMatchObject({ areaName: '新宿エリア', moveMinutes: 20, revenueYen: 4167, arrivalLevel: 4 })
+    expect(r.options.filter((o) => o.action === 'move')).toHaveLength(1)
+    expect(r.recommended).toBe('move')
+    expect(r.reasons.join()).toContain('「新宿エリア」へ移動（20分）すると、移動の時間を引いても +1,167円（着く頃は段階4）')
+    expect(r.reasons.join()).toContain('エリア同士の比較は目安')
+
+    // 吉祥寺だけ：1時間50分 × 1,600円 = 2,933円 → 続ける（3,000円）より下なので移動しない
+    expect(evaluateOutlook({ ...base, moves: [{ name: '吉祥寺エリア', minutes: 10, estimate: at(1600) }] }).recommended).toBe('continue')
+
+    // レンタル中：移動の20分も乗っているので、続けるより料金が増える
+    const rental = { tariff: HELLO_TOKYO_CITY, startAt: jst('2026-10-05T18:30:00') }
+    const withRental = evaluateOutlook({ ...base, rental, moves: [{ name: '新宿エリア', minutes: 20, estimate: at(2500) }] })
+    const cont = withRental.options.find((o) => o.action === 'continue')!
+    expect(withRental.options.find((o) => o.action === 'move')!.rentalYen).toBe(cont.rentalYen)
+  })
+
+  it('着いてから30分働けないエリアは候補にしない', () => {
+    const r = evaluateOutlook({ ...base, endAt: jst('2026-10-05T19:40:00'), moves: [{ name: '新宿エリア', minutes: 20, estimate: at(5000) }] })
+    expect(r.options.some((o) => o.action === 'move')).toBe(false)
+  })
+})
+

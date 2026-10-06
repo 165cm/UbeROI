@@ -60,3 +60,65 @@ test('終了予定を決めると、今日のペースとこの先の混み具�
   await page.reload()
   await expect(page.getByLabel('終了予定（配達をやめる時刻）', { exact: true })).toHaveValue('21:00')
 })
+
+test('移動の分を入れたエリアの方が見込みが良ければ、エリアの移動を勧める', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-05T18:30:00+09:00') })
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: 'エリア' }).click()
+  // 主なエリア：月曜19・20時台は空き
+  await page.getByRole('button', { name: 'エリアを追加' }).click()
+  await page.getByLabel('エリアの名前', { exact: true }).fill('中野・荻窪エリア')
+  await page.getByRole('button', { name: /^月曜 19時/ }).click()
+  await page.getByRole('button', { name: /^月曜 20時/ }).click()
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  // 隣のエリア：月曜19・20時台は混む、移動15分
+  await page.getByRole('button', { name: 'エリアを追加' }).click()
+  await page.getByLabel('エリアの名前', { exact: true }).fill('新宿エリア')
+  for (const h of [19, 20]) {
+    const cell = page.getByRole('button', { name: new RegExp(`^月曜 ${h}時`) })
+    for (let i = 0; i < 4; i++) await cell.click()
+  }
+  await page.getByLabel('主なエリアにする（計画と「続ける？帰る？」の見込みに使う）').uncheck()
+  await page.getByLabel('主なエリアからの移動（任意）', { exact: true }).fill('15')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.getByText(/移動15分/)).toBeVisible()
+  // もう1つのエリア：同じく混む、移動30分
+  await page.getByRole('button', { name: 'エリアを追加' }).click()
+  await page.getByLabel('エリアの名前', { exact: true }).fill('吉祥寺エリア')
+  for (const h of [19, 20]) {
+    const cell = page.getByRole('button', { name: new RegExp(`^月曜 ${h}時`) })
+    for (let i = 0; i < 4; i++) await cell.click()
+  }
+  await page.getByLabel('主なエリアにする（計画と「続ける？帰る？」の見込みに使う）').uncheck()
+  await page.getByLabel('主なエリアからの移動（任意）', { exact: true }).fill('30')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.getByText(/移動30分/)).toBeVisible()
+
+  await page.goto('#home')
+  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  // 出発が保存されてから（カードが出てから）時刻を進めて読み直す
+  await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
+  await page.clock.setFixedTime(new Date('2026-10-05T19:00:00+09:00'))
+  await page.reload()
+  await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
+  await page.getByLabel('終了予定（配達をやめる時刻）', { exact: true }).fill('21:00')
+  const options = page.getByRole('list', { name: '行動ごとのこの先の利益' }).getByRole('listitem')
+  await expect(options.filter({ hasText: 'おすすめ' })).toContainText('新宿エリアへ移動（15分）')
+  await expect(page.getByText(/「新宿エリア」へ移動（15分）すると、移動の時間を引いても \+[\d,]+円（着く頃は段階4）/)).toBeVisible()
+
+  await expect(options).toHaveCount(4)
+
+  // 主なエリアを新宿に変えると、中野から測った吉祥寺への30分は使わない（入れ直すまで移動の案に出さない）
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: 'エリア' }).click()
+  await page.getByRole('button', { name: '新宿エリアを編集' }).click()
+  await page.getByLabel('主なエリアにする（計画と「続ける？帰る？」の見込みに使う）').check()
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.getByText(/移動の分は入れ直し/)).toBeVisible()
+  await page.getByRole('button', { name: '吉祥寺エリアを編集' }).click()
+  await expect(page.getByText('前の主なエリアから測った値です')).toBeVisible()
+  await page.getByRole('button', { name: 'やめる' }).click()
+  await page.goto('#home')
+  await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
+  await expect(page.getByRole('list', { name: '行動ごとのこの先の利益' }).getByRole('listitem').filter({ hasText: '移動' })).toHaveCount(0)
+})

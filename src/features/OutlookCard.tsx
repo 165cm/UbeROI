@@ -6,7 +6,7 @@ import { CardTitle, IntInput, Tip } from '../components/fields'
 import { formatYen } from '../format'
 import { loadPrefs } from './ContinueCard'
 
-const ACTION_LABELS: Record<OutlookAction, string> = { continue: 'このまま続ける', break: '休憩して再開', stop: '今やめて帰る' }
+const ACTION_LABELS: Record<OutlookAction, string> = { continue: 'このまま続ける', break: '休憩して再開', move: 'エリアを移動', stop: '今やめて帰る' }
 const LEVEL_MARKS = ['·', '▮', '▮▮', '▮▮▮', '▮▮▮▮'] as const
 
 const STORE_KEY = 'deli-kan:outlook'
@@ -65,6 +65,7 @@ export function OutlookCard({
   allOffers,
   targetHourlyYen,
   homeDeadline,
+  moveAreas,
 }: {
   now: string
   sessionId: string
@@ -76,6 +77,8 @@ export function OutlookCard({
   allOffers: OutlookOffer[]
   targetHourlyYen: number | null
   homeDeadline: string | null
+  /** 移動の候補にするエリア（主なエリア以外で、移動の分を登録したもの） */
+  moveAreas: { name: string; minutes: number; levels: BusynessTable }[]
 }) {
   const prefs = loadPrefs()
   const [stored, setStored] = useState<Stored>(
@@ -102,17 +105,18 @@ export function OutlookCard({
       homeDeadline,
       deadlineMs: homeDeadline ? deadlineMs(departedAt, homeDeadline) : null,
       targetHourlyYen,
+      moves: moveAreas.map((a) => ({ name: a.name, minutes: a.minutes, busyness: a.levels, estimate: (st: string, e: string) => estimateRevenue(st, e, past, a.levels).revenueYen })),
     })
     // 実績・レンタル・好みは毎秒作り直される値なので、件数と分が変わった時だけ計算し直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minute, departedAt, stored, offers, allOffers, past.length, busyness, rental?.startAt, rental?.tariff, homeDeadline, targetHourlyYen])
+  }, [minute, departedAt, stored, offers, allOffers, past.length, busyness, rental?.startAt, rental?.tariff, homeDeadline, targetHourlyYen, moveAreas.map((a) => `${a.name}:${a.minutes}`).join()])
 
   const { soFar } = result
   return (
     <section className="card stack" aria-labelledby="outlook-title">
       <CardTitle
         id="outlook-title"
-        tip="止まっている時に確かめてください（走行中は操作しないでください）。終了予定までの時間を、このまま続ける・休憩して再開する・今やめて帰るの3つで比べます。この先の売上は、混み具合と自分の実績から出す普段の見込みに、今日のペース（普段の見込みとの比）を半分だけ反映した目安です。すでに稼いだ分はどれを選んでも同じなので比べません。目標の時給があれば、それを上回る分が一番大きい行動を勧めます（今やめる場合との差が200円未満なら早く帰る方）。今日のここまでは、オファー判定で「受けた」と記録した報酬の合計です。"
+        tip="止まっている時に確かめてください（走行中は操作しないでください）。終了予定までの時間を、このまま続ける・休憩して再開する・ほかのエリアへ移動する（設定 → エリアで移動の分を入れたエリア）・今やめて帰るで比べます。移動は、移動しない一番良い案より200円以上良い時だけ勧めます。この先の売上は、混み具合と自分の実績から出す普段の見込みに、今日のペース（普段の見込みとの比）を半分だけ反映した目安です。すでに稼いだ分はどれを選んでも同じなので比べません。目標の時給があれば、それを上回る分が一番大きい行動を勧めます（今やめる場合との差が200円未満なら早く帰る方）。今日のここまでは、オファー判定で「受けた」と記録した報酬の合計です。"
       >
         🏁 終了までの見通し
       </CardTitle>
@@ -164,7 +168,7 @@ export function OutlookCard({
             <li key={o.action} className={`line${picked ? ' picked' : ''}`}>
               <span className="grow">
                 {picked ? '▶ ' : ''}
-                {o.action === 'break' ? `${o.breakMinutes}分休憩して再開` : ACTION_LABELS[o.action]}
+                {o.action === 'break' ? `${o.breakMinutes}分休憩して再開` : o.action === 'move' ? `${o.areaName}へ移動（${o.moveMinutes}分）` : ACTION_LABELS[o.action]}
                 {picked && <span className="tag">おすすめ</span>}
               </span>
               <span className="num">

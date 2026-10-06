@@ -276,6 +276,8 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.arr(r, 'towns', path).forEach((t, i) => {
       if (typeof t !== 'string') c.add(`${path}.towns[${i}]`, '文字ではありません')
     })
+    if (r.moveMinutes !== undefined) c.int(r, 'moveMinutes', path, { nullable: true, min: 1 })
+    if (r.moveFromAreaId !== undefined) c.str(r, 'moveFromAreaId', path, { nullable: true })
     c.stamped(r, path)
   },
   offers(c, r, path) {
@@ -306,9 +308,10 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし）のバックアップは、足りない一覧を空として読み込む。
+  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし、6：エリアの移動の分なし）のバックアップは、足りない一覧を空として読み込む。
+  // 版6までのエリアには移動の分（moveMinutes）が無いが、無ければ移動を候補にしないだけなので、そのままでよい
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ([1, 2, 3, 4, 5].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+  if ([1, 2, 3, 4, 5, 6].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
     raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], offers: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }

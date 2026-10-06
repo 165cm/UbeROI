@@ -8,7 +8,7 @@ import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, Tariff 
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 interface Stamped {
   createdAt: string
@@ -215,6 +215,10 @@ export interface AreaRecord extends Stamped {
   towns: string[]
   /** 配達アプリで確かめた日 YYYY-MM-DD（1か月たったら見直しを知らせる） */
   checkedAt: string
+  /** 主なエリアからこのエリアへの移動の分（終了までの見通しで「移動」を候補にする。版7で追加。未設定なら候補にしない） */
+  moveMinutes?: number | null
+  /** 移動の分をどのエリア（その時の主なエリア）から測ったか。主なエリアが変わったら、その分は使わない（版7で追加） */
+  moveFromAreaId?: string | null
 }
 
 /**

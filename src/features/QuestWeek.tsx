@@ -4,6 +4,7 @@ import {
   REFERENCE_HOURLY_REVENUE_YEN,
   ordersPerHour,
   planQuest,
+  questOccurrence,
   questOccurrencesNow,
   questProgress,
   type PastSession,
@@ -46,13 +47,19 @@ export function QuestWeek({
   const ws = Date.parse(weekStart)
   const we = Date.parse(weekEnd)
   const nowMs = Date.parse(now)
-  // 表示している週に重なる回（今の週なら今の回、先の週ならその週の始まりの回）
-  const items = quests
-    .map((q) => {
-      const occ = questOccurrencesNow(q, new Date(Math.max(nowMs, ws)).toISOString()).current
-      return { q, occ }
-    })
-    .filter(({ occ }) => Date.parse(occ.startsAt) < we && Date.parse(occ.endsAt) > ws && Date.parse(occ.endsAt) > nowMs)
+  // 表示している週に重なる、これからの回をすべて（毎日のクエストなら週の各日の回）
+  const from = Math.max(nowMs, ws)
+  const items = quests.flatMap((q) => {
+    const first = questOccurrencesNow(q, new Date(from).toISOString()).current
+    const out: { q: QuestRecord; occ: { startsAt: string; endsAt: string; index: number } }[] = []
+    for (let k = first.index; ; k++) {
+      const occ = { ...questOccurrence(q, k), index: k }
+      if (Date.parse(occ.startsAt) >= we) break
+      if (Date.parse(occ.endsAt) > from) out.push({ q, occ })
+      if ((q.repeat ?? 'none') === 'none') break
+    }
+    return out
+  })
   if (items.length === 0) return null
 
   const rate = ordersPerHour(

@@ -8,6 +8,8 @@ describe('1時間あたりの件数', () => {
   it('件数の入った確定記録が3回以上なら自分の平均、それまでは目安の2件', () => {
     expect(ordersPerHour([{ hours: 2, completedCount: 5 }, { hours: 3, completedCount: 7 }])).toEqual({ rate: 2, source: 'reference', samples: 2 })
     expect(ordersPerHour([{ hours: 2, completedCount: 5 }, { hours: 3, completedCount: 7 }, { hours: 3, completedCount: 8 }, { hours: 1, completedCount: null }])).toEqual({ rate: 2.5, source: 'personal', samples: 3 })
+    // 0件の記録も自分の実績として使う
+    expect(ordersPerHour([{ hours: 2, completedCount: 0 }, { hours: 3, completedCount: 0 }, { hours: 1, completedCount: 0 }])).toEqual({ rate: 0, source: 'personal', samples: 3 })
   })
 })
 
@@ -58,6 +60,13 @@ describe('クエストの組み立て', () => {
     // 1時間300円の費用：第2段階は (1,100×2.5 + 1,500) ÷ 2.5 = 1,700円/時、第3段階は (1,100×10 + 4,000) ÷ 10 = 1,500円/時
     const p = planQuest({ ...base, costPerHourYen: 300, targetHourlyYen: 1800 })
     expect(p.tiers.map((t) => t.extraHourlyYen)).toEqual([null, 1700, 1500])
+    expect(p.worthIt).toBeNull()
+  })
+
+  it('1時間の件数が0なら、時間を足しても届かない（段階はすべて期間内は無理）', () => {
+    const p = planQuest({ ...base, ordersPerHour: 0 })
+    expect(p.expectedCount).toBe(6)
+    expect(p.tiers.map((t) => [t.possible, t.extraHourlyYen])).toEqual([[false, null], [false, null], [false, null]])
     expect(p.worthIt).toBeNull()
   })
 })

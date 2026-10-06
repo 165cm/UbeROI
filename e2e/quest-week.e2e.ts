@@ -50,3 +50,24 @@ test('毎週のクエストと候補枠から、届く段階と、足す価値�
   await expect(card).toContainText(/10\/12.*〜10\/16/)
   await expect(card).toContainText('今 0件 → 計画（0h）どおりなら 0件（段階に届かない）')
 })
+
+test('毎日のクエストは、表示している週のこれからの回をすべて出す', async ({ page }) => {
+  // 金曜の昼：金・土・日の3回が残っている
+  await page.clock.install({ time: new Date('2026-10-09T12:00:00+09:00') })
+  await page.goto('#home')
+  await page.getByRole('button', { name: 'クエストを追加' }).click()
+  await page.getByLabel('名前', { exact: true }).fill('毎日クエスト')
+  await page.getByLabel('開始', { exact: true }).fill('2026-10-05T04:00')
+  await page.getByLabel('終了', { exact: true }).fill('2026-10-06T04:00')
+  await page.getByLabel('くり返し', { exact: true }).selectOption('daily')
+  await page.getByLabel('第1段階の件数', { exact: true }).fill('5')
+  await page.getByLabel('報酬', { exact: true }).fill('500')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.locator('.subcard', { hasText: '毎日クエスト' }).first()).toBeVisible()
+
+  await page.goto('#plan')
+  const card = page.getByRole('region', { name: '🎯 クエストから見たこの週' })
+  await expect(card.getByRole('region', { name: '毎日クエストの段階ごとの見込み' })).toHaveCount(3)
+  await expect(card).toContainText(/10\/9.*〜10\/10/)
+  await expect(card).toContainText(/10\/11.*〜10\/12/)
+})

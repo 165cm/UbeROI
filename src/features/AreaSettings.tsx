@@ -185,24 +185,34 @@ function AreaForm({
             </button>
           ))}
         </div>
-        <div className="busy-grid" role="group" aria-label={`${WEEKDAY_LABELS[day]}曜日の時間帯ごとの傾向`}>
-          {BUSINESS_HOURS.map((hour) => {
-            const level = row[hour]!
-            return (
-              <button
-                key={hour}
-                type="button"
-                className={`busy-cell level-${level}`}
-                aria-label={`${WEEKDAY_LABELS[day]}曜 ${hour}時：${LEVEL_LABELS[level]}`}
-                onClick={() => cycle(hour)}
-              >
-                <span className="busy-bar" aria-hidden="true" style={{ height: `${level * 8}px` }} />
-                <span className="busy-level" aria-hidden="true">{level || '·'}</span>
-                <span className="busy-hour" aria-hidden="true">{hour}</span>
-              </button>
-            )
-          })}
-        </div>
+        {[
+          { label: '☀️ 昼の部（4〜15時）', hours: BUSINESS_HOURS.slice(0, 12) },
+          { label: '🌙 夜の部（16〜翌3時）', hours: BUSINESS_HOURS.slice(12) },
+        ].map((half) => (
+          <div key={half.label} className="busy-half">
+            <p className="busy-half-label">{half.label}</p>
+            <div className="busy-grid" role="group" aria-label={`${WEEKDAY_LABELS[day]}曜日の${half.label}`}>
+              {half.hours.map((hour) => {
+                const level = row[hour]!
+                return (
+                  <button
+                    key={hour}
+                    type="button"
+                    className={`busy-cell level-${level}`}
+                    aria-label={`${WEEKDAY_LABELS[day]}曜 ${hour}時：${LEVEL_LABELS[level]}`}
+                    onClick={() => cycle(hour)}
+                  >
+                    <span className="busy-plot" aria-hidden="true">
+                      <span className="busy-bar" style={{ height: `${level * 25}%` }} />
+                      <span className="busy-level">{level || '·'}</span>
+                    </span>
+                    <span className="busy-hour" aria-hidden="true">{hour}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
         <p className="hint">1 空き・2 やや空き・3 やや混む・4 混む（「·」は未入力）</p>
         <ScreenshotImport
           firstDay={day}

@@ -939,37 +939,50 @@ a {
 }
 
 button.busy-cell {
-  min-height: 64px;
+  min-height: 0;
   padding: 2px 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   align-items: stretch;
   border-radius: 6px;
-  gap: 1px;
+  gap: 2px;
+}
+
+/* 棒の場所（高さをそろえ、根元を一直線にする）。段階の数字は棒の上に重ねる */
+.busy-plot {
   position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 44px;
+  margin: 0 2px;
+  border-radius: 4px;
+  background: var(--chart-muted-bg, rgba(127, 127, 127, 0.12));
+  overflow: hidden;
 }
 
 .busy-bar {
   display: block;
-  flex: none;
-  margin: 0 3px;
+  width: 100%;
   border-radius: 3px 3px 0 0;
   background: var(--chart);
 }
 
-/* 濃さでも段階を示す（数字でも読める） */
+/* 混み具合の色（4 混む＝緑 → 1 空き＝赤）。数字も必ず出す */
 .level-1 .busy-bar { background: var(--busy-1); }
 .level-2 .busy-bar { background: var(--busy-2); }
 .level-3 .busy-bar { background: var(--busy-3); }
 .level-4 .busy-bar { background: var(--busy-4); }
 
-
 .busy-level {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
-  text-align: center;
-  line-height: 1.1;
+  color: var(--text);
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);
 }
 
 .busy-hour {
@@ -977,6 +990,15 @@ button.busy-cell {
   color: var(--text-muted);
   text-align: center;
   line-height: 1.1;
+}
+
+.busy-half + .busy-half {
+  margin-top: 6px;
+}
+.busy-half-label {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 textarea {

@@ -7,6 +7,7 @@ test('終了予定を決めると、今日のペースとこの先の混み具�
   await page.clock.install({ time: new Date('2026-10-05T17:00:00+09:00') })
   await page.goto('#settings')
   await page.getByLabel('目標の営業純時給', { exact: true }).fill('1200')
+  await page.getByLabel('オファー判定を使う（手入力）').check()
   await page.getByRole('button', { name: '💾 保存' }).click()
   // エリア：月曜19時台は空き、20時台は混む
   await page.getByRole('tab', { name: 'エリア' }).click()

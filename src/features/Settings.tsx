@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Tariff } from '../domain'
-import { CardTitle, IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
+import { CardTitle, IntInput, Notice, Problems, Select, TextInput, Tip, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { listTariffs, newId, saveRecurringExpense, saveSettings, saveTariff } from '../storage/repo'
@@ -78,6 +78,7 @@ function BasicSettings() {
             <div><dt>帰宅締切</dt><dd>{saved.homeDeadline ?? '未設定'}</dd></div>
             <div><dt>起点</dt><dd>{saved.originLabel ?? '未設定'}</dd></div>
             <div className="wide"><dt>よく使う料金</dt><dd>{tariffName ?? '未設定（一覧の先頭）'}</dd></div>
+            <div className="wide"><dt>オファー判定</dt><dd>{saved.offerJudgeEnabled ? '使う（手入力）' : '使わない'}</dd></div>
           </dl>
         </section>
       </div>
@@ -116,6 +117,15 @@ function BasicSettings() {
         options={[{ value: '', label: '未設定（一覧の先頭を使う）' }, ...tariffs.map((t) => ({ value: t.id, label: t.name }))]}
         onChange={(v) => set({ defaultTariffId: v || null })}
       />
+      <div className="line">
+        <label className="line grow">
+          <input type="checkbox" className="check" checked={form.offerJudgeEnabled ?? false} onChange={(e) => set({ offerJudgeEnabled: e.target.checked })} />
+          <span>オファー判定を使う（手入力）</span>
+        </label>
+        <Tip label="オファー判定の使い方">
+          ホームに「🧾 オファー判定」が出ます。止まっている時に、配達アプリのオファーを見ながら報酬・分・km を手で入れると、受けるかの目安を出します。配達アプリの画面のスクリーンショットや、画面の読み取りは使いません（配達アプリから警告されることがあるため）。
+        </Tip>
+      </div>
       <Problems items={problems} />
       {notice && <Notice message={notice} onClose={() => setNotice(null)} />}
       <div className="actions">

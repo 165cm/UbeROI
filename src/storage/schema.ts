@@ -8,7 +8,7 @@ import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, Tariff 
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 interface Stamped {
   createdAt: string
@@ -33,6 +33,8 @@ export interface SettingsRecord extends Stamped {
   offerBufferMinutes?: number
   /** オファー判定：km単価の下限（任意。null／未定義は使わない） */
   offerMinKmYen?: number | null
+  /** オファー判定を使うか（手入力。版8で追加。未定義は使わない） */
+  offerJudgeEnabled?: boolean
 }
 
 export interface TariffRecord extends Stamped {

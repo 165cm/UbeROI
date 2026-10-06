@@ -46,7 +46,7 @@
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集 |
 | `src/features/CashChange.tsx` | ホームの「💴 お釣り」 |
-| `src/features/OfferJudge.tsx` | オファー判定（`#offer`。ショートカットから text=・cfg= を受け取る）、判定の基準、ショートカットの作り方、持ち帰り／取り込み、地名の評価の一覧 |
+| `src/features/OfferJudge.tsx` | オファー判定（`#offer`。設定でオンの時だけ。手入力の報酬・分・km・届け先の地名で判定。前のショートカットの text=・cfg= も読めるが案内はしない）、判定の基準、持ち帰り／取り込み、地名の評価の一覧 |
 | `src/features/AreaSettings.tsx` | 設定・エリア：混み具合の表（マスを押して段階を切り替え・スクショから読み取り）・地名・主なエリア |
 | `src/features/OutlookCard.tsx` | ホームの「🏁 終了までの見通し」カード（稼働中だけ表示。終了予定は端末に覚える） |
 | `src/features/ContinueCard.tsx` | ホームの「🤔 あと少し続ける？」（30・60・90分延ばした時の GO/WAIT/STOP。畳んで表示） |
@@ -76,7 +76,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
+- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`

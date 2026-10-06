@@ -1054,3 +1054,56 @@ select.shot-day {
 .outlook-options .tag {
   margin-left: 4px;
 }
+
+/* ホーム：この先4時間の混み具合（エリアごと）。数字は棒の上に重ねる */
+.busy-ahead table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.busy-ahead th,
+.busy-ahead td {
+  padding: 2px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.busy-ahead th[scope='row'] {
+  text-align: left;
+  width: 38%;
+  overflow-wrap: anywhere;
+}
+.busy-ahead tr.best th[scope='row'] {
+  font-weight: 700;
+}
+.ahead-cell {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 32px;
+  border-radius: 4px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  overflow: hidden;
+}
+.ahead-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--chart);
+}
+.ahead-cell.level-1 .ahead-bar { opacity: 0.35; }
+.ahead-cell.level-2 .ahead-bar { opacity: 0.55; }
+.ahead-cell.level-3 .ahead-bar { opacity: 0.8; }
+.ahead-num {
+  position: relative;
+  align-self: center;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface);
+}
+.busy-ahead th[scope='row'] .hint {
+  display: block;
+  font-weight: 400;
+}

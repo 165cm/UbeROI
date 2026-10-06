@@ -25,9 +25,14 @@ test('エリアの混み具合を登録すると、ホームに今の混み具�
   await expect(page.getByText(/4\/168マス・地名2/)).toBeVisible()
   await expect(page.locator('.tag', { hasText: '主なエリア' })).toBeVisible()
 
-  // ホーム：今（18時台）は混む、1時間後（19時台）はやや混む
+  // ホーム：この先4時間の表。今（18時台）は混む、19時台はやや混む、20・21時台は未入力
   await page.goto('#home')
-  await expect(page.locator('.busy-now')).toContainText('今 ▮▮▮▮ 混む → 1時間後 ▮▮▮▯ やや混む')
+  const ahead = page.getByRole('region', { name: 'この先4時間の混み具合' })
+  await expect(ahead.getByRole('columnheader')).toHaveText(['📈 エリア', '今 18時', '19時', '20時', '21時'])
+  const row = ahead.getByRole('row', { name: /中野・荻窪エリア/ })
+  await expect(row.getByRole('cell').nth(0)).toHaveAccessibleName('段階4 混む')
+  await expect(row.getByRole('cell').nth(1)).toHaveAccessibleName('段階3 やや混む')
+  await expect(row.getByRole('cell').nth(2)).toHaveAccessibleName('未入力')
 
   // 計画：月曜 18〜20時の候補で見込みを自動で入れると、混み具合を使った推計になる
   await page.goto('#plan')

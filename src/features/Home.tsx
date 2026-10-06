@@ -1,12 +1,13 @@
 // ホーム（S02）：今日の状態・稼働中のレンタル料金・今月の成績
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { breakAdvice, busyLevelAt, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
+import { averageLevel, breakAdvice, busyAhead, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
 import { CardTitle, IntInput, Problems, Tip, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
 import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, primaryArea, startRental } from '../storage/repo'
 import { pastSessionsFor, periodFor } from '../storage/toDomain'
+import type { AreaRecord } from '../storage/schema'
 import { CashChange } from './CashChange'
 import { ContinueCard } from './ContinueCard'
 import { OutlookCard } from './OutlookCard'
@@ -83,7 +84,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
     <div className="stack">
       <section className="card" aria-labelledby="today-title">
         <h3 id="today-title">今日の状態：{status}</h3>
-        {area && <BusyNow levels={area.levels} name={area.name} now={now} />}
+        <BusyAhead areas={data.areas} primaryId={area?.id ?? null} now={now} />
         {!active ? (
           <button type="button" className="primary" onClick={() => void run(() => departNow(db))}>
             🏠 自宅を出発
@@ -272,15 +273,59 @@ function BreakAdviceBox({ tariff, startAt, now }: { tariff: Tariff; startAt: str
 const BUSY_WORDS = ['', '空き', 'やや空き', 'やや混む', '混む'] as const
 
 /** 主なエリアの、今と1時間後の混み具合（配達アプリの傾向を写したもの） */
-function BusyNow({ levels, name, now }: { levels: number[][]; name: string; now: string }) {
+/**
+ * 登録したエリアの「この先4時間」の混み具合を並べる（主なエリアが先頭）。
+ * 段階はそれぞれのエリアの中での比べっこなので、エリア同士の比較は目安
+ */
+function BusyAhead({ areas, primaryId, now }: { areas: AreaRecord[]; primaryId: string | null; now: string }) {
   const t = Date.parse(now)
-  const nowLevel = busyLevelAt(levels, t)
-  const nextLevel = busyLevelAt(levels, t + 3_600_000)
-  if (nowLevel === null && nextLevel === null) return null
-  const word = (l: number | null) => (l === null ? '未入力' : `${'▮'.repeat(l)}${'▯'.repeat(4 - l)} ${BUSY_WORDS[l]}`)
+  const rows = [...areas]
+    .sort((a, b) => Number(b.id === primaryId) - Number(a.id === primaryId) || a.name.localeCompare(b.name, 'ja'))
+    .map((a) => {
+      const cells = busyAhead(a.levels, t)
+      return { area: a, cells, average: averageLevel(cells.map((c) => c.level)) }
+    })
+    .filter((r) => r.average !== null)
+  if (rows.length === 0) return null
+  const hours = rows[0]!.cells.map((c) => new Date(c.startMs + 9 * 3_600_000).getUTCHours())
+  const best = rows.length > 1 ? rows.reduce((a, b) => (b.average! > a.average! ? b : a)) : null
   return (
-    <p className="hint busy-now">
-      📈 {name}：今 {word(nowLevel)} → 1時間後 {word(nextLevel)}
-    </p>
+    <div className="busy-ahead">
+      <div className="table-scroll" tabIndex={0} role="region" aria-label="この先4時間の混み具合">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">📈 エリア</th>
+              {hours.map((h, i) => (
+                <th key={h} scope="col">{i === 0 ? `今 ${h}時` : `${h}時`}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ area, cells }) => (
+              <tr key={area.id} className={best?.area.id === area.id ? 'best' : undefined}>
+                <th scope="row">
+                  {area.name}
+                  {area.id !== primaryId && area.moveMinutes && area.moveFromAreaId === primaryId ? <span className="hint">移動{area.moveMinutes}分</span> : null}
+                </th>
+                {cells.map((c) => (
+                  <td key={c.startMs} aria-label={c.level === null ? '未入力' : `段階${c.level} ${BUSY_WORDS[c.level]}`}>
+                    <span className={`ahead-cell level-${c.level ?? 0}`} aria-hidden="true">
+                      <span className="ahead-bar" style={{ height: `${(c.level ?? 0) * 25}%` }} />
+                      <span className="ahead-num">{c.level ?? '·'}</span>
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {best && (
+        <p className="hint" role="status">
+          4時間の平均で一番混むのは <strong>{best.area.name}</strong>（{best.average}）。段階はエリアごとの比べっこなので目安です
+        </p>
+      )}
+    </div>
   )
 }

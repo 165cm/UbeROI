@@ -38,6 +38,17 @@ test('日跨ぎと毎日のピークをまとめて、本命・最低の目標�
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.locator('.subcard', { hasText: '昼ピーク' })).toBeVisible()
 
+  // 別のサービスの夜ピーク：日跨ぎ（Uber）の配達には数えないので、作戦に入れない
+  await page.getByRole('button', { name: 'クエストを追加' }).click()
+  await page.getByLabel('名前', { exact: true }).fill('出前館の夜')
+  await page.getByLabel('対象のサービス', { exact: true }).selectOption({ index: 1 })
+  await page.getByLabel('開始', { exact: true }).fill('2026-10-09T17:00')
+  await page.getByLabel('終了', { exact: true }).fill('2026-10-09T20:00')
+  await page.getByLabel('くり返し', { exact: true }).selectOption('daily')
+  await fillTiers(page, [[5, 1000]])
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.locator('.subcard', { hasText: '出前館の夜' })).toBeVisible()
+
   await page.goto('#plan')
   const card = page.getByRole('region', { name: '🧭 クエスト作戦（日跨ぎ）' })
   await expect(card.getByRole('tab', { name: '本命 50件' })).toHaveAttribute('aria-selected', 'true')

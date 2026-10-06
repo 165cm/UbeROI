@@ -20,7 +20,8 @@ export function QuestStrategyCard(input: QuestWeekInput) {
   // 作戦の軸：日をまたぐクエストのうち、先に終わる回
   const main = items.filter((it) => length(it.occ) >= MAIN_QUEST_MIN_HOURS && !it.progress.ended).sort((a, b) => a.occ.endsAt.localeCompare(b.occ.endsAt))[0]
   if (!main) return null
-  const peaks = items.filter((it) => length(it.occ) < MAIN_QUEST_MIN_HOURS)
+  // 1つの配達が両方に数えられるのは同じサービスのクエストだけ
+  const peaks = items.filter((it) => length(it.occ) < MAIN_QUEST_MIN_HOURS && it.q.platform === main.q.platform)
   const toQuest = (it: (typeof items)[number]) => ({ label: it.q.label, startsAt: it.occ.startsAt, endsAt: it.occ.endsAt, rewardMode: it.q.rewardMode, tiers: it.q.tiers, count: it.progress.count })
   const s = questStrategy({
     now: input.now,
@@ -39,7 +40,7 @@ export function QuestStrategyCard(input: QuestWeekInput) {
     <section className="card stack" aria-labelledby="strategy-title">
       <CardTitle
         id="strategy-title"
-        tip={`「${main.q.label}」の段階ごとに、残りの日（4時区切り）に件数を割り振ります。期間に入るピークタイムのクエスト（${MAIN_QUEST_MIN_HOURS}時間より短いクエスト）は、最後の段階まで取る前提で先に数え、足りない分を残りの日に均等に足します（ピークの前後で）。1つの配達は両方のクエストに数えます。時間は、ピークの時間＋ほかの件数÷1時間の件数（${rate.rate}件/時${rate.source === 'personal' ? '・自分の記録' : '・目安'}）。報酬は、まだ届いていない段階の分です。見込みなので、実績には入りません。`}
+        tip={`「${main.q.label}」の段階ごとに、残りの日（4時区切り）に件数を割り振ります。期間に入る同じサービスのピークタイムのクエスト（${MAIN_QUEST_MIN_HOURS}時間より短いクエスト）は、最後の段階まで取る前提で先に数え、足りない分を残りの日に均等に足します（ピークの前後で）。1つの配達は両方のクエストに数えます。時間は、ピークの時間＋ほかの件数÷1時間の件数（${rate.rate}件/時${rate.source === 'personal' ? '・自分の記録' : '・目安'}）。報酬は、まだ届いていない段階の分です。見込みなので、実績には入りません。`}
       >
         🧭 クエスト作戦（{main.q.label}）
       </CardTitle>

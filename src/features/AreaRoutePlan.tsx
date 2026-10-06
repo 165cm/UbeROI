@@ -7,7 +7,7 @@ import { formatYen } from '../format'
 import type { AreaRecord, SlotRecord } from '../storage/schema'
 
 const clock = (iso: string) => new Date(Date.parse(iso) + 9 * 3_600_000).toISOString().slice(11, 16)
-const day = (iso: string) => new Date(iso).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
+const day = (iso: string) => new Date(iso).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' })
 const slotText = (s: SlotRecord) => `${day(s.startsAt)} ${clock(s.startsAt)}〜${clock(s.endsAt)}`
 
 export function AreaRoutePlan({

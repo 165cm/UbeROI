@@ -1,6 +1,6 @@
 // エリアの混み具合（曜日×1時間×4段階）と、売上の見込みへの反映
 import { describe, expect, it } from 'vitest'
-import { BUSY_LEVEL_FACTORS, busyLevelAt, busynessSlot, emptyBusyness, estimateRevenue, isBusynessTable } from './index'
+import { BUSY_LEVEL_FACTORS, averageLevel, busyAhead, busyLevelAt, busynessSlot, emptyBusyness, estimateRevenue, isBusynessTable } from './index'
 
 const ms = (iso: string) => Date.parse(iso)
 
@@ -60,5 +60,19 @@ describe('混み具合を売上の見込みに使う', () => {
     expect(busier.note).toContain('混み具合で×')
     // 混み具合がなければ今まで通り
     expect(estimateRevenue('2026-10-05T09:00:00Z', '2026-10-05T10:00:00Z', past).revenueYen).toBe(2000)
+  })
+})
+
+describe('この先の混み具合（ホーム）', () => {
+  it('今の時間（正時で切る）から4時間分の段階と、入力済みの平均', () => {
+    const t = emptyBusyness()
+    t[1]![18] = 4
+    t[1]![19] = 3
+    t[1]![21] = 1
+    const ahead = busyAhead(t, Date.parse('2026-10-05T18:40:00+09:00'))
+    expect(ahead.map((c) => c.level)).toEqual([4, 3, null, 1])
+    expect(new Date(ahead[0]!.startMs).toISOString()).toBe('2026-10-05T09:00:00.000Z')
+    expect(averageLevel(ahead.map((c) => c.level))).toBe(2.7)
+    expect(averageLevel([null, null])).toBeNull()
   })
 })

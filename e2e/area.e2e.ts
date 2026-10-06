@@ -25,9 +25,16 @@ test('エリアの混み具合を登録すると、ホームに今の混み具�
   await expect(page.getByText(/4\/168マス・地名2/)).toBeVisible()
   await expect(page.locator('.tag', { hasText: '主なエリア' })).toBeVisible()
 
-  // ホーム：今（18時台）は混む、1時間後（19時台）はやや混む
+  // ホーム：この先4時間の表。今（18時台）は混む、19時台はやや混む、20・21時台は未入力
   await page.goto('#home')
-  await expect(page.locator('.busy-now')).toContainText('今 ▮▮▮▮ 混む → 1時間後 ▮▮▮▯ やや混む')
+  const ahead = page.getByRole('region', { name: 'この先4時間の混み具合' })
+  await expect(ahead.getByRole('columnheader')).toHaveText(['📈 エリア', '今 18時', '19時', '20時', '21時'])
+  const row = ahead.getByRole('row', { name: /中野・荻窪エリア/ })
+  await expect(row.getByRole('cell').nth(0)).toHaveAccessibleName('段階4 混む')
+  await expect(row.getByRole('cell').nth(1)).toHaveAccessibleName('段階3 やや混む')
+  await expect(row.getByRole('cell').nth(2)).toHaveAccessibleName('未入力')
+  // 未入力のマスがあるので「一番混む」は出さない（エリアが1つの時は比べない）
+  await expect(page.getByText(/一番混むのは/)).toHaveCount(0)
 
   // 計画：月曜 18〜20時の候補で見込みを自動で入れると、混み具合を使った推計になる
   await page.goto('#plan')
@@ -99,4 +106,33 @@ test('混み具合のスクリーンショットを選ぶと、棒の段階と�
   await expect(page.getByRole('button', { name: /^土曜 19時/ })).toHaveAccessibleName('土曜 19時：混む')
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.getByText(/48\/168マス/)).toBeVisible()
+})
+
+test('ホームのこの先4時間：登録したエリアは未入力でも並べ、4時間そろったエリアだけで一番混むところを知らせる', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-05T18:00:00+09:00') })
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: 'エリア' }).click()
+  const add = async (name: string, cells: [number, number, number][]) => {
+    await page.getByRole('button', { name: 'エリアを追加' }).click()
+    await page.getByLabel('エリアの名前', { exact: true }).fill(name)
+    for (const [day, hour, level] of cells) {
+      const label = ['日', '月', '火', '水', '木', '金', '土'][day]!
+      if (label !== '月') await page.getByRole('tab', { name: label }).click()
+      const cell = page.getByRole('button', { name: new RegExp(`^${label}曜 ${hour}時`) })
+      for (let i = 0; i < level; i++) await cell.click()
+      if (label !== '月') await page.getByRole('tab', { name: '月' }).click()
+    }
+    await page.getByRole('button', { name: '💾 保存' }).click()
+    await expect(page.getByText(name)).toBeVisible()
+  }
+  // 中野：月曜18〜21時がすべて段階3。新宿：18時だけ段階4。吉祥寺：火曜だけ入力
+  await add('中野エリア', [[1, 18, 3], [1, 19, 3], [1, 20, 3], [1, 21, 3]])
+  await add('新宿エリア', [[1, 18, 4]])
+  await add('吉祥寺エリア', [[2, 18, 2]])
+  await page.goto('#home')
+  const ahead = page.getByRole('region', { name: 'この先4時間の混み具合' })
+  await expect(ahead.getByRole('row')).toHaveCount(4)
+  await expect(ahead.getByRole('row', { name: /吉祥寺エリア/ }).getByRole('cell').nth(0)).toHaveAccessibleName('未入力')
+  await expect(page.getByText(/一番混むのは 中野エリア（3）/)).toBeVisible()
+  await expect(page.getByText('未入力のマスがあるエリア（2つ）は比べていません。')).toBeVisible()
 })

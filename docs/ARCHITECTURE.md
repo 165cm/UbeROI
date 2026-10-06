@@ -38,7 +38,7 @@
 | `src/domain/cash.ts` | お釣り：出されそうな額、お釣りと渡し方（お札・硬貨の内訳） |
 | `src/domain/domain.test.ts` | 受入基準 A01〜A15・A27・A30 のテスト |
 | `src/App.tsx` | 画面の枠と下のメニュー（`#home` などのURLで切り替え）、デモ表示の帯 |
-| `src/features/Home.tsx` | ホーム：出発・レンタル開始／返却・帰宅して精算、今月の成績 |
+| `src/features/Home.tsx` | ホーム：出発・レンタル開始／返却・帰宅して精算、登録したエリアのこの先4時間の混み具合、今月の成績 |
 | `src/features/Records.tsx` `SessionForm.tsx` | 記録の一覧・追加・編集・削除（取り消しつき）、計算明細のプレビュー |
 | `src/features/Settings.tsx` | 設定：基本・料金（版管理）・固定費・装備と投資・データ |
 | `src/features/DataSettings.tsx` | データ：デモ切り替え、バックアップの書き出し・復元、全削除 |

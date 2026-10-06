@@ -82,3 +82,20 @@ export function averageBusyFactor(table: BusynessTable, startMs: number, endMs: 
   const { weighted, coveredHours } = weightedBusyHours(table, startMs, endMs, () => 0)
   return coveredHours > 0 ? weighted / coveredHours : null
 }
+
+/**
+ * 今の時間（正時で切る）から hours 時間分の段階（未入力は null）。ホームの「この先の混み具合」で、エリアを見比べるのに使う
+ */
+export function busyAhead(table: BusynessTable, ms: number, hours = 4): { startMs: number; level: number | null }[] {
+  const first = Math.floor((ms + JST_MS) / 3_600_000) * 3_600_000 - JST_MS
+  return Array.from({ length: hours }, (_, i) => {
+    const startMs = first + i * 3_600_000
+    return { startMs, level: busyLevelAt(table, startMs) }
+  })
+}
+
+/** 入力済みの段階の平均（なければ null）。小数1桁 */
+export function averageLevel(levels: readonly (number | null)[]): number | null {
+  const filled = levels.filter((l): l is number => l !== null)
+  return filled.length ? Math.round((filled.reduce((a, b) => a + b, 0) / filled.length) * 10) / 10 : null
+}

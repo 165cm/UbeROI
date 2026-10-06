@@ -32,6 +32,7 @@ import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 import { QuestWeek, questWeekItems } from './QuestWeek'
 import { WeekBoard, type QuestTarget } from './WeekBoard'
+import { QuestStrategyCard } from './QuestStrategyCard'
 import { AreaRoutePlan } from './AreaRoutePlan'
 
 /** 7日の帯に出すクエストの数の上限（毎日のクエストなどで帯が埋まらないように） */
@@ -275,6 +276,7 @@ export function Plan() {
         }}
       />
 
+      <QuestStrategyCard {...questInput} />
       <QuestWeek {...questInput} onAddSlot={() => setEditing(newSlot())} />
 
       <details className="more">

@@ -144,12 +144,18 @@ function QuestForm({ initial, index, onSave, onCancel }: { initial: QuestRecord;
     setReading({ busy: true, message: `📷 ${files.length}枚を読み取り中…（初めての時は読み取りの準備に少しかかります）` })
     try {
       const r = parseQuestText(await recognizeImages(files), new Date().toISOString())
-      const next = { ...q, rewardMode: 'incremental' as const }
+      const next = { ...q }
       if (r.startsAt) next.startsAt = r.startsAt
       if (r.endsAt) next.endsAt = r.endsAt
-      if (r.tiers.length > 0) next.tiers = r.tiers
+      // 段階を読めた時だけ置き換える（読めた額は段階ごとの上乗せ。読めなかった時は今の書き方のまま）
+      if (r.tiers.length > 0) {
+        next.tiers = r.tiers
+        next.rewardMode = 'incremental'
+      }
       const days = r.startsAt && r.endsAt ? (Date.parse(r.endsAt) - Date.parse(r.startsAt)) / 86_400_000 : null
-      if (r.startsAt && (q.label === initial.label || !q.label.trim())) next.label = days !== null && days >= 1 ? '日跨ぎクエスト' : 'ピークタイムクエスト'
+      // 名前は、新しいクエストで既定の名前のままの時（または空欄の時）だけ入れる。保存済みの名前は変えない
+      const isNew = !initial.createdAt
+      if (r.startsAt && ((isNew && q.label === initial.label) || !q.label.trim())) next.label = days !== null && days >= 1 ? '日跨ぎクエスト' : 'ピークタイムクエスト'
       setQ(next)
       const fmt = (iso: string) => new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })
       const got = [

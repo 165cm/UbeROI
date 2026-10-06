@@ -62,6 +62,24 @@ export function tieredNextIncreaseSeconds(t: TieredTariff, elapsedSeconds: numbe
   return next > t.capMinutes * 60 ? null : next
 }
 
+/**
+ * 段階料金の上限の使い方：上限に達する経過秒と、上限で乗れる最後の秒（それを過ぎると見積の対象外）。
+ * 例：HELLO CYCLING 東京都シティサイクルは 240分1秒で 2,500円に達し、720分（12時間）までは増えない
+ */
+export function tieredCapInfo(t: TieredTariff): { capYen: number; reachesCapAtSeconds: number; coversUntilSeconds: number } {
+  const stepsToCap = t.initialYen >= t.capYen ? 0 : Math.ceil((t.capYen - t.initialYen) / t.stepYen)
+  const minute = stepsToCap === 0 ? 1 : t.initialMinutes + (stepsToCap - 1) * t.stepMinutes + 1
+  return { capYen: t.capYen, reachesCapAtSeconds: (minute - 1) * 60 + 1, coversUntilSeconds: t.capMinutes * 60 }
+}
+
+/** 乗る長さ（時間）ごとのレンタル代と、1時間あたり（長く乗るほど上限で下がる）。対象外の長さは null */
+export function rentalCostByHours(t: Tariff, hours: readonly number[]): { hours: number; yen: number | null; perHourYen: number | null }[] {
+  return hours.map((h) => {
+    const yen = feeFor(t, h * 3600)
+    return { hours: h, yen, perHourYen: yen === null || h <= 0 ? null : Math.round(yen / h) }
+  })
+}
+
 export function passFee(t: PassTariff, elapsedSeconds: number): number | null {
   const candidates = t.passes.filter((p) => p.minutes * 60 >= elapsedSeconds).map((p) => p.yen)
   return candidates.length === 0 ? null : Math.min(...candidates)

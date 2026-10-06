@@ -1209,3 +1209,12 @@ select.inline-select {
   text-shadow: 0 0 3px #fff, 0 0 3px #fff;
   pointer-events: none;
 }
+
+/* レンタル：上限までの残り・上限後は 0円 */
+.cap-line {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.cap-line.capped {
+  font-weight: 700;
+}

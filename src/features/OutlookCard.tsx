@@ -1,7 +1,7 @@
 // 稼働中の「🏁 終了までの見通し」。終了予定の時刻を決めると、今日のペースとこの先の混み具合から、
 // 続ける／休憩して再開／今やめるの、この先の利益を比べる。止まっている時に確かめる前提で、走行中の操作は求めない
 import { useEffect, useMemo, useState } from 'react'
-import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
+import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, tieredCapInfo, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
 import { CardTitle, IntInput, Tip } from '../components/fields'
 import { formatYen } from '../format'
 import { loadPrefs } from './ContinueCard'
@@ -112,6 +112,17 @@ export function OutlookCard({
   }, [minute, departedAt, stored, offers, allOffers, past.length, busyness, rental?.startAt, rental?.tariff, homeDeadline, targetHourlyYen, moveAreas.map((a) => `${a.name}:${a.minutes}`).join()])
 
   const { soFar } = result
+  // レンタル中の段階料金：終了予定までに上限に達するなら、その後は追加のレンタル代がかからないことを伝える
+  const capNote = (() => {
+    if (!rental || rental.tariff.kind !== 'tiered') return null
+    const cap = tieredCapInfo(rental.tariff)
+    const start = Date.parse(rental.startAt)
+    const reachMs = start + cap.reachesCapAtSeconds * 1000
+    const endMs = endTimeMs(minute, stored.end)
+    if (Date.parse(minute) >= reachMs) return `レンタルは上限 ${formatYen(cap.capYen)} に達しています。この先（貸出から12時間まで）は追加のレンタル代がかかりません`
+    if (endMs > reachMs) return `レンタルは ${new Date(reachMs + 9 * 3_600_000).toISOString().slice(11, 16)} に上限 ${formatYen(cap.capYen)} に達し、その後は追加のレンタル代がかかりません（この差は上の利益に入っています）`
+    return null
+  })()
   return (
     <section className="card stack" aria-labelledby="outlook-title">
       <CardTitle
@@ -189,6 +200,7 @@ export function OutlookCard({
           {result.reasons.map((r) => (
             <li key={r}>{r}</li>
           ))}
+          {capNote && <li>{capNote}</li>}
         </ul>
       </div>
 

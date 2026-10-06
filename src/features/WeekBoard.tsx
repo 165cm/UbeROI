@@ -56,7 +56,7 @@ export function WeekBoard({
   onAddSuggestion: (w: SuggestedWindow) => void
 }) {
   const nowMs = Date.parse(now)
-  const weekStart = new Date(`${weekFrom}T00:00`).getTime()
+  const weekStart = new Date(`${weekFrom}T${pad(DAY_START_HOUR)}:00`).getTime()
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)

@@ -38,7 +38,7 @@ const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   past_deadline: '帰宅締切を過ぎる',
   missing_estimate: '見込みが未入力',
   not_profitable: '見込み利益が0円以下',
-  overlap_or_budget: 'ほかの枠と重なる／週の時間を超える',
+  overlap_or_budget: 'ほかの枠と重なる／週の残りの時間を超える',
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -84,10 +84,19 @@ export function Plan() {
   const computed = useMemo(() => {
     if (!data) return null
     const past = pastSessionsFor(data.sessions)
-    const inWeek = data.slots.filter((s) => {
-      const d = localParts(s.startsAt).date
-      return d >= week.from && d <= week.to
-    })
+    // 週は、帯と同じく月曜4時〜翌週の月曜4時（深夜0〜4時は前の日の続き）
+    const weekStartIso = new Date(`${week.from}T04:00`).toISOString()
+    const weekEndIso = new Date(Date.parse(`${week.to}T04:00`) + 86_400_000).toISOString()
+    const inWeek = data.slots.filter((s) => s.startsAt >= weekStartIso && s.startsAt < weekEndIso)
+    // この週の確定した稼働（出発〜帰宅）
+    const done = data.sessions
+      .filter((x) => x.status === 'completed' && x.returnedAt && x.departedAt < weekEndIso && x.returnedAt > weekStartIso)
+      .map((x) => ({ startsAt: x.departedAt, endsAt: x.returnedAt! }))
+    const doneMinutes = done.reduce(
+      (a, x) => a + Math.max(0, Math.min(Date.parse(x.endsAt), Date.parse(weekEndIso)) - Math.max(Date.parse(x.startsAt), Date.parse(weekStartIso))) / 60_000,
+      0,
+    )
+    const nowIso = new Date().toISOString()
     const tariffOf = (s: SlotRecord) => data.tariffs.find((t) => t.id === s.tariffId) ?? pickDefaultTariff(data.tariffs, data.settings)
     const inputs: SlotInput[] = inWeek.map((s) => ({
       id: s.id,
@@ -99,8 +108,15 @@ export function Plan() {
       homeDeadline: data.settings?.homeDeadline ?? null,
     }))
     const fixed = weeklyFixedCostYen(expandRecurring(data.recurringExpenses, week.from.slice(0, 7), week.to.slice(0, 7)), week.from, week.to)
-    const plan = planWeek(inputs, data.settings?.weeklyBudgetMinutes ?? null, scenario, fixed)
-    return { past, inWeek, inputs, plan, tariffOf }
+    // おすすめは、まだ終わっていない枠から、週の上限からこの週の実績を引いた時間の中で選ぶ
+    const budgetMinutes = data.settings?.weeklyBudgetMinutes ?? null
+    const plan = planWeek(
+      inputs.filter((i) => i.endsAt > nowIso),
+      budgetMinutes === null ? null : Math.max(0, Math.round(budgetMinutes - doneMinutes)),
+      scenario,
+      fixed,
+    )
+    return { past, inWeek, inputs, plan, tariffOf, done, weekStartIso, weekEndIso, nowIso }
   }, [data, week.from, week.to, scenario])
 
   if (!data || !computed) return <p className="loading">読み込み中…</p>
@@ -135,14 +151,8 @@ export function Plan() {
     }
   }
 
-  const nowIso = new Date().toISOString()
+  const { done, weekStartIso, weekEndIso, nowIso } = computed
   const busyness = primaryArea(data.areas, data.settings)?.levels ?? null
-  const weekStartIso = new Date(`${week.from}T00:00`).toISOString()
-  const weekEndIso = new Date(Date.parse(`${week.to}T00:00`) + 86_400_000).toISOString()
-  // この週の確定した稼働（出発〜帰宅）
-  const done = data.sessions
-    .filter((x) => x.status === 'completed' && x.returnedAt && x.departedAt < weekEndIso && x.returnedAt > weekStartIso)
-    .map((x) => ({ startsAt: x.departedAt, endsAt: x.returnedAt! }))
   const homeDeadline = data.settings?.homeDeadline ?? null
   const suggestions = busyness
     ? suggestWindows({
@@ -294,7 +304,7 @@ export function Plan() {
                     </span>
                     <span className="line hint">
                       <span className="grow">
-                        {chosen.has(s.id) ? '✅ おすすめ' : `— ${reason ? ISSUE_LABELS[reason] : ''}`}・{ev.hours.toFixed(1)}h{s.areaLabel && `・${s.areaLabel}`}・🚲{input.rentalYen === null ? '算出不可' : formatYen(input.rentalYen)}
+                        {chosen.has(s.id) ? '✅ おすすめ' : s.endsAt <= nowIso ? '— 終わった枠' : `— ${reason ? ISSUE_LABELS[reason] : ''}`}・{ev.hours.toFixed(1)}h{s.areaLabel && `・${s.areaLabel}`}・🚲{input.rentalYen === null ? '算出不可' : formatYen(input.rentalYen)}
                       </span>
                       <span>{perHour(ev.hourlyYen[scenario])}</span>
                     </span>

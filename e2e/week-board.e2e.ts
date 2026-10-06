@@ -72,3 +72,36 @@ test('混み具合がない時は、入れ方を案内する', async ({ page }) 
   await expect(page.getByRole('region', { name: '💡 空いている、稼げそうな時間' })).toContainText('設定 → エリアで主なエリアの混み具合を入れると')
   await expect(page.getByRole('region', { name: '⏱️ この週の稼働' })).toContainText('「週に使える時間」を入れると')
 })
+
+test('この週の実績の時間を上限から引いて、残りの時間に入る枠だけをおすすめにする', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-05T17:00:00+09:00') })
+  await page.goto('#settings')
+  await page.getByLabel('週に使える時間', { exact: true }).fill('6')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  // 月曜 17〜20時に3時間働いた（確定）
+  await page.goto('#home')
+  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
+  await page.clock.fastForward('03:00:00')
+  await page.getByRole('button', { name: '🏁 帰宅して精算' }).click()
+  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('4000')
+  await page.getByRole('button', { name: '✅ 確定して保存' }).click()
+  await expect(page.locator('.list-item').first()).toBeVisible()
+
+  // 水曜 17〜21時（4時間）と木曜 17〜20時（3時間）。残りは 6 − 3 = 3時間なので、入るのは木曜だけ
+  await page.goto('#plan')
+  for (const [d, e] of [['2026-10-07', '21:00'], ['2026-10-08', '20:00']] as const) {
+    await page.getByRole('button', { name: '候補枠を追加' }).click()
+    await page.getByLabel('日付', { exact: true }).fill(d)
+    await page.getByLabel('出発', { exact: true }).fill('17:00')
+    await page.getByLabel('帰宅', { exact: true }).fill(e)
+    await page.getByRole('button', { name: '🔮 見込みを自動で入れる' }).click()
+    await page.getByRole('button', { name: '💾 保存' }).click()
+  }
+  const amount = page.getByRole('region', { name: '⏱️ この週の稼働' })
+  await expect(amount.getByRole('definition')).toHaveText(['3h', '3h', '0h'])
+  await expect(page.getByRole('button', { name: /10\/8\(木\) 17:00〜20:00（✅ おすすめ）を編集/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /10\/7\(水\) 17:00〜21:00（選ばれなかった候補）を編集/ })).toBeVisible()
+  // 月曜の帯に実績、その日の時間は 3h
+  await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').first()).toContainText('3h')
+})

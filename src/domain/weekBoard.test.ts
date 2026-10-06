@@ -53,4 +53,27 @@ describe('空いている、稼げそうな時間', () => {
   it('混み具合が入っていない時間を含む枠は出さない', () => {
     expect(suggestWindows({ ...base, busyness: emptyBusyness() })).toEqual([])
   })
+
+  it('4時をまたいで時間が重なる枠は、別の日でも同時に出さない', () => {
+    const t = emptyBusyness()
+    for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) t[d]![h] = h >= 2 && h <= 6 ? 4 : 1
+    const level = (iso: string) => t[0]![hourOf(iso)]!
+    const r = suggestWindows({
+      ...base,
+      now: jst('2026-10-07T00:00:00'),
+      to: jst('2026-10-07T12:00:00'),
+      busyness: t,
+      estimate: (s, e) => {
+        let y = 0
+        for (let h = Date.parse(s); h < Date.parse(e); h += 3_600_000) y += level(new Date(h).toISOString()) * 500
+        return y
+      },
+    })
+    // 2〜5時（前の日）を選ぶと、4〜7時（次の日）は4〜5時が重なるので選ばず、5〜8時を選ぶ
+    expect(r.map((w) => [hourOf(w.startsAt), hourOf(w.endsAt)])).toEqual([
+      [2, 5],
+      [5, 8],
+    ])
+  })
 })
+

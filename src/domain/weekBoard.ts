@@ -67,7 +67,8 @@ export function suggestWindows(input: SuggestInput): SuggestedWindow[] {
   for (const c of ordered) {
     if (picked.length >= count) break
     const day = businessDay(Date.parse(c.startsAt))
-    if (picked.some((p) => businessDay(Date.parse(p.startsAt)) === day)) continue
+    // 同じ日のものと、4時をまたいで時間が重なるものは選ばない
+    if (picked.some((p) => businessDay(Date.parse(p.startsAt)) === day || (p.startsAt < c.endsAt && p.endsAt > c.startsAt))) continue
     picked.push(c)
   }
   return picked.sort((a, b) => a.startsAt.localeCompare(b.startsAt))

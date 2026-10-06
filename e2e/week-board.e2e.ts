@@ -1,11 +1,9 @@
 // 計画：この週の稼働量を決める画面（稼働の量・7日の帯・空いている稼げそうな時間）
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
-test('開くと、この週の稼働の量・いつ働くか・空いている稼げそうな時間がひと目で出る', async ({ page }) => {
-  await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
+/** 主なエリア：毎日 17〜20時は段階4、11〜13時・21時は段階3、14・16・22時は段階2、ほかは段階1 */
+async function addBusyArea(page: Page) {
   await page.goto('#settings')
-  await page.getByLabel('週に使える時間', { exact: true }).fill('15')
-  await page.getByRole('button', { name: '💾 保存' }).click()
   await page.getByRole('tab', { name: 'エリア' }).click()
   await page.getByRole('button', { name: 'エリアを追加' }).click()
   await page.getByLabel('エリアの名前', { exact: true }).fill('中野エリア')
@@ -16,6 +14,14 @@ test('開くと、この週の稼働の量・いつ働くか・空いている�
   }
   await page.getByRole('button', { name: '📋 全曜日に写す' }).click()
   await page.getByRole('button', { name: '💾 保存' }).click()
+}
+
+test('開くと、この週の稼働の量・いつ働くか・空いている稼げそうな時間がひと目で出る', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
+  await page.goto('#settings')
+  await page.getByLabel('週に使える時間', { exact: true }).fill('15')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await addBusyArea(page)
   await page.goto('#plan')
   // 主なエリアの混み具合があれば、予定がなくても稼げそうな時間を出す（月曜の17〜20時：1,400円 × 1.35 × 3時間）
   await expect(page.getByRole('list', { name: '稼げそうな時間' }).getByRole('listitem').first()).toContainText('10/5(月) 17:00〜20:00')
@@ -105,3 +111,49 @@ test('この週の実績の時間を上限から引いて、残りの時間に�
   // 月曜の帯に実績、その日の時間は 3h
   await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').first()).toContainText('3h')
 })
+
+test('クエストの次の段階まで足す時間を逆算し、その時間を働くとよい時間を帯に出して、まとめて候補枠に入れられる', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
+  await addBusyArea(page)
+  // 平日クエスト：20件で +3,000円、今 4件
+  await page.goto('#home')
+  await page.getByRole('button', { name: 'クエストを追加' }).click()
+  await page.getByRole('button', { name: '🔁 毎週の平日（月4:00〜金4:00）' }).click()
+  await page.getByLabel('名前', { exact: true }).fill('平日クエスト')
+  await page.getByLabel('第1段階の件数', { exact: true }).fill('20')
+  await page.getByLabel('報酬', { exact: true }).fill('3000')
+  await page.getByLabel('この回の件数の調整（±）', { exact: true }).fill('4')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.locator('.subcard', { hasText: '平日クエスト' })).toContainText('4件／あと16件')
+
+  // 月曜 17〜21時（4時間 × 2件 = 8件）を入れると 12件。20件まで あと8件 = 4時間
+  await page.goto('#plan')
+  await page.getByRole('button', { name: '候補枠を追加' }).click()
+  await page.getByLabel('出発', { exact: true }).fill('17:00')
+  await page.getByLabel('帰宅', { exact: true }).fill('21:00')
+  await page.getByRole('button', { name: '🔮 見込みを自動で入れる' }).click()
+  await page.getByRole('button', { name: '💾 保存' }).click()
+
+  const targets = page.getByRole('list', { name: 'クエストのための時間' }).getByRole('listitem')
+  await expect(targets).toHaveCount(1)
+  await expect(targets.first()).toContainText('🎯 平日クエスト 第1段階（+3,000円）まで あと4h')
+  // 月曜の夜は予定ずみ。段階4の 火曜 17〜20時 と、続く 20〜21時 を1つにまとめて 17〜21時
+  await expect(targets.first()).toContainText('10/6(火) 17:00〜21:00')
+  await expect(targets.first()).toContainText('純時給 1,550円/時')
+  // 帯にも、火曜の行に 🎯 の時間が出る
+  await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').nth(1).locator('.wb-quest')).toHaveCount(1)
+  // 「稼げそうな時間」は、🎯 の時間と重ならない
+  await expect(page.getByRole('list', { name: '稼げそうな時間' })).not.toContainText('10/6(火) 17:00')
+
+  // ＋で、まとめて候補枠に入れる → 計画で第1段階に届くので、🎯 の行は消える
+  await targets.first().getByRole('button', { name: '平日クエストのための時間を候補枠に入れる' }).click()
+  await expect(page.getByText('🎯 1つの候補枠を入れました')).toBeVisible()
+  await expect(page.getByRole('button', { name: /10\/6\(火\) 17:00〜21:00（✅ おすすめ）を編集/ })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'クエストのための時間' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '🎯 クエストから見たこの週' })).toContainText('計画（8h）どおりなら 20件（第1段階まで・+3,000円）')
+
+  // ↩ 元に戻すと、入れた枠は消える
+  await page.getByRole('button', { name: '↩ 元に戻す' }).click()
+  await expect(page.getByRole('list', { name: 'クエストのための時間' }).getByRole('listitem')).toHaveCount(1)
+})
+

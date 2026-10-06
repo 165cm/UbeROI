@@ -1,6 +1,6 @@
 // 計画：空いている、稼げそうな時間のおすすめ
 import { describe, expect, it } from 'vitest'
-import { deadlineMs, emptyBusyness, suggestWindows, type SuggestInput } from './index'
+import { deadlineMs, emptyBusyness, suggestHours, suggestWindows, type SuggestInput } from './index'
 
 const jst = (s: string) => new Date(`${s}+09:00`).toISOString()
 const hourOf = (iso: string) => new Date(Date.parse(iso) + 9 * 3_600_000).getUTCHours()
@@ -74,6 +74,33 @@ describe('空いている、稼げそうな時間', () => {
       [2, 5],
       [5, 8],
     ])
+  })
+})
+
+describe('クエストのための時間（必要な時間を、見込みの大きい枠で埋める）', () => {
+  it('7時間なら 3時間・3時間・1時間 の枠を、見込みの大きい時間から選んで早い順に出す', () => {
+    const r = suggestHours({ ...base, to: jst('2026-10-09T04:00:00'), hoursNeeded: 7 })
+    // 水・木の 18〜21時（段階4×3）。残り1時間は段階4の時間が残っていないので、段階3のうち一番早い水曜 13時
+    expect(r.windows.map((w) => [w.startsAt, w.endsAt])).toEqual([
+      [jst('2026-10-07T13:00:00'), jst('2026-10-07T14:00:00')],
+      [jst('2026-10-07T18:00:00'), jst('2026-10-07T21:00:00')],
+      [jst('2026-10-08T18:00:00'), jst('2026-10-08T21:00:00')],
+    ])
+    expect(r).toMatchObject({ hours: 7, shortHours: 0 })
+  })
+
+  it('2.5時間なら3時間の枠1つ。期間の中に入る時間が足りなければ、足りない時間を返す', () => {
+    expect(suggestHours({ ...base, hoursNeeded: 2.5 }).windows.map((w) => w.levels)).toEqual([[4, 4, 4]])
+    // 水曜 12:30〜14:00 しか残っていない：入るのは 13〜14時の1時間だけ
+    const r = suggestHours({ ...base, to: jst('2026-10-07T14:00:00'), hoursNeeded: 3 })
+    expect(r.windows.map((w) => [w.startsAt, w.endsAt])).toEqual([[jst('2026-10-07T13:00:00'), jst('2026-10-07T14:00:00')]])
+    expect(r).toMatchObject({ hours: 1, shortHours: 2 })
+  })
+
+  it('続いている枠は1つにまとめる', () => {
+    const r = suggestHours({ ...base, now: jst('2026-10-07T17:00:00'), to: jst('2026-10-08T04:00:00'), busyness, hoursNeeded: 4 })
+    // 水 17時〜翌4時の中で：まず 18〜21時（段階4×3）。残り1時間は段階1ばかりで、同じ見込みなら早い 17時 → 17〜21時に1つにまとまる
+    expect(r.windows.map((w) => [w.startsAt, w.endsAt, w.levels])).toEqual([[jst('2026-10-07T17:00:00'), jst('2026-10-07T21:00:00'), [1, 4, 4, 4]]])
   })
 })
 

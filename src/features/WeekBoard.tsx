@@ -19,6 +19,21 @@ export interface BoardSlot {
   label: string
 }
 
+/** クエストの次の段階まで、計画の後に足す時間と、それを働く時間のおすすめ */
+export interface QuestTarget {
+  key: string
+  label: string
+  tier: number
+  gainYen: number
+  extraHours: number
+  /** その時間のボーナス込みの純時給 */
+  hourlyYen: number | null
+  belowTarget: boolean
+  windows: SuggestedWindow[]
+  /** 期間の空き時間に入らなかった時間 */
+  shortHours: number
+}
+
 const pad = (n: number) => String(n).padStart(2, '0')
 const hm = (ms: number) => {
   const d = new Date(ms)
@@ -39,6 +54,8 @@ export function WeekBoard({
   onAdd,
   onEdit,
   onAddSuggestion,
+  questTargets,
+  onAddQuestWindows,
 }: {
   now: string
   /** 週の月曜（YYYY-MM-DD・端末の日付） */
@@ -54,6 +71,8 @@ export function WeekBoard({
   onAdd: (date: string) => void
   onEdit: (id: string) => void
   onAddSuggestion: (w: SuggestedWindow) => void
+  questTargets: QuestTarget[]
+  onAddQuestWindows: (windows: SuggestedWindow[]) => void
 }) {
   const nowMs = Date.parse(now)
   const weekStart = new Date(`${weekFrom}T${pad(DAY_START_HOUR)}:00`).getTime()
@@ -65,6 +84,12 @@ export function WeekBoard({
     return { date, start, end: start + DAY, label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}` }
   })
   const weekEnd = days[6]!.end
+  const questWindows = questTargets.flatMap((t) => t.windows)
+  const winText = (w: { startsAt: string; endsAt: string }) => {
+    const st = Date.parse(w.startsAt)
+    const d = new Date(st)
+    return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]}) ${hm(st)}〜${hm(Date.parse(w.endsAt))}`
+  }
   const range = (x: { startsAt: string; endsAt: string }) => [Date.parse(x.startsAt), Date.parse(x.endsAt)] as const
 
   const doneHours = done.reduce((a, x) => a + overlapH(...range(x), weekStart, weekEnd), 0)
@@ -117,7 +142,7 @@ export function WeekBoard({
       <section className="card stack" aria-labelledby="week-board-title">
         <CardTitle
           id="week-board-title"
-          tip="1行が1日（4時〜翌4時）です。帯の色は主なエリアの混み具合（緑＝混む・稼げる、赤＝空き）。濃い四角が ✅ おすすめの予定、点線は選ばれなかった候補、灰色は実績です。四角を押すと編集、＋でその日に候補枠を足せます。"
+          tip="1行が1日（4時〜翌4時）です。帯の色は主なエリアの混み具合（緑＝混む・稼げる、赤＝空き）。濃い四角が ✅ おすすめの予定、点線は選ばれなかった候補、灰色は実績、🎯 はクエストの次の段階に届くために足すとよい時間です。四角を押すと編集、＋でその日に候補枠を足せます。🎯 の時間は、今の計画で届かない次の段階まで足す時間（1時間の件数から逆算）を、その回の期間の空いている時間から、見込みの大きい順に3時間までの枠で埋めたものです。下の＋でまとめて候補枠に入れられます。"
           right={
             <button type="button" className="icon" aria-label="候補枠を追加" onClick={() => onAdd(days.find((d) => d.end > nowMs)?.date ?? weekFrom)}>
               ＋
@@ -170,6 +195,13 @@ export function WeekBoard({
                     {dayDone.map((x) => (
                       <span key={x.startsAt} className="wb-done" style={pos(...range(x))} title={`実績 ${hm(Date.parse(x.startsAt))}〜${hm(Date.parse(x.endsAt))}`} />
                     ))}
+                    {questWindows
+                      .filter((w) => Date.parse(w.startsAt) < d.end && Date.parse(w.endsAt) > d.start)
+                      .map((w) => (
+                        <span key={w.startsAt} className="wb-quest" style={pos(...range(w))} aria-hidden="true">
+                          🎯
+                        </span>
+                      ))}
                     {daySlots.map((s) => (
                       <button
                         key={s.id}
@@ -196,7 +228,12 @@ export function WeekBoard({
           </ul>
         </div>
         <p className="wb-legend hint" aria-hidden="true">
-          <span className="key chosen" />予定 <span className="key cand" />候補 <span className="key done" />実績
+          <span className="key chosen" />予定 <span className="key cand" />候補 <span className="key done" />実績{questWindows.length > 0 && (
+            <>
+              {' '}
+              <span className="key quest" />クエスト用
+            </>
+          )}
           {busyness && (
             <>
               {' '}
@@ -204,6 +241,29 @@ export function WeekBoard({
             </>
           )}
         </p>
+        {questTargets.length > 0 && (
+          <ul className="list quest-targets" aria-label="クエストのための時間">
+            {questTargets.map((t) => (
+              <li key={t.key} className="stack">
+                <span className="line">
+                  <span className="grow">
+                    🎯 <strong>{t.label}</strong> 第{t.tier}段階（+{formatYen(t.gainYen)}）まで あと<strong>{fmtH(t.extraHours)}</strong>
+                  </span>
+                  {t.windows.length > 0 && (
+                    <button type="button" className="icon" aria-label={`${t.label}のための時間を候補枠に入れる`} onClick={() => onAddQuestWindows(t.windows)}>
+                      ＋
+                    </button>
+                  )}
+                </span>
+                <span className="hint">
+                  {t.windows.length > 0 ? t.windows.map(winText).join('・') : busyness ? '期間の中に空いている時間がありません' : '設定 → エリアで混み具合を入れると、働く時間を出します'}
+                  {t.shortHours > 0 && t.windows.length > 0 && `（${fmtH(t.shortHours)}足りない）`}
+                  {t.hourlyYen !== null && ` ・純時給 ${formatYen(t.hourlyYen)}/時${t.belowTarget ? ' ⚠️目標未満' : ''}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="card stack" aria-labelledby="suggest-title">

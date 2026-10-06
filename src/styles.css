@@ -17,6 +17,8 @@
   --busy-2: #f2a93b;
   --busy-1: #e0503d;
   --grid: #e6e9e6;
+  /* クエストのために足す時間（混み具合の色と見分けるため紫） */
+  --quest: #7c3aed;
   --radius: 12px;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -41,6 +43,7 @@
     --busy-2: #f5b14c;
     --busy-1: #ef6a57;
     --grid: #2a2f2c;
+    --quest: #b197fc;
   }
 }
 
@@ -1450,3 +1453,28 @@ details.more > summary .hint {
 details.more[open] > summary {
   margin-bottom: 8px;
 }
+
+/* 帯の上の、クエストのために足すとよい時間 */
+.wb-quest {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border: 2px dashed var(--quest);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--quest) 22%, transparent);
+  font-size: 0.625rem;
+  line-height: 18px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.wb-legend .key.quest {
+  border: 2px dashed var(--quest);
+  background: color-mix(in srgb, var(--quest) 22%, transparent);
+}
+
+.quest-targets > li {
+  gap: 0;
+  padding: 4px 0;
+}
+

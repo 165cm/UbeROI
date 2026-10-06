@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   SCENARIOS,
   deadlineMs,
+  suggestHours,
   suggestWindows,
   SCENARIO_FACTORS,
   SCENARIO_LABELS,
@@ -26,12 +27,15 @@ import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, l
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
-import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot } from '../storage/repo'
+import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot, saveSlots } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
-import { QuestWeek } from './QuestWeek'
-import { WeekBoard } from './WeekBoard'
+import { QuestWeek, questWeekItems } from './QuestWeek'
+import { WeekBoard, type QuestTarget } from './WeekBoard'
 import { AreaRoutePlan } from './AreaRoutePlan'
+
+/** 7日の帯に出すクエストの数の上限（毎日のクエストなどで帯が埋まらないように） */
+const MAX_QUEST_TARGETS = 3
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   invalid_time: '時間が正しくない',
@@ -154,16 +158,54 @@ export function Plan() {
   const { done, weekStartIso, weekEndIso, nowIso } = computed
   const busyness = primaryArea(data.areas, data.settings)?.levels ?? null
   const homeDeadline = data.settings?.homeDeadline ?? null
+  const estimate = (st: string, e: string) => estimateRevenue(st, e, past, busyness).revenueYen
+  const deadline = homeDeadline ? (st: string) => deadlineMs(st, homeDeadline) : null
+  // クエスト：計画で届かない次の段階まで、あと何時間か（逆算）と、その時間をどこで働くか
+  const questInput = {
+    now: nowIso,
+    weekStart: weekStartIso,
+    weekEnd: weekEndIso,
+    quests: data.quests,
+    sessions: data.sessions,
+    past,
+    chosenSlots: inWeek.filter((s) => chosen.has(s.id)),
+    costPerHourYen: costPerHour,
+    targetHourlyYen: target,
+  }
+  const questTargets: QuestTarget[] = []
+  const taken: { startsAt: string; endsAt: string }[] = [...inWeek, ...done]
+  // 先に終わる回から（§5.8）
+  const questItems = [...questWeekItems(questInput).items].sort((a, b) => a.occ.endsAt.localeCompare(b.occ.endsAt))
+  for (const { q, occ, plan: qp } of questItems) {
+    const goal = qp.tiers.find((t) => !t.reachedByPlan && t.possible)
+    if (!goal || goal.extraHours <= 0 || questTargets.length >= MAX_QUEST_TARGETS) continue
+    const found = busyness
+      ? suggestHours({
+          now: nowIso,
+          from: occ.startsAt > weekStartIso ? occ.startsAt : weekStartIso,
+          to: occ.endsAt < weekEndIso ? occ.endsAt : weekEndIso,
+          busyness,
+          busy: taken,
+          estimate,
+          deadline,
+          hoursNeeded: goal.extraHours,
+        })
+      : null
+    if (found) taken.push(...found.windows)
+    questTargets.push({
+      key: `${q.id}-${occ.index}`,
+      label: q.label,
+      tier: goal.tier,
+      gainYen: goal.gainYen,
+      extraHours: goal.extraHours,
+      hourlyYen: goal.extraHourlyYen,
+      belowTarget: target !== null && goal.extraHourlyYen !== null && goal.extraHourlyYen < target,
+      windows: found?.windows ?? [],
+      shortHours: found?.shortHours ?? 0,
+    })
+  }
   const suggestions = busyness
-    ? suggestWindows({
-        now: nowIso,
-        from: weekStartIso,
-        to: weekEndIso,
-        busyness,
-        busy: [...inWeek, ...done],
-        estimate: (st, e) => estimateRevenue(st, e, past, busyness).revenueYen,
-        deadline: homeDeadline ? (st) => deadlineMs(st, homeDeadline) : null,
-      })
+    ? suggestWindows({ now: nowIso, from: weekStartIso, to: weekEndIso, busyness, busy: taken, estimate, deadline })
     : []
   /** おすすめの時間から、見込みを入れた候補枠の入力を開く */
   const fromSuggestion = (w: { startsAt: string; endsAt: string }): SlotRecord => {
@@ -217,20 +259,23 @@ export function Plan() {
         onAdd={(date) => setEditing(newSlot(date))}
         onEdit={(id) => setEditing(inWeek.find((s) => s.id === id) ?? null)}
         onAddSuggestion={(w) => setEditing(fromSuggestion(w))}
+        questTargets={questTargets}
+        onAddQuestWindows={async (windows) => {
+          const slots = windows.map(fromSuggestion)
+          try {
+            await saveSlots(db, slots)
+          } catch (e) {
+            setNotice({ message: `⚠️ 候補枠を保存できませんでした（1つも入れていません）：${errorMessages(e).join('・')}` })
+            return
+          }
+          setNotice({
+            message: `🎯 ${slots.length}つの候補枠を入れました`,
+            undo: () => void db.slots.bulkDelete(slots.map((x) => x.id)).then(() => setNotice(null)),
+          })
+        }}
       />
 
-      <QuestWeek
-        now={new Date().toISOString()}
-        weekStart={new Date(`${week.from}T00:00`).toISOString()}
-        weekEnd={new Date(Date.parse(`${week.to}T00:00`) + 86_400_000).toISOString()}
-        quests={data.quests}
-        sessions={data.sessions}
-        past={past}
-        chosenSlots={inWeek.filter((s) => chosen.has(s.id))}
-        costPerHourYen={costPerHour}
-        targetHourlyYen={target}
-        onAddSlot={() => setEditing(newSlot())}
-      />
+      <QuestWeek {...questInput} onAddSlot={() => setEditing(newSlot())} />
 
       <details className="more">
         <summary>

@@ -1,6 +1,6 @@
 // 端末に保存するデータの形（docs/spec/docs/03-data-model.md を MVP 向けに簡略化）
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
-import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, Tariff } from '../domain'
+import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, QuestRepeat, Tariff } from '../domain'
 
 /**
  * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
@@ -8,7 +8,7 @@ import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, Tariff 
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 interface Stamped {
   createdAt: string
@@ -200,7 +200,12 @@ export interface QuestRecord extends Stamped {
   endsAt: string
   rewardMode: 'cumulative' | 'incremental'
   tiers: { count: number; rewardYen: number }[]
+  /** 件数の調整。くり返すクエストでは最初の回（0回目）の分 */
   manualOffset: number
+  /** くり返し（版10で追加。未定義は「くり返さない」）。startsAt〜endsAt が最初の回で、同じ長さで毎日・毎週・毎月くり返す */
+  repeat?: QuestRepeat
+  /** くり返すクエストの、2回目以降の件数の調整（キーは回の番号。最初の回は manualOffset） */
+  offsets?: Record<string, number>
 }
 
 /**

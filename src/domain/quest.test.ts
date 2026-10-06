@@ -1,6 +1,6 @@
 // クエストの進み具合と休憩前の返却
 import { describe, expect, it } from 'vitest'
-import { HELLO_TOKYO_CITY, breakAdvice, questProgress, selectiveQuestPeriod, type QuestInput } from './index'
+import { HELLO_TOKYO_CITY, breakAdvice, questOccurrence, questOccurrencesNow, questProgress, selectiveQuestPeriod, type QuestInput } from './index'
 
 describe('選択制クエストの期間（日本時間 月曜4:00／金曜4:00 区切り）', () => {
   it('平日と週末を正しく切り分ける', () => {
@@ -79,5 +79,31 @@ describe('休憩前の返却', () => {
     // 貸出200分：F=2080。借りたまま1時間休憩＋1時間：F(320分)=2500 − 2080 = 420円。借り直す：F(60分)=480円
     const a = breakAdvice(HELLO_TOKYO_CITY, '2026-10-05T00:00:00Z', '2026-10-05T03:20:00Z', 60, 60)
     expect(a.savingYen).toBe(-60)
+  })
+})
+
+describe('くり返すクエスト', () => {
+  const jst = (s: string) => new Date(`${s}+09:00`).toISOString()
+  const weekday = { startsAt: jst('2026-10-05T04:00:00'), endsAt: jst('2026-10-09T04:00:00'), repeat: 'weekly' as const }
+
+  it('毎週：今の回と、終わって1日以内の前の回を出す', () => {
+    // 2週後の火曜 → 10/19〜10/23 の回
+    expect(questOccurrencesNow(weekday, jst('2026-10-20T12:00:00'))).toEqual({
+      current: { startsAt: jst('2026-10-19T04:00:00'), endsAt: jst('2026-10-23T04:00:00'), index: 2 },
+      previous: null,
+    })
+    // 金曜の朝（終わった直後）→ 前の回も出し、今の回は次の月曜から
+    const r = questOccurrencesNow(weekday, jst('2026-10-09T10:00:00'))
+    expect(r.current.startsAt).toBe(jst('2026-10-12T04:00:00'))
+    expect(r.previous?.startsAt).toBe(jst('2026-10-05T04:00:00'))
+  })
+
+  it('毎日・毎月（月末はそろえる）・くり返さない', () => {
+    const daily = { startsAt: jst('2026-10-05T17:00:00'), endsAt: jst('2026-10-05T21:30:00'), repeat: 'daily' as const }
+    expect(questOccurrencesNow(daily, jst('2026-10-07T18:00:00')).current).toEqual({ startsAt: jst('2026-10-07T17:00:00'), endsAt: jst('2026-10-07T21:30:00'), index: 2 })
+    const monthly = { startsAt: jst('2026-01-31T04:00:00'), endsAt: jst('2026-02-01T04:00:00'), repeat: 'monthly' as const }
+    expect(questOccurrence(monthly, 1)).toEqual({ startsAt: jst('2026-02-28T04:00:00'), endsAt: jst('2026-03-01T04:00:00') })
+    const once = { startsAt: jst('2026-10-05T04:00:00'), endsAt: jst('2026-10-09T04:00:00') }
+    expect(questOccurrencesNow(once, jst('2026-11-01T00:00:00')).current.startsAt).toBe(jst('2026-10-05T04:00:00'))
   })
 })

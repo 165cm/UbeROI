@@ -24,6 +24,58 @@ export function selectiveQuestPeriod(atIso: string): { startsAt: string; endsAt:
   return { startsAt: toIso(start), endsAt: toIso(end), label }
 }
 
+/** クエストの繰り返し。none＝1回だけ、daily・weekly・monthly＝最初の期間を同じ長さで毎日・毎週・毎月くり返す */
+export type QuestRepeat = 'none' | 'daily' | 'weekly' | 'monthly'
+
+export const QUEST_REPEAT_LABELS: Record<QuestRepeat, string> = { none: 'くり返さない', daily: '毎日', weekly: '毎週', monthly: '毎月' }
+
+/** くり返しの1回分の長さの上限（期間が次の回と重ならないように） */
+export const QUEST_REPEAT_MAX_MS: Record<Exclude<QuestRepeat, 'none'>, number> = { daily: DAY_MS, weekly: 7 * DAY_MS, monthly: 28 * DAY_MS }
+
+/** 日本時間の暦で k か月ずらす（31日が無い月は月末にそろえる） */
+function addMonthsJst(iso: string, k: number): string {
+  const d = new Date(parseInstant(iso) + JST_MS)
+  const y = d.getUTCFullYear()
+  const m = d.getUTCMonth() + k
+  const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+  const day = Math.min(d.getUTCDate(), lastDay)
+  return new Date(Date.UTC(y, m, day, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()) - JST_MS).toISOString()
+}
+
+/** k 回目（最初が0）の期間 */
+export function questOccurrence(q: { startsAt: string; endsAt: string; repeat?: QuestRepeat }, k: number): { startsAt: string; endsAt: string } {
+  const repeat = q.repeat ?? 'none'
+  if (repeat === 'none' || k === 0) return { startsAt: new Date(parseInstant(q.startsAt)).toISOString(), endsAt: new Date(parseInstant(q.endsAt)).toISOString() }
+  if (repeat === 'monthly') return { startsAt: addMonthsJst(q.startsAt, k), endsAt: addMonthsJst(q.endsAt, k) }
+  const step = (repeat === 'daily' ? 1 : 7) * DAY_MS * k
+  return { startsAt: new Date(parseInstant(q.startsAt) + step).toISOString(), endsAt: new Date(parseInstant(q.endsAt) + step).toISOString() }
+}
+
+/**
+ * 今見せる回：今の回（開始〜終了の間）、なければ次の回。くり返さないクエストは登録した期間のまま。
+ * 直前の回が終わって1日以内なら、それも返す（達成分の入れ忘れを防ぐ）
+ */
+export function questOccurrencesNow(
+  q: { startsAt: string; endsAt: string; repeat?: QuestRepeat },
+  nowIso: string,
+): { current: { startsAt: string; endsAt: string; index: number }; previous: { startsAt: string; endsAt: string; index: number } | null } {
+  const now = parseInstant(nowIso)
+  if ((q.repeat ?? 'none') === 'none') return { current: { ...questOccurrence(q, 0), index: 0 }, previous: null }
+  // 終了が今より後になる最初の回を探す（毎日でも数年分で足りる）
+  let k = 0
+  const first = parseInstant(q.endsAt)
+  if (first <= now) {
+    const approx = q.repeat === 'daily' ? DAY_MS : q.repeat === 'weekly' ? 7 * DAY_MS : 28 * DAY_MS
+    k = Math.max(0, Math.floor((now - first) / approx) - 1)
+    while (parseInstant(questOccurrence(q, k).endsAt) <= now) k++
+  }
+  const prev = k > 0 ? { ...questOccurrence(q, k - 1), index: k - 1 } : null
+  return {
+    current: { ...questOccurrence(q, k), index: k },
+    previous: prev && now < parseInstant(prev.endsAt) + DAY_MS ? prev : null,
+  }
+}
+
 export interface QuestTier {
   /** この段階に必要な件数 */
   count: number

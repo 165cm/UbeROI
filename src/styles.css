@@ -1193,3 +1193,19 @@ select.inline-select {
 .nowrap {
   white-space: nowrap;
 }
+.map-wrap {
+  position: relative;
+}
+/* 地図の真ん中の十字（キーボードで中心を決める時の目印） */
+.map-cross {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1b1f1d;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+  pointer-events: none;
+}

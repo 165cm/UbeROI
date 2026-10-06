@@ -1,5 +1,6 @@
 // エリアの地図（OpenStreetMap）。エリアは配達アプリの形を写さず、中心と半径の円で目安として描く。
-// 地図の画像は OpenStreetMap から読み込む（見ている辺りの地図の画像を取りに行くだけで、記録や現在地は送らない）
+// 地図の画像は OpenStreetMap から読み込む（見ている辺りの地図の画像を取りに行くだけで、記録や現在地は送らない）。
+// 現在地（位置情報）は使わない：現在地へ地図を動かすと、その辺りの地図の画像を取りに行き、だいたいの現在地が伝わるため
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -60,8 +61,7 @@ export function MapPicker({
   const circle = useRef<L.Circle | null>(null)
   const latest = useRef({ radiusM, onChange })
   latest.current = { radiusM, onChange }
-  const [locating, setLocating] = useState<string | null>(null)
-  /** 円が全部見えるように地図を合わせる（現在地にした時・半径を変えた時。タップした時は動かさない） */
+  /** 円が全部見えるように地図を合わせる（半径を変えた時。タップした時は動かさない） */
   const showCircle = (c: { lat: number; lng: number }, r: number) => map.current?.fitBounds(L.latLng(c.lat, c.lng).toBounds(r * 2), { padding: [16, 16] })
 
   useEffect(() => {
@@ -93,7 +93,11 @@ export function MapPicker({
 
   return (
     <div className="stack">
-      <div ref={el} className="area-map" role="region" aria-label="エリアの場所を決める地図（タップした所が中心になります）" />
+      {/* 地図は矢印キーで動かし、＋・−で拡大できる。十字を合わせて下のボタンで中心を決める（キーボードだけでも決められる） */}
+      <div className="map-wrap">
+        <div ref={el} className="area-map" role="region" aria-label="エリアの場所を決める地図（タップした所が中心になります。矢印キーで動かせます）" />
+        <span className="map-cross" aria-hidden="true">＋</span>
+      </div>
       <div className="line wrap">
         <label className="line">
           <span className="nowrap">半径</span>
@@ -114,24 +118,13 @@ export function MapPicker({
         <button
           type="button"
           onClick={() => {
-            if (!('geolocation' in navigator)) {
-              setLocating('この端末では現在地を使えません')
-              return
-            }
-            setLocating('現在地を探しています…')
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                const c = { lat: round(pos.coords.latitude), lng: round(pos.coords.longitude) }
-                onChange(c, radiusM)
-                showCircle(c, radiusM)
-                setLocating(null)
-              },
-              () => setLocating('現在地を使えませんでした。地図をタップして決めてください'),
-              { timeout: 10_000 },
-            )
+            const m = map.current
+            if (!m) return
+            const c = m.getCenter()
+            onChange({ lat: round(c.lat), lng: round(c.lng) }, radiusM)
           }}
         >
-          📍 現在地を中心に
+          ＋ 地図の真ん中（十字）を中心にする
         </button>
         {center && (
           <button type="button" onClick={() => onChange(null, radiusM)}>
@@ -140,7 +133,7 @@ export function MapPicker({
         )}
       </div>
       <p className="hint" role="status">
-        {locating ?? (center ? `中心：設定済み（半径 ${radiusM >= 1000 ? `${radiusM / 1000}km` : `${radiusM}m`}）` : '中心：未設定（地図をタップして決めてください）')}
+        {center ? `中心：設定済み（半径 ${radiusM >= 1000 ? `${radiusM / 1000}km` : `${radiusM}m`}）` : '中心：未設定（地図をタップするか、十字を合わせてボタンを押してください）'}
       </p>
     </div>
   )
@@ -199,7 +192,7 @@ export function BusyMap({ areas, now, hours = 4 }: { areas: MapArea[]; now: stri
 
   return (
     <div className="stack">
-      <div ref={el} className="area-map" role="region" aria-label={`混み具合の地図：${hourLabel(offset)}。${areas.map((a) => `${a.name} 段階${busyAhead(a.levels, t, hours)[offset]?.level ?? '未入力'}`).join('、')}`} />
+      <div ref={el} className="area-map" role="region" aria-label={`混み具合の地図：${hourLabel(offset)}。${areas.map((a) => `${a.name} ${((l) => (l == null ? '未入力' : `段階${l}`))(busyAhead(a.levels, t, hours)[offset]?.level)}`).join('、')}`} />
       <div className="line">
         <button type="button" className="icon" aria-label={playing ? '止める' : '時間を進めて動かす'} onClick={() => setPlaying((p) => !p)}>
           {playing ? '⏸' : '▶'}

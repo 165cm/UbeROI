@@ -1,6 +1,5 @@
 // 計画：🧭 クエスト作戦。日跨ぎのクエストと、その期間のピークタイムのクエストをまとめて、
 // 段階（最低・本命）ごとに、残りの日の件数（ピーク＋ほか）・時間・報酬を出す（見込み。実績には入れない）
-import { useState } from 'react'
 import { MAIN_QUEST_MIN_HOURS, questStrategy } from '../domain'
 import { CardTitle } from '../components/fields'
 import { formatYen } from '../format'
@@ -13,8 +12,8 @@ const dayText = (iso: string) => {
 }
 const clock = (iso: string) => new Date(Date.parse(iso) + 9 * 3_600_000).toISOString().slice(11, 16)
 
-export function QuestStrategyCard(input: QuestWeekInput) {
-  const [picked, setPicked] = useState<number | null>(null)
+/** 作戦の軸（日跨ぎ）と、同じサービスのピークを選び、作戦を出す。軸がなければ null */
+export function buildStrategy(input: QuestWeekInput, allowed: readonly (readonly [number, number])[] | null) {
   const { items, rate, revenuePerHour } = questWeekItems(input)
   const length = (o: { startsAt: string; endsAt: string }) => (Date.parse(o.endsAt) - Date.parse(o.startsAt)) / 3_600_000
   // 作戦の軸：日をまたぐクエストのうち、先に終わる回
@@ -23,17 +22,30 @@ export function QuestStrategyCard(input: QuestWeekInput) {
   // 1つの配達が両方に数えられるのは同じサービスのクエストだけ
   const peaks = items.filter((it) => length(it.occ) < MAIN_QUEST_MIN_HOURS && it.q.platform === main.q.platform)
   const toQuest = (it: (typeof items)[number]) => ({ label: it.q.label, startsAt: it.occ.startsAt, endsAt: it.occ.endsAt, rewardMode: it.q.rewardMode, tiers: it.q.tiers, count: it.progress.count })
-  const s = questStrategy({
+  const strategy = questStrategy({
     now: input.now,
     main: toQuest(main),
     peaks: peaks.map(toQuest),
     ordersPerHour: rate.rate,
     revenuePerOrderYen: rate.rate > 0 ? revenuePerHour / rate.rate : 0,
+    allowed,
   })
-  if (s.goals.length === 0) return null
+  if (strategy.goals.length === 0) return null
+  /** 作戦で扱うクエスト（🎯 クエストのための時間では重ねて出さない） */
+  const keys = new Set([main, ...peaks].map((it) => `${it.q.id}-${it.occ.index}`))
+  return { main, strategy, rate, keys }
+}
+
+export type StrategyData = NonNullable<ReturnType<typeof buildStrategy>>
+
+/** 選んでいる目標（未選択・範囲外は本命＝最後の段階） */
+export const goalIndexOf = (s: StrategyData['strategy'], picked: number | null) => (picked !== null && picked < s.goals.length ? picked : s.goals.length - 1)
+
+export function QuestStrategyCard({ data, picked, onPick }: { data: StrategyData; picked: number | null; onPick: (i: number) => void }) {
+  const { main, strategy: s, rate } = data
   const last = s.goals.length - 1
   const goalName = (i: number) => (i === last ? '本命' : i === 0 ? '最低' : `第${s.goals[i]!.tier}段階`)
-  const idx = picked !== null && picked <= last ? picked : last
+  const idx = goalIndexOf(s, picked)
   const g = s.goals[idx]!
 
   return (
@@ -46,7 +58,7 @@ export function QuestStrategyCard(input: QuestWeekInput) {
       </CardTitle>
       <div className="segmented" role="tablist" aria-label="目標">
         {s.goals.map((x, i) => (
-          <button key={x.tier} type="button" role="tab" aria-selected={i === idx} onClick={() => setPicked(i)}>
+          <button key={x.tier} type="button" role="tab" aria-selected={i === idx} onClick={() => onPick(i)}>
             {goalName(i)} {x.target}件
           </button>
         ))}
@@ -98,6 +110,9 @@ export function QuestStrategyCard(input: QuestWeekInput) {
           </tbody>
         </table>
       </div>
+      {s.skippedPeaks.length > 0 && (
+        <p className="hint">🕒 働ける時間の外のピーク {s.skippedPeaks.length}回は数えていません（設定 → 基本 → 働ける時間）</p>
+      )}
       {s.warnings.length > 0 && (
         <ul className="reasons" aria-label="ピークの注意">
           {s.warnings.map((w) => (

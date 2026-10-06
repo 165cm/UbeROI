@@ -13,7 +13,10 @@ export interface SuggestInput {
   /** 探す範囲（表示している週） */
   from: string
   to: string
-  busyness: BusynessTable
+  /** 主なエリアの混み具合。null なら混み具合では絞らない（段階は空） */
+  busyness: BusynessTable | null
+  /** 働ける時間（設定）。あれば、枠がその中に収まるものだけ */
+  allowed?: readonly (readonly [number, number])[] | null
   /** 予定・実績で埋まっている時間（重なる時間はおすすめしない） */
   busy: readonly { startsAt: string; endsAt: string }[]
   /** 区間の売上の見込み（5.1） */
@@ -47,14 +50,17 @@ function windowCandidates(input: SuggestInput, hours: number): SuggestedWindow[]
   for (let s = from; s + hours * HOUR <= to; s += HOUR) {
     const e = s + hours * HOUR
     if (busy.some(([a, b]) => a < e && b > s)) continue
+    if (input.allowed && !input.allowed.some(([a, b]) => a <= s && e <= b)) continue
     const levels: number[] = []
-    for (let h = s; h < e; h += HOUR) {
-      const l = busyLevelAt(input.busyness, h)
-      if (l === null) break
-      levels.push(l)
+    if (input.busyness) {
+      for (let h = s; h < e; h += HOUR) {
+        const l = busyLevelAt(input.busyness, h)
+        if (l === null) break
+        levels.push(l)
+      }
+      // 混み具合が入っていない時間を含む枠は比べられないので出さない
+      if (levels.length < hours) continue
     }
-    // 混み具合が入っていない時間を含む枠は比べられないので出さない
-    if (levels.length < hours) continue
     const startsAt = new Date(s).toISOString()
     const endsAt = new Date(e).toISOString()
     if (input.deadline && e > input.deadline(startsAt)) continue
@@ -101,7 +107,7 @@ export function suggestHours(input: Omit<SuggestInput, 'hours' | 'count'> & { ho
     }
     if (!pick) break
     windows.push(pick)
-    got += pick.levels.length
+    got += (Date.parse(pick.endsAt) - Date.parse(pick.startsAt)) / HOUR
   }
   // 続いている枠（例：17〜20時と20〜21時）は1つにまとめる
   const merged: SuggestedWindow[] = []

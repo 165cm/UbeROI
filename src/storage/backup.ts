@@ -1,7 +1,7 @@
 // バックアップ（JSON）の書き出し・検証・復元。復元は全体の置き換えのみ（マージしない）
 import type { Tariff } from '../domain'
 import type { DeliKanDB, DataMode } from './db'
-import { isBusynessTable, parseInstant } from '../domain'
+import { availabilityProblems, isBusynessTable, parseInstant } from '../domain'
 import { areaProblems, initialRecords, questProblems, sessionRecordProblems, sessionSetProblems } from './repo'
 import { SCHEMA_VERSION, type AreaRecord, type QuestRecord, type SessionRecord } from './schema'
 
@@ -137,6 +137,7 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     if (r.offerBufferMinutes !== undefined) c.int(r, 'offerBufferMinutes', path)
     if (r.offerMinKmYen !== undefined) c.int(r, 'offerMinKmYen', path, { nullable: true })
     if (r.offerJudgeEnabled !== undefined && typeof r.offerJudgeEnabled !== 'boolean') c.add(`${path}.offerJudgeEnabled`, '真偽値ではありません')
+    if (r.availability !== undefined && r.availability !== null) for (const p of availabilityProblems(r.availability)) c.add(`${path}.availability`, p)
     c.stamped(r, path)
   },
   tariffs(c, r, path) {
@@ -316,13 +317,14 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし、6：エリアの移動の分なし、7：オファー判定の切り替えなし、8：エリアの地図の場所なし、9：クエストのくり返しなし）のバックアップは、足りない一覧を空として読み込む。
+  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし、6：エリアの移動の分なし、7：オファー判定の切り替えなし、8：エリアの地図の場所なし、9：クエストのくり返しなし、10：働ける時間なし）のバックアップは、足りない一覧を空として読み込む。
   // 版6までのエリアには移動の分（moveMinutes）が無いが、無ければ移動を候補にしないだけなので、そのままでよい
   // 版7までの設定にはオファー判定の切り替え（offerJudgeEnabled）が無いが、無ければ「使わない」なので、そのままでよい
   // 版8までのエリアには地図の場所（center・radiusM）が無いが、無ければ地図に出さないだけなので、そのままでよい
   // 版9までのクエストにはくり返し（repeat・offsets）が無いが、無ければ「くり返さない」なので、そのままでよい
+  // 版10までの設定には働ける時間（availability）が無いが、無ければ「制限なし」なので、そのままでよい
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ([1, 2, 3, 4, 5, 6, 7, 8, 9].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
     raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], offers: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }

@@ -34,6 +34,17 @@ export interface QuestTarget {
   shortHours: number
 }
 
+/** 🧭 クエスト作戦の、選んだ目標の時間を実際の時間に置いたもの */
+export interface StrategyPlan {
+  label: string
+  goalName: string
+  target: number
+  days: { startsAt: string; needHours: number; plannedHours: number; creditHours: number; windows: SuggestedWindow[]; shortHours: number }[]
+  windows: SuggestedWindow[]
+  hours: number
+  shortHours: number
+}
+
 const pad = (n: number) => String(n).padStart(2, '0')
 const hm = (ms: number) => {
   const d = new Date(ms)
@@ -56,6 +67,8 @@ export function WeekBoard({
   onAddSuggestion,
   questTargets,
   onAddQuestWindows,
+  strategyPlan,
+  allowed,
 }: {
   now: string
   /** 週の月曜（YYYY-MM-DD・端末の日付） */
@@ -73,6 +86,9 @@ export function WeekBoard({
   onAddSuggestion: (w: SuggestedWindow) => void
   questTargets: QuestTarget[]
   onAddQuestWindows: (windows: SuggestedWindow[]) => void
+  strategyPlan: StrategyPlan | null
+  /** 働ける時間（設定）。null は制限なし */
+  allowed: readonly (readonly [number, number])[] | null
 }) {
   const nowMs = Date.parse(now)
   const weekStart = new Date(`${weekFrom}T${pad(DAY_START_HOUR)}:00`).getTime()
@@ -84,7 +100,24 @@ export function WeekBoard({
     return { date, start, end: start + DAY, label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}` }
   })
   const weekEnd = days[6]!.end
-  const questWindows = questTargets.flatMap((t) => t.windows)
+  const questWindows = [...questTargets.flatMap((t) => t.windows), ...(strategyPlan?.windows ?? [])]
+  /** その日の、働けない時間（帯に斜線で出す） */
+  const offSpans = (start: number, end: number): [number, number][] => {
+    if (!allowed) return []
+    const out: [number, number][] = []
+    let t = start
+    for (const [a, b] of allowed) {
+      if (b <= start || a >= end) continue
+      if (a > t) out.push([t, Math.min(a, end)])
+      t = Math.max(t, b)
+    }
+    if (t < end) out.push([t, end])
+    return out
+  }
+  const dayLabel = (iso: string) => {
+    const d = new Date(Date.parse(iso))
+    return `${WEEKDAYS[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`
+  }
   const winText = (w: { startsAt: string; endsAt: string }) => {
     const st = Date.parse(w.startsAt)
     const d = new Date(st)
@@ -187,6 +220,9 @@ export function WeekBoard({
                         })}
                       </span>
                     )}
+                    {offSpans(d.start, d.end).map(([a, b]) => (
+                      <span key={a} className="wb-off" aria-hidden="true" style={pos(a, b)} />
+                    ))}
                     {past ? (
                       <span className="wb-past" aria-hidden="true" />
                     ) : (
@@ -234,6 +270,12 @@ export function WeekBoard({
               <span className="key quest" />クエスト用
             </>
           )}
+          {allowed && (
+            <>
+              {' '}
+              <span className="key off" />働けない
+            </>
+          )}
           {busyness && (
             <>
               {' '}
@@ -241,6 +283,40 @@ export function WeekBoard({
             </>
           )}
         </p>
+        {strategyPlan && (
+          <div className="stack strategy-plan" role="group" aria-label="クエスト作戦の時間">
+            <p className="line">
+              <span className="grow">
+                🧭 <strong>{strategyPlan.label}</strong> {strategyPlan.goalName}{strategyPlan.target}件：この週 <strong>{fmtH(strategyPlan.hours + strategyPlan.days.reduce((a, d) => a + d.plannedHours, 0))}</strong>
+                {strategyPlan.shortHours > 0 && <span className="warn-text">（⚠️ 働ける時間に {fmtH(strategyPlan.shortHours)} 入らない）</span>}
+              </span>
+              {strategyPlan.windows.length > 0 && (
+                <button type="button" className="icon" aria-label="作戦の時間を候補枠に入れる" onClick={() => onAddQuestWindows(strategyPlan.windows)}>
+                  ＋
+                </button>
+              )}
+            </p>
+            <ul className="list" aria-label="作戦の日ごとの時間">
+              {strategyPlan.days.map((d) => (
+                <li key={d.startsAt} className="line">
+                  <strong className="strategy-day">{dayLabel(d.startsAt)}</strong>
+                  <span className="grow hint">
+                    {d.windows.length > 0
+                      ? d.windows.map((w) => `${hm(Date.parse(w.startsAt))}〜${hm(Date.parse(w.endsAt))}`).join('・')
+                      : d.plannedHours > 0
+                        ? '選んだ枠で足りる'
+                        : d.creditHours > 0
+                          ? 'ほかの日の選んだ枠でまかなう'
+                          : '—'}
+                    {d.plannedHours > 0 && d.windows.length > 0 && `（＋選んだ枠 ${fmtH(d.plannedHours)}）`}
+                    {d.shortHours > 0 && ` ⚠️${fmtH(d.shortHours)}入らない`}
+                  </span>
+                  <span className="num">{fmtH(d.needHours)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {questTargets.length > 0 && (
           <ul className="list quest-targets" aria-label="クエストのための時間">
             {questTargets.map((t) => (

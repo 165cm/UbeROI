@@ -8,6 +8,7 @@ import { useData } from '../storage/context'
 import { listTariffs, newId, saveRecurringExpense, saveSettings, saveTariff } from '../storage/repo'
 import type { RecurringExpenseRecord, SettingsRecord, TariffRecord } from '../storage/schema'
 import { AreaSettings } from './AreaSettings'
+import { AvailabilitySettings } from './AvailabilitySettings'
 import { DataSettings } from './DataSettings'
 import { Equipment } from './Equipment'
 
@@ -32,7 +33,12 @@ export function Settings() {
           </button>
         ))}
       </div>
-      {section === 'basic' && <BasicSettings />}
+      {section === 'basic' && (
+        <>
+          <BasicSettings />
+          <AvailabilitySettings />
+        </>
+      )}
       {section === 'tariff' && <TariffSettings />}
       {section === 'equipment' && <Equipment />}
       {section === 'fixed' && <FixedCosts />}

@@ -1,5 +1,5 @@
 // データの読み書き。保存前の検証と、まとめて書く操作（トランザクション）をここに集める
-import { QUEST_REPEAT_LABELS, QUEST_REPEAT_MAX_MS, assertYen, isBusynessTable, isCalendarDate, localMonth, parseInstant } from '../domain'
+import { QUEST_REPEAT_LABELS, QUEST_REPEAT_MAX_MS, assertYen, availabilityProblems, isBusynessTable, isCalendarDate, localMonth, parseInstant } from '../domain'
 import type { DeliKanDB } from './db'
 import { EQUIPMENT_PRESETS, TARIFF_PRESETS, type EquipmentPresetItem } from './presets'
 import type {
@@ -104,6 +104,7 @@ export async function saveSettings(db: DeliKanDB, patch: Partial<Omit<SettingsRe
   if (patch.offerMinKmYen != null && (!Number.isSafeInteger(patch.offerMinKmYen) || patch.offerMinKmYen < 0)) {
     problems.push('km単価の下限は0以上の整数円で入力してください')
   }
+  if (patch.availability != null) problems.push(...availabilityProblems(patch.availability))
   if (patch.homeDeadline != null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(patch.homeDeadline)) {
     problems.push('帰宅締切は 21:30 のように入力してください')
   }

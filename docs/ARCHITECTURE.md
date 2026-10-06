@@ -33,6 +33,7 @@
 | `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
 | `src/domain/csv.ts` | CSVの読み取り（引用符・改行・BOM） |
 | `src/domain/busyness.ts` | エリアの混み具合：曜日×時間の表（4時区切り）、段階の倍率、区間の積算 |
+| `src/domain/questScreenshot.ts` | クエストの進捗の画面のスクショを文字認識した結果から、期間（または開始の曜日・時刻）と段階（件数は足していく・¥ の読み違いを直す）を読む |
 | `src/domain/busyScreenshot.ts` | 配達アプリの「時間帯ごとの傾向」のスクリーンショットから、24本の棒の段階と曜日（画面下の点）を読む。画像は端末の中で読むだけ |
 | `src/domain/offer.ts` `offerConfig.ts` | オファー判定：画面の文字の読み取り、実質時給と判定、設定コード（URL に入れる設定。学習した地名の評価も入れる） |
 | `src/domain/outlook.ts` | 終了までの見通し：今日のペース（オファーの記録）とこの先の混み具合から、続ける／休憩して再開／エリアを移動／今やめるの利益を比べる |
@@ -47,7 +48,8 @@
 | `src/features/DataSettings.tsx` | データ：デモ切り替え、バックアップの書き出し・復元、全削除 |
 | `src/features/CsvImport.tsx` | データ：CSVから記録を取り込む（見本・確認・まとめて確定） |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
-| `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集 |
+| `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集・📷 スクショから読み取り |
+| `src/features/ocr.ts` | 端末の中の文字認識（tesseract.js・日本語）。必要なファイルは `ocr/` から使う時だけ読み込む |
 | `src/features/AreaRoutePlan.tsx` | 計画の「🧭 時間帯ごとのエリア計画」：候補枠を選び、エリアの順番と、ずっと主なエリアにいる場合との差 |
 | `src/features/QuestWeek.tsx` | 計画の「🎯 クエストから見たこの週」：届く段階・足す時間・純時給 |
 | `src/features/CashChange.tsx` | ホームの「💴 お釣り」 |
@@ -74,7 +76,8 @@
 | `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
 | `src/pwa.ts` | Service Worker の登録、新しい版の知らせ、オフライン判定、ホーム画面に追加、消えにくい保存の依頼 |
 | `src/features/InstallHelp.tsx` | 「アプリとして使う」の案内（設定 → データ） |
-| `sw/sw.template.js` | Service Worker のひな形。ビルド時に版と一覧を埋め込んで `dist/sw.js` になる |
+| `sw/sw.template.js` | Service Worker のひな形。ビルド時に版と一覧を埋め込んで `dist/sw.js` になる。文字認識のファイル（`ocr/`）は最初の一覧に入れず、使った時に `deli-kan-ocr-v1` に保存する（版が変わっても消さない） |
+| `vite.config.ts` | `base`、文字認識のファイル（tesseract.js の worker・core・日本語データ `jpn.traineddata.gz`）を `node_modules` から `ocr/` に置く、`sw.js` を作る |
 | `public/` | マニフェスト（`manifest.webmanifest`）とアイコン（`icon.svg` と PNG） |
 | `.github/workflows/` | `ci.yml`＝PRのテスト、`pages.yml`＝main を GitHub Pages に公開 |
 | `docs/spec/` | 仕様書（`MANIFEST.sha256` で中身を確かめられる）と、収益性の参考資料（全国版） |
@@ -94,5 +97,6 @@
   - 送るのは、見ている辺りの地図の画像の位置（ズームと区画）だけ。記録・設定・現在地は送らない（現在地＝位置情報は使わない。現在地へ地図を動かすと、その辺りの地図の画像を取りに行き、だいたいの現在地が伝わるため）
   - 表示に「© OpenStreetMap contributors」を出す。Service Worker は外のサイトの画像をキャッシュしない（電波がない時は地図の絵が出ない）
   - 地図の部品は Leaflet（`leaflet`）
+- **スクショの文字認識**は外部サービスを使わない：tesseract.js（Apache-2.0）と日本語データ（`@tesseract.js-data/jpn` の best_int、約2MB）を、このアプリと同じ場所の `ocr/` から読み込み、端末の中で動かす。画像も文字も送らない
 - 環境変数・APIキーはなし
 - 候補：シェアサイクルの公開データ（GBFS。例：HELLO CYCLING）、天気、AIの説明（サーバー経由のみ）

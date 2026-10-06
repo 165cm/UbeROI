@@ -1,7 +1,7 @@
 // ホームの「🎯 クエスト」：今の期間のクエストの進み具合（見込みの管理用。実績の売上には自動で入れない）
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { questProgress, selectiveQuestPeriod, type Platform } from '../domain'
+import { QUEST_REPEAT_LABELS, questOccurrencesNow, questProgress, selectiveQuestPeriod, type Platform, type QuestRepeat } from '../domain'
 import { CardTitle, DateTimeInput, IntInput, Notice, Problems, Select, TextInput, errorMessages, localToday } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
@@ -33,15 +33,21 @@ function blankQuest(nowIso: string): QuestRecord {
 export function QuestCard({ now }: { now: string }) {
   const { db } = useData()
   const data = useLiveQuery(async () => ({ quests: await db.quests.toArray(), sessions: await db.sessions.toArray() }), [db])
-  const [editing, setEditing] = useState<QuestRecord | null>(null)
+  // 編集するクエストと、件数の調整を入れる回（くり返すクエストは回ごとに調整を持つ）
+  const [editing, setEditing] = useState<{ quest: QuestRecord; index: number } | null>(null)
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
   if (!data) return null
 
   const nowMs = Date.parse(now)
   // 今の期間のもの・これから始まるもの（入力の誤りを直せるように）・終わってから1日以内のもの（達成分の入れ忘れ防止）を出す
+  // くり返すクエストは、今の回（なければ次の回）と、終わって1日以内の前の回を出す
   const visible = data.quests
-    .filter((q) => nowMs < Date.parse(q.endsAt) + 86_400_000)
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.endsAt.localeCompare(b.endsAt))
+    .flatMap((q) => {
+      const occ = questOccurrencesNow(q, now)
+      const items = [...(occ.previous ? [{ quest: q, occ: occ.previous }] : []), { quest: q, occ: occ.current }]
+      return items.filter(({ occ: o }) => nowMs < Date.parse(o.endsAt) + 86_400_000)
+    })
+    .sort((a, b) => a.occ.startsAt.localeCompare(b.occ.startsAt) || a.occ.endsAt.localeCompare(b.occ.endsAt))
 
   return (
     <section className="card stack" aria-labelledby="quest-title">
@@ -50,7 +56,7 @@ export function QuestCard({ now }: { now: string }) {
         tip="配達アプリで選んだクエストの段階を入れると、期間内に帰宅した確定記録の件数から「あと何件で次の段階か」を出します。達成分は見込みなので、報酬が確定したら精算の「確定ボーナス」に入れてください。"
         right={
           !editing && (
-            <button type="button" className="icon" aria-label="クエストを追加" onClick={() => setEditing(blankQuest(now))}>
+            <button type="button" className="icon" aria-label="クエストを追加" onClick={() => setEditing({ quest: blankQuest(now), index: 0 })}>
               ＋
             </button>
           )
@@ -61,7 +67,8 @@ export function QuestCard({ now }: { now: string }) {
       {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
       {editing ? (
         <QuestForm
-          initial={editing}
+          initial={editing.quest}
+          index={editing.index}
           onCancel={() => setEditing(null)}
           onSave={async (q) => {
             await saveQuest(db, q)
@@ -72,24 +79,29 @@ export function QuestCard({ now }: { now: string }) {
       ) : (
         <>
           {visible.length === 0 && <p className="hint">今の期間のクエストはありません（＋で追加）</p>}
-          {visible.map((q) => {
+          {visible.map(({ quest: q, occ }) => {
+            const repeat = q.repeat ?? 'none'
+            const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
             const p = questProgress(
-              q,
+              { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
               data.sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
               now,
             )
             const target = p.next ? p.count + p.next.remaining : q.tiers[q.tiers.length - 1]?.count ?? p.count
-            const upcoming = nowMs < Date.parse(q.startsAt)
+            const upcoming = nowMs < Date.parse(occ.startsAt)
             return (
-              <div key={q.id} className="subcard">
+              <div key={`${q.id}-${occ.index}`} className="subcard">
                 <div className="line">
-                  <strong className="grow">{q.label}</strong>
+                  <strong className="grow">
+                    {q.label}
+                    {repeat !== 'none' && <span className="hint"> 🔁 {QUEST_REPEAT_LABELS[repeat]}</span>}
+                  </strong>
                   <span className="tag">{p.ended ? '⌛ 終了' : upcoming ? '🕒 これから' : PLATFORM_LABELS[q.platform]}</span>
-                  <button type="button" className="icon" aria-label={`${q.label}を編集・件数の調整`} onClick={() => setEditing(q)}>✏️</button>
+                  <button type="button" className="icon" aria-label={`${q.label}を編集・件数の調整`} onClick={() => setEditing({ quest: q, index: occ.index })}>✏️</button>
                   <button
                     type="button"
                     className="icon danger-text"
-                    aria-label={`${q.label}を削除`}
+                    aria-label={`${q.label}を削除${repeat !== 'none' ? '（くり返しもすべて）' : ''}`}
                     onClick={async () => {
                       await db.quests.delete(q.id)
                       setNotice({ message: '🗑️ 削除しました', undo: () => void db.quests.put(q).then(() => setNotice(null)) })
@@ -107,7 +119,7 @@ export function QuestCard({ now }: { now: string }) {
                     {p.next ? `／あと${p.next.remaining}件で+${formatYen(p.next.gainYen)}` : '／全段階を達成'}
                     {p.earnedYen > 0 && <span className="hint">（達成 {formatYen(p.earnedYen)}・見込み）</span>}
                   </span>
-                  <span className="hint">{periodText(q)}</span>
+                  <span className="hint">{periodText(occ)}</span>
                 </p>
                 {p.unknownCountSessions > 0 && <p className="hint">⚠️ 件数未入力の記録{p.unknownCountSessions}件は数えていません</p>}
               </div>
@@ -119,10 +131,12 @@ export function QuestCard({ now }: { now: string }) {
   )
 }
 
-function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave: (q: QuestRecord) => Promise<void>; onCancel: () => void }) {
+function QuestForm({ initial, index, onSave, onCancel }: { initial: QuestRecord; index: number; onSave: (q: QuestRecord) => Promise<void>; onCancel: () => void }) {
   const [q, setQ] = useState(initial)
   const [problems, setProblems] = useState<string[]>([])
   const today = localToday()
+  // 調整を入れる回：くり返さないクエストは常に最初の回（manualOffset）
+  const slot = (q.repeat ?? 'none') === 'none' ? 0 : index
   const peak = (start: string, end: string, label: string) => {
     setQ({ ...q, label, startsAt: new Date(`${today}T${start}`).toISOString(), endsAt: new Date(`${today}T${end}`).toISOString() })
   }
@@ -150,6 +164,8 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
       </div>
       <div className="buttons" role="group" aria-label="期間をすばやく入れる">
         <button type="button" onClick={() => setQ({ ...q, ...selectiveQuestPeriod(new Date().toISOString()), label: q.label })}>選択制（今の期間）</button>
+        <button type="button" onClick={() => setQ({ ...q, ...weeklyHalf('weekday'), repeat: 'weekly' })}>🔁 毎週の平日（月4:00〜金4:00）</button>
+        <button type="button" onClick={() => setQ({ ...q, ...weeklyHalf('weekend'), repeat: 'weekly' })}>🔁 毎週の週末（金4:00〜月4:00）</button>
         <button type="button" onClick={() => peak('10:30', '15:00', '今日のランチピーク')}>今日のランチ</button>
         <button type="button" onClick={() => peak('17:00', '21:30', '今日のディナーピーク')}>今日のディナー</button>
       </div>
@@ -157,6 +173,13 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
         <DateTimeInput label="開始" value={q.startsAt} onChange={(v) => v && setQ({ ...q, startsAt: v })} />
         <DateTimeInput label="終了" value={q.endsAt} onChange={(v) => v && setQ({ ...q, endsAt: v })} />
       </div>
+      <Select
+        label="くり返し"
+        value={q.repeat ?? 'none'}
+        options={(Object.keys(QUEST_REPEAT_LABELS) as QuestRepeat[]).map((r) => ({ value: r, label: QUEST_REPEAT_LABELS[r] }))}
+        onChange={(v) => setQ({ ...q, repeat: v })}
+        tip="開始〜終了を最初の回として、同じ長さで毎日・毎週・毎月くり返します。一度登録すれば、次の回からは登録し直さなくてよくなります。件数は回ごとに数えます"
+      />
       <Select
         label="報酬の書き方"
         value={q.rewardMode}
@@ -182,11 +205,11 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
         ＋ 段階を追加
       </button>
       <IntInput
-        label="件数の調整（±）"
+        label={(q.repeat ?? 'none') === 'none' ? '件数の調整（±）' : 'この回の件数の調整（±）'}
         unit="件"
         allowNegative
-        value={q.manualOffset}
-        onChange={(v) => setQ({ ...q, manualOffset: v ?? 0 })}
+        value={slot === 0 ? q.manualOffset : (q.offsets?.[String(slot)] ?? 0)}
+        onChange={(v) => (slot === 0 ? setQ({ ...q, manualOffset: v ?? 0 }) : setQ({ ...q, offsets: { ...q.offsets, [String(slot)]: v ?? 0 } }))}
         tip="記録していない配達の分を足します（配達アプリの件数と合わせる時に使います）"
       />
       <Problems items={problems} />
@@ -196,4 +219,13 @@ function QuestForm({ initial, onSave, onCancel }: { initial: QuestRecord; onSave
       </div>
     </form>
   )
+}
+
+/** 毎週の平日（月曜4:00〜金曜4:00）・週末（金曜4:00〜月曜4:00）の、今か次の回 */
+function weeklyHalf(half: 'weekday' | 'weekend'): { startsAt: string; endsAt: string } {
+  const p = selectiveQuestPeriod(new Date().toISOString())
+  const isWeekday = p.label.startsWith('平日')
+  if ((half === 'weekday') === isWeekday) return { startsAt: p.startsAt, endsAt: p.endsAt }
+  // 今はもう片方の期間なので、その終わりから始まる期間（＝次の回）
+  return { startsAt: p.endsAt, endsAt: selectiveQuestPeriod(p.endsAt).endsAt }
 }

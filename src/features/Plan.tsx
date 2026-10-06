@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   SCENARIOS,
+  deadlineMs,
+  suggestWindows,
   SCENARIO_FACTORS,
   SCENARIO_LABELS,
   estimateRevenue,
@@ -28,6 +30,7 @@ import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot } from '..
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 import { QuestWeek } from './QuestWeek'
+import { WeekBoard } from './WeekBoard'
 import { AreaRoutePlan } from './AreaRoutePlan'
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
@@ -112,10 +115,10 @@ export function Plan() {
   const costPerHour = chosenHours > 0 ? Math.round(chosenInputs.reduce((a, i) => a + (i.rentalYen ?? 0) + i.expenseYen, 0) / chosenHours) : 0
   const skippedReason = new Map(plan.skipped.map((s) => [s.id, s.reason]))
 
-  const newSlot = (): SlotRecord => {
-    const date = week.from <= localToday() && localToday() <= week.to ? localToday() : week.from
-    const startsAt = new Date(`${date}T17:00`).toISOString()
-    const endsAt = new Date(`${date}T21:00`).toISOString()
+  const newSlot = (day?: string, times?: { startsAt: string; endsAt: string }): SlotRecord => {
+    const date = day ?? (week.from <= localToday() && localToday() <= week.to ? localToday() : week.from)
+    const startsAt = times?.startsAt ?? new Date(`${date}T17:00`).toISOString()
+    const endsAt = times?.endsAt ?? new Date(`${date}T21:00`).toISOString()
     return {
       id: newId(),
       startsAt,
@@ -132,12 +135,46 @@ export function Plan() {
     }
   }
 
+  const nowIso = new Date().toISOString()
+  const busyness = primaryArea(data.areas, data.settings)?.levels ?? null
+  const weekStartIso = new Date(`${week.from}T00:00`).toISOString()
+  const weekEndIso = new Date(Date.parse(`${week.to}T00:00`) + 86_400_000).toISOString()
+  // この週の確定した稼働（出発〜帰宅）
+  const done = data.sessions
+    .filter((x) => x.status === 'completed' && x.returnedAt && x.departedAt < weekEndIso && x.returnedAt > weekStartIso)
+    .map((x) => ({ startsAt: x.departedAt, endsAt: x.returnedAt! }))
+  const homeDeadline = data.settings?.homeDeadline ?? null
+  const suggestions = busyness
+    ? suggestWindows({
+        now: nowIso,
+        from: weekStartIso,
+        to: weekEndIso,
+        busyness,
+        busy: [...inWeek, ...done],
+        estimate: (st, e) => estimateRevenue(st, e, past, busyness).revenueYen,
+        deadline: homeDeadline ? (st) => deadlineMs(st, homeDeadline) : null,
+      })
+    : []
+  /** おすすめの時間から、見込みを入れた候補枠の入力を開く */
+  const fromSuggestion = (w: { startsAt: string; endsAt: string }): SlotRecord => {
+    const est = estimateRevenue(w.startsAt, w.endsAt, past, busyness)
+    return {
+      ...newSlot(undefined, w),
+      revenueYen: {
+        pessimistic: Math.round(est.revenueYen * SCENARIO_FACTORS.pessimistic),
+        standard: est.revenueYen,
+        optimistic: Math.round(est.revenueYen * SCENARIO_FACTORS.optimistic),
+      },
+      estimateNote: est.note,
+    }
+  }
+
   if (editing) {
     return (
       <SlotForm
         initial={editing}
         past={past}
-        busyness={primaryArea(data.areas, data.settings)?.levels ?? null}
+        busyness={busyness}
         tariff={computed.tariffOf(editing)}
         onCancel={() => setEditing(null)}
         onSave={async (slot) => {
@@ -156,6 +193,40 @@ export function Plan() {
         <strong>{Number(week.from.slice(5, 7))}/{Number(week.from.slice(8))}（月）〜{Number(week.to.slice(5, 7))}/{Number(week.to.slice(8))}（日）</strong>
         <button type="button" aria-label="次の週" onClick={() => setAnchor(shiftPeriod('week', anchor, 1))}>›</button>
       </div>
+      {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
+
+      <WeekBoard
+        now={nowIso}
+        weekFrom={week.from}
+        slots={inWeek.map((s) => ({ id: s.id, startsAt: s.startsAt, endsAt: s.endsAt, chosen: chosen.has(s.id), label: slotLabel(s) }))}
+        done={done}
+        budgetHours={budget === null ? null : budget / 60}
+        profitYen={plan.profitYen[scenario]}
+        busyness={busyness}
+        suggestions={suggestions}
+        onAdd={(date) => setEditing(newSlot(date))}
+        onEdit={(id) => setEditing(inWeek.find((s) => s.id === id) ?? null)}
+        onAddSuggestion={(w) => setEditing(fromSuggestion(w))}
+      />
+
+      <QuestWeek
+        now={new Date().toISOString()}
+        weekStart={new Date(`${week.from}T00:00`).toISOString()}
+        weekEnd={new Date(Date.parse(`${week.to}T00:00`) + 86_400_000).toISOString()}
+        quests={data.quests}
+        sessions={data.sessions}
+        past={past}
+        chosenSlots={inWeek.filter((s) => chosen.has(s.id))}
+        costPerHourYen={costPerHour}
+        targetHourlyYen={target}
+        onAddSlot={() => setEditing(newSlot())}
+      />
+
+      <details className="more">
+        <summary>
+          📋 くわしく見る<span className="hint">比べ方・一覧・エリア・装備</span>
+        </summary>
+        <div className="stack">
       <div className="line">
         <div className="segmented grow" role="tablist" aria-label="どの見込みで選ぶか">
           {SCENARIOS.map((s) => (
@@ -168,8 +239,6 @@ export function Plan() {
           働けそうな時間（家を出てから帰るまで）を候補として入れると、週の時間内で見込み利益が一番大きくなる組み合わせを選びます。上のボタンは、どの見込みで選ぶかです。悲観・楽観は標準の売上の0.8倍・1.2倍の目安で、統計的な範囲ではありません。見込みは予測で、実績ではありません。
         </Tip>
       </div>
-
-      {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
 
       <section className="card stack" aria-labelledby="plan-title">
         <CardTitle
@@ -206,40 +275,10 @@ export function Plan() {
         </div>
       </section>
 
-      <QuestWeek
-        now={new Date().toISOString()}
-        weekStart={new Date(`${week.from}T00:00`).toISOString()}
-        weekEnd={new Date(Date.parse(`${week.to}T00:00`) + 86_400_000).toISOString()}
-        quests={data.quests}
-        sessions={data.sessions}
-        past={past}
-        chosenSlots={inWeek.filter((s) => chosen.has(s.id))}
-        costPerHourYen={costPerHour}
-        targetHourlyYen={target}
-        onAddSlot={() => setEditing(newSlot())}
-      />
-
-      <AreaRoutePlan
-        now={new Date().toISOString()}
-        slots={inWeek}
-        chosenIds={chosen}
-        areas={data.areas}
-        primaryId={primaryArea(data.areas, data.settings)?.id ?? null}
-        past={past}
-      />
-
       <section className="card">
-        <CardTitle
-          right={
-            <button type="button" className="icon" aria-label="候補枠を追加" onClick={() => setEditing(newSlot())}>
-              ＋
-            </button>
-          }
-        >
-          ⏱️ 候補枠
-        </CardTitle>
+        <CardTitle>⏱️ 候補枠の一覧</CardTitle>
         {inWeek.length === 0 ? (
-          <p className="hint">この週に働けそうな時間を＋で入れてください</p>
+          <p className="hint">上の「📅 いつ働くか」の＋で、働けそうな時間を入れてください</p>
         ) : (
           <ul className="list">
             {inWeek.map((s) => {
@@ -279,6 +318,15 @@ export function Plan() {
         )}
       </section>
 
+      <AreaRoutePlan
+        now={new Date().toISOString()}
+        slots={inWeek}
+        chosenIds={chosen}
+        areas={data.areas}
+        primaryId={primaryArea(data.areas, data.settings)?.id ?? null}
+        past={past}
+      />
+
       <section className="card stack" aria-labelledby="eq-title">
         <CardTitle id="eq-title" tip={`この週の${SCENARIO_LABELS[scenario]}の見込み利益で、各プランの「これから必要な現金」を割った目安です。装備を良くしても売上が増えるとは仮定していません。`}>
           🎒 装備を買った場合の回収の目安
@@ -314,6 +362,8 @@ export function Plan() {
           })}
         </dl>
       </section>
+        </div>
+      </details>
     </div>
   )
 }

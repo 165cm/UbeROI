@@ -24,6 +24,7 @@ test('混む時間に合わせて、主なエリアから隣のエリアへ移�
   await page.getByLabel('出発', { exact: true }).fill('17:00')
   await page.getByLabel('帰宅', { exact: true }).fill('21:00')
   await page.getByRole('button', { name: '💾 保存' }).click()
+  await page.getByText('📋 くわしく見る').click()
   const card = page.getByRole('region', { name: '🧭 時間帯ごとのエリア計画' })
   await expect(card).toContainText('ほかのエリアに「中野エリア」からの移動の分を入れると')
 
@@ -40,6 +41,7 @@ test('混む時間に合わせて、主なエリアから隣のエリアへ移�
   await expect(page.getByText(/移動15分/)).toBeVisible()
 
   await page.goto('#plan')
+  await page.getByText('📋 くわしく見る').click()
   await expect(card.getByRole('combobox', { name: 'どの候補枠で見るか' })).toHaveValue(/.+/)
   const steps = card.getByRole('list', { name: 'エリアの順番' }).getByRole('listitem')
   await expect(steps).toHaveCount(2)

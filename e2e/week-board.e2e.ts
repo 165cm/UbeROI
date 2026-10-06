@@ -27,6 +27,8 @@ test('開くと、この週の稼働の量・いつ働くか・空いている�
     await page.getByRole('button', { name: '🔮 見込みを自動で入れる' }).click()
     await page.getByRole('button', { name: '💾 保存' }).click()
   }
+  // 3つ目の保存が終わってから（帯に3つの四角が出てから）時刻を進めて読み直す
+  await expect(page.getByRole('button', { name: /（✅ おすすめ）を編集$/ })).toHaveCount(3)
   await page.clock.setFixedTime(new Date('2026-10-07T12:00:00+09:00'))
   await page.reload()
   await expect(page.getByRole('heading', { name: /この週の稼働/ })).toBeVisible()

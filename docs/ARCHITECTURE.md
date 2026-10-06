@@ -25,6 +25,7 @@
 | `src/domain/period.ts` | 日・週・月などの期間損益（固定費・配賦を稼働へ配る） |
 | `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
 | `src/domain/quest.ts` | 選択制クエストの期間、クエストの進み具合、休憩前の返却で節約できる額 |
+| `src/domain/questPlan.ts` | クエストを軸にした週の組み立て（1時間あたりの件数、計画で届く段階、次の段階まで足す時間とボーナス込みの純時給） |
 | `src/domain/continuation.ts` | 続けるか帰るか：追加の利益・増えるレンタル代・追加の時給と GO/WAIT/STOP の判定 |
 | `src/domain/planning.ts` | 計画：売上の見込み（本人の実績／参考資料の推計）、候補枠の評価、週の最適な組み合わせ、装備の回収の目安 |
 | `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
@@ -45,6 +46,7 @@
 | `src/features/CsvImport.tsx` | データ：CSVから記録を取り込む（見本・確認・まとめて確定） |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集 |
+| `src/features/QuestWeek.tsx` | 計画の「🎯 クエストから見たこの週」：届く段階・足す時間・純時給 |
 | `src/features/CashChange.tsx` | ホームの「💴 お釣り」 |
 | `src/features/OfferJudge.tsx` | オファー判定（`#offer`。設定でオンの時だけ。手入力の報酬・分・km・届け先の地名で判定。前のショートカットの text=・cfg= も読めるが案内はしない）、判定の基準、持ち帰り／取り込み、地名の評価の一覧 |
 | `src/features/AreaSettings.tsx` | 設定・エリア：混み具合の表（マスを押して段階を切り替え・スクショから読み取り）・地名・主なエリア |

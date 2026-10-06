@@ -27,6 +27,7 @@ import { EQUIPMENT_PRESETS } from '../storage/presets'
 import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
+import { QuestWeek } from './QuestWeek'
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   invalid_time: '時間が正しくない',
@@ -67,6 +68,7 @@ export function Plan() {
     tariffs: await listTariffs(db),
     settings: await db.settings.get('settings'),
     areas: await db.areas.toArray(),
+    quests: await db.quests.toArray(),
   }), [db])
   const [anchor, setAnchor] = useState(localToday())
   const [scenario, setScenario] = useState<Scenario>('standard')
@@ -103,6 +105,10 @@ export function Plan() {
   const budget = data.settings?.weeklyBudgetMinutes ?? null
   const target = data.settings?.targetHourlyYen ?? null
   const chosen = new Set(plan.chosenIds)
+  // 選んだ枠の、1時間あたりの費用（レンタル代・経費）。クエストの追加の時間の見込みに使う
+  const chosenInputs = inputs.filter((i) => chosen.has(i.id))
+  const chosenHours = chosenInputs.reduce((a, i) => a + (Date.parse(i.endsAt) - Date.parse(i.startsAt)) / 3_600_000, 0)
+  const costPerHour = chosenHours > 0 ? Math.round(chosenInputs.reduce((a, i) => a + (i.rentalYen ?? 0) + i.expenseYen, 0) / chosenHours) : 0
   const skippedReason = new Map(plan.skipped.map((s) => [s.id, s.reason]))
 
   const newSlot = (): SlotRecord => {
@@ -198,6 +204,19 @@ export function Plan() {
           </table>
         </div>
       </section>
+
+      <QuestWeek
+        now={new Date().toISOString()}
+        weekStart={new Date(`${week.from}T00:00`).toISOString()}
+        weekEnd={new Date(Date.parse(`${week.to}T00:00`) + 86_400_000).toISOString()}
+        quests={data.quests}
+        sessions={data.sessions}
+        past={past}
+        chosenSlots={inWeek.filter((s) => chosen.has(s.id))}
+        costPerHourYen={costPerHour}
+        targetHourlyYen={target}
+        onAddSlot={() => setEditing(newSlot())}
+      />
 
       <section className="card">
         <CardTitle

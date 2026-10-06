@@ -11,6 +11,11 @@
   /* グラフの色（検証済み：明るさ帯・彩度・背景とのコントラスト） */
   --chart: #0d9488;
   --chart-muted: #b9c0bc;
+  /* 混み具合の段階の色（4 混む＝緑 → 1 空き＝赤）。数字も必ず一緒に出す（色だけに頼らない） */
+  --busy-4: #2f9e44;
+  --busy-3: #94c13b;
+  --busy-2: #f2a93b;
+  --busy-1: #e0503d;
   --grid: #e6e9e6;
   --radius: 12px;
   color-scheme: light dark;
@@ -31,6 +36,10 @@
     --warn: #fdb022;
     --chart: #1aa89a;
     --chart-muted: #4a524e;
+    --busy-4: #37b24d;
+    --busy-3: #a3cf45;
+    --busy-2: #f5b14c;
+    --busy-1: #ef6a57;
     --grid: #2a2f2c;
   }
 }
@@ -950,10 +959,10 @@ button.busy-cell {
 }
 
 /* 濃さでも段階を示す（数字でも読める） */
-.level-1 .busy-bar { opacity: 0.35; }
-.level-2 .busy-bar { opacity: 0.55; }
-.level-3 .busy-bar { opacity: 0.8; }
-.level-4 .busy-bar { opacity: 1; }
+.level-1 .busy-bar { background: var(--busy-1); }
+.level-2 .busy-bar { background: var(--busy-2); }
+.level-3 .busy-bar { background: var(--busy-3); }
+.level-4 .busy-bar { background: var(--busy-4); }
 
 
 .busy-level {
@@ -1026,9 +1035,10 @@ label.button-link:focus-within {
   background: var(--chart);
   border-radius: 1px;
 }
-.mini-bars > .level-1 { opacity: 0.35; }
-.mini-bars > .level-2 { opacity: 0.55; }
-.mini-bars > .level-3 { opacity: 0.8; }
+.mini-bars > .level-1 { background: var(--busy-1); }
+.mini-bars > .level-2 { background: var(--busy-2); }
+.mini-bars > .level-3 { background: var(--busy-3); }
+.mini-bars > .level-4 { background: var(--busy-4); }
 select.shot-day {
   width: auto;
   flex: none;
@@ -1093,9 +1103,10 @@ select.shot-day {
   bottom: 0;
   background: var(--chart);
 }
-.ahead-cell.level-1 .ahead-bar { opacity: 0.35; }
-.ahead-cell.level-2 .ahead-bar { opacity: 0.55; }
-.ahead-cell.level-3 .ahead-bar { opacity: 0.8; }
+.ahead-cell.level-1 .ahead-bar { background: var(--busy-1); }
+.ahead-cell.level-2 .ahead-bar { background: var(--busy-2); }
+.ahead-cell.level-3 .ahead-bar { background: var(--busy-3); }
+.ahead-cell.level-4 .ahead-bar { background: var(--busy-4); }
 .ahead-num {
   position: relative;
   align-self: center;

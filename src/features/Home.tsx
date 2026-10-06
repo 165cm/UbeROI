@@ -9,6 +9,7 @@ import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, prima
 import { pastSessionsFor, periodFor } from '../storage/toDomain'
 import { CashChange } from './CashChange'
 import { ContinueCard } from './ContinueCard'
+import { OutlookCard } from './OutlookCard'
 import { QuestCard } from './QuestCard'
 
 function useNow(active: boolean): string {
@@ -32,6 +33,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
     tariffs: await listTariffs(db),
     settings: await db.settings.get('settings'),
     areas: await db.areas.toArray(),
+    offers: await db.offers.orderBy('at').toArray(),
   }), [db])
   const active = data?.sessions.find((s) => s.status === 'active')
   const now = useNow(Boolean(active))
@@ -127,6 +129,21 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         <Problems items={problems} />
         <a className="button-link" href="#offer">🧾 オファー判定</a>
       </section>
+
+      {active && (
+        <OutlookCard
+          now={now}
+          sessionId={active.id}
+          departedAt={active.departedAt}
+          rental={openRental && openRental.startAt ? { tariff: openRental.tariff, startAt: openRental.startAt } : null}
+          past={pastSessionsFor(data.sessions)}
+          busyness={area?.levels ?? null}
+          offers={data.offers}
+          allOffers={data.offers}
+          targetHourlyYen={target}
+          homeDeadline={data.settings?.homeDeadline ?? null}
+        />
+      )}
 
       {active && (
         <ContinueCard

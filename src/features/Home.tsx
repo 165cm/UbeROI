@@ -283,12 +283,16 @@ function BusyAhead({ areas, primaryId, now }: { areas: AreaRecord[]; primaryId: 
     .sort((a, b) => Number(b.id === primaryId) - Number(a.id === primaryId) || a.name.localeCompare(b.name, 'ja'))
     .map((a) => {
       const cells = busyAhead(a.levels, t)
-      return { area: a, cells, average: averageLevel(cells.map((c) => c.level)) }
+      // 4時間分がそろったエリアだけを比べる（未入力を除いた平均では、1枠だけ入力したエリアが有利になるため）
+      const complete = cells.every((c) => c.level !== null)
+      return { area: a, cells, complete, average: complete ? averageLevel(cells.map((c) => c.level)) : null }
     })
-    .filter((r) => r.average !== null)
-  if (rows.length === 0) return null
+  // 登録したエリアは、この先4時間が未入力でも行を残す（すべて未入力の時だけ表を出さない）
+  if (rows.length === 0 || rows.every((r) => r.cells.every((c) => c.level === null))) return null
   const hours = rows[0]!.cells.map((c) => new Date(c.startMs + 9 * 3_600_000).getUTCHours())
-  const best = rows.length > 1 ? rows.reduce((a, b) => (b.average! > a.average! ? b : a)) : null
+  const comparable = rows.filter((r) => r.complete)
+  const best = rows.length > 1 && comparable.length > 0 ? comparable.reduce((a, b) => (b.average! > a.average! ? b : a)) : null
+  const skipped = rows.length > 1 ? rows.filter((r) => !r.complete).length : 0
   return (
     <div className="busy-ahead">
       <div className="table-scroll" tabIndex={0} role="region" aria-label="この先4時間の混み具合">
@@ -321,9 +325,14 @@ function BusyAhead({ areas, primaryId, now }: { areas: AreaRecord[]; primaryId: 
           </tbody>
         </table>
       </div>
-      {best && (
+      {(best || skipped > 0) && (
         <p className="hint" role="status">
-          4時間の平均で一番混むのは <strong>{best.area.name}</strong>（{best.average}）。段階はエリアごとの比べっこなので目安です
+          {best && (
+            <>
+              4時間の平均で一番混むのは <strong>{best.area.name}</strong>（{best.average}）。段階はエリアごとの比べっこなので目安です。
+            </>
+          )}
+          {skipped > 0 && `未入力のマスがあるエリア（${skipped}つ）は比べていません。`}
         </p>
       )}
     </div>

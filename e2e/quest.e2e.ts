@@ -29,6 +29,11 @@ test('毎週の平日クエストは、翌週になっても今の回（月4:00�
   await page.getByLabel('この回の件数の調整（±）', { exact: true }).fill('5')
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(card).toContainText('5件／あと5件で+1,000円')
+
+  // くり返しをやめる時は、調整は最初の回（くり返さないクエストの調整）を読み書きする
+  await card.getByRole('button', { name: '平日クエストを編集・件数の調整' }).click()
+  await page.getByLabel('くり返し', { exact: true }).selectOption('none')
+  await expect(page.getByLabel('件数の調整（±）', { exact: true })).toHaveValue('2')
 })
 
 test('毎日くり返すクエストは、期間が1日より長いと保存できない', async ({ page }) => {

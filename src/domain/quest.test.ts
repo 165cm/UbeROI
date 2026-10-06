@@ -103,6 +103,8 @@ describe('くり返すクエスト', () => {
     expect(questOccurrencesNow(daily, jst('2026-10-07T18:00:00')).current).toEqual({ startsAt: jst('2026-10-07T17:00:00'), endsAt: jst('2026-10-07T21:30:00'), index: 2 })
     const monthly = { startsAt: jst('2026-01-31T04:00:00'), endsAt: jst('2026-02-01T04:00:00'), repeat: 'monthly' as const }
     expect(questOccurrence(monthly, 1)).toEqual({ startsAt: jst('2026-02-28T04:00:00'), endsAt: jst('2026-03-01T04:00:00') })
+    // 何年たっても正しい回（2030年1月15日 → 2030年1月31日の回）
+    expect(questOccurrencesNow(monthly, jst('2030-01-15T12:00:00')).current).toEqual({ startsAt: jst('2030-01-31T04:00:00'), endsAt: jst('2030-02-01T04:00:00'), index: 48 })
     const once = { startsAt: jst('2026-10-05T04:00:00'), endsAt: jst('2026-10-09T04:00:00') }
     expect(questOccurrencesNow(once, jst('2026-11-01T00:00:00')).current.startsAt).toBe(jst('2026-10-05T04:00:00'))
   })

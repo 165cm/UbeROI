@@ -135,6 +135,8 @@ function QuestForm({ initial, index, onSave, onCancel }: { initial: QuestRecord;
   const [q, setQ] = useState(initial)
   const [problems, setProblems] = useState<string[]>([])
   const today = localToday()
+  // 調整を入れる回：くり返さないクエストは常に最初の回（manualOffset）
+  const slot = (q.repeat ?? 'none') === 'none' ? 0 : index
   const peak = (start: string, end: string, label: string) => {
     setQ({ ...q, label, startsAt: new Date(`${today}T${start}`).toISOString(), endsAt: new Date(`${today}T${end}`).toISOString() })
   }
@@ -206,8 +208,8 @@ function QuestForm({ initial, index, onSave, onCancel }: { initial: QuestRecord;
         label={(q.repeat ?? 'none') === 'none' ? '件数の調整（±）' : 'この回の件数の調整（±）'}
         unit="件"
         allowNegative
-        value={index === 0 ? q.manualOffset : (q.offsets?.[String(index)] ?? 0)}
-        onChange={(v) => (index === 0 ? setQ({ ...q, manualOffset: v ?? 0 }) : setQ({ ...q, offsets: { ...q.offsets, [String(index)]: v ?? 0 } }))}
+        value={slot === 0 ? q.manualOffset : (q.offsets?.[String(slot)] ?? 0)}
+        onChange={(v) => (slot === 0 ? setQ({ ...q, manualOffset: v ?? 0 }) : setQ({ ...q, offsets: { ...q.offsets, [String(slot)]: v ?? 0 } }))}
         tip="記録していない配達の分を足します（配達アプリの件数と合わせる時に使います）"
       />
       <Problems items={problems} />

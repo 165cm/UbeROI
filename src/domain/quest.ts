@@ -67,6 +67,8 @@ export function questOccurrencesNow(
   if (first <= now) {
     const approx = q.repeat === 'daily' ? DAY_MS : q.repeat === 'weekly' ? 7 * DAY_MS : 28 * DAY_MS
     k = Math.max(0, Math.floor((now - first) / approx) - 1)
+    // 概算は月の長さ（28〜31日）でずれるので、前後どちらにも補正する
+    while (k > 0 && parseInstant(questOccurrence(q, k - 1).endsAt) > now) k--
     while (parseInstant(questOccurrence(q, k).endsAt) <= now) k++
   }
   const prev = k > 0 ? { ...questOccurrence(q, k - 1), index: k - 1 } : null

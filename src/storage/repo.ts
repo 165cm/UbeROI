@@ -512,6 +512,7 @@ export function areaProblems(area: AreaRecord): string[] {
   if (!isBusynessTable(area.levels)) problems.push('混み具合の表が正しくありません')
   if (area.towns.some((t) => t.trim() === '')) problems.push('空の地名があります')
   if (!isCalendarDate(area.checkedAt)) problems.push('確かめた日が実在する日付（YYYY-MM-DD）ではありません')
+  if (area.moveMinutes != null && (!Number.isSafeInteger(area.moveMinutes) || area.moveMinutes <= 0)) problems.push('移動の分は1以上の整数にしてください')
   return problems
 }
 

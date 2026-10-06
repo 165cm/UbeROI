@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { BUSINESS_HOURS, emptyBusyness, filledCount, readBusyChart, WEEKDAY_LABELS, type BusynessTable, type Pixels } from '../domain'
-import { CardTitle, Notice, Problems, TextInput, Tip, errorMessages, localToday } from '../components/fields'
+import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, localToday } from '../components/fields'
 import { useData } from '../storage/context'
 import { deleteArea, newId, primaryArea, saveArea, saveSettings } from '../storage/repo'
 import type { AreaRecord } from '../storage/schema'
@@ -69,7 +69,7 @@ export function AreaSettings() {
                   <strong>{a.name}</strong> {primary?.id === a.id && <span className="tag">主なエリア</span>}
                   <br />
                   <span className="hint">
-                    {filledCount(a.levels)}/168マス・地名{a.towns.length}・確認 {a.checkedAt}
+                    {filledCount(a.levels)}/168マス・地名{a.towns.length}{a.moveMinutes && primary?.id !== a.id ? `・移動${a.moveMinutes}分` : ''}・確認 {a.checkedAt}
                     {age >= AREA_REVIEW_DAYS && <strong>（⚠️ {age}日たちました。見直しましょう）</strong>}
                   </span>
                 </span>
@@ -154,6 +154,15 @@ function AreaForm({
           <input type="checkbox" className="check" checked={primary} onChange={(e) => setPrimary(e.target.checked)} />
           <span>主なエリアにする（計画と「続ける？帰る？」の見込みに使う）</span>
         </label>
+        {!primary && (
+          <IntInput
+            label="主なエリアからの移動（任意）"
+            unit="分"
+            value={area.moveMinutes ?? null}
+            onChange={(v) => setArea({ ...area, moveMinutes: v })}
+            tip="入れると、稼働中の「終了までの見通し」で、このエリアへ移動する案も比べます。移動している間は稼げない時間として数えます"
+          />
+        )}
       </section>
 
       <section className="card stack">

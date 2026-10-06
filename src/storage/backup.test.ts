@@ -245,4 +245,19 @@ describe('データの版の移行（版4）とエリアの検証', () => {
     b.datasets.areas = [{ id: 'a1', name: '中野', levels, towns: [], checkedAt: '2026-02-30', createdAt: now, updatedAt: now, revision: 1 }]
     expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
   })
+
+  it('版6（エリアに移動の分がない頃）のバックアップもそのまま復元でき、移動の分が0以下・小数のエリアは復元しない', async () => {
+    const now = new Date().toISOString()
+    const levels = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0))
+    const b = await createBackup(db, 'real')
+    const area = { id: 'a1', name: '新宿', levels, towns: [], checkedAt: '2026-10-05', createdAt: now, updatedAt: now, revision: 1 }
+    b.datasets.areas = [area]
+    expect(parseBackup(JSON.stringify({ ...b, schema_version: 6 })).ok).toBe(true)
+    b.datasets.areas = [{ ...area, moveMinutes: 20 }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(true)
+    b.datasets.areas = [{ ...area, moveMinutes: 0 }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+    b.datasets.areas = [{ ...area, moveMinutes: 2.5 }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
 })

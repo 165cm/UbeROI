@@ -1,11 +1,11 @@
 // 終了までの見通し（docs/spec/docs/02-profitability.md §5.4）。稼働中に終了予定の時刻を決めると、
 // 今日のここまで（オファーの記録）・いまのペース・この先の混み具合から、
-// 「このまま続ける／休憩して再開／今やめる」のこの先の利益を比べる。すでに稼いだ分は、どれを選んでも同じなので比べない
+// 「このまま続ける／休憩して再開／ほかのエリアへ移動／今やめる」のこの先の利益を比べる。すでに稼いだ分は、どれを選んでも同じなので比べない
 import { parseInstant } from './core'
 import { busyLevelAt, type BusynessTable } from './busyness'
 import { feeFor, type Tariff } from './tariff'
 
-export type OutlookAction = 'continue' | 'break' | 'stop'
+export type OutlookAction = 'continue' | 'break' | 'move' | 'stop'
 
 /** 今日のペースを見込みに反映する割合（半分だけ反映）と、ペースの比の上下限 */
 export const PACE_WEIGHT = 0.5
@@ -51,12 +51,28 @@ export interface OutlookInput {
   /** 締切の日付を決める時刻（帰宅締切の計算と同じ） */
   deadlineMs?: number | null
   targetHourlyYen: number | null
+  /** 移動の候補：今いる（主な）エリア以外で、移動の分を登録したエリア */
+  moves?: readonly OutlookMove[]
+}
+
+export interface OutlookMove {
+  name: string
+  /** 今いるエリアからの移動の分（この間は稼げない） */
+  minutes: number
+  /** そのエリアの区間の売上の見込み */
+  estimate: (startIso: string, endIso: string) => number
+  busyness?: BusynessTable | null
 }
 
 export interface OutlookOption {
   action: OutlookAction
   /** 休憩の長さ（分。休憩の時だけ） */
   breakMinutes: number
+  /** 移動の分と行き先（移動の時だけ） */
+  moveMinutes: number
+  areaName: string | null
+  /** 移動の先で、着いた時の混み具合（移動の時だけ。未入力なら null） */
+  arrivalLevel: number | null
   /** この先働く時間（時間） */
   workHours: number
   revenueYen: number
@@ -188,16 +204,18 @@ export function evaluateOutlook(input: OutlookInput): OutlookResult {
   const rental = input.rental ?? null
   const elapsedRental = rental ? Math.max(0, (nowMs + returnMs - parseInstant(rental.startAt)) / 1000) : 0
   const stopFee = rental ? feeFor(rental.tariff, elapsedRental) : 0
-  const option = (action: OutlookAction, breakMinutes: number): OutlookOption => {
-    const startMs = nowMs + breakMinutes * 60_000
+  const option = (action: OutlookAction, breakMinutes: number, move?: OutlookMove): OutlookOption => {
+    const offsetMinutes = move ? move.minutes : breakMinutes
+    const startMs = nowMs + offsetMinutes * 60_000
     const workMs = Math.max(0, endMs - startMs)
     const workHours = workMs / 3_600_000
-    const revenueYen = workMs > 0 ? Math.round(input.estimate(new Date(startMs).toISOString(), input.endAt) * paceFactor) : 0
-    // 増えるレンタル代：借りたまま＝F(今の経過＋休憩＋働く時間)−F(今の経過)。休憩中に返して借り直す＝F(働く時間)
+    const estimate = move ? move.estimate : input.estimate
+    const revenueYen = workMs > 0 ? Math.round(estimate(new Date(startMs).toISOString(), input.endAt) * paceFactor) : 0
+    // 増えるレンタル代：借りたまま＝F(今の経過＋休憩か移動＋働く時間)−F(今の経過)。休憩中に返して借り直す＝F(働く時間)（移動は乗っていくので借りたまま）
     let rentalYen: number | null = 0
     let returnDuringBreak = false
     if (rental && workMs > 0) {
-      const keepFee = feeFor(rental.tariff, elapsedRental + (breakMinutes * 60_000 + workMs) / 1000)
+      const keepFee = feeFor(rental.tariff, elapsedRental + (offsetMinutes * 60_000 + workMs) / 1000)
       const keep = keepFee === null || stopFee === null ? null : keepFee - stopFee
       const reRent = breakMinutes > 0 ? feeFor(rental.tariff, workMs / 1000) : null
       if (reRent !== null && (keep === null || reRent < keep)) {
@@ -207,7 +225,19 @@ export function evaluateOutlook(input: OutlookInput): OutlookResult {
     }
     const profitYen = rentalYen === null ? null : revenueYen - rentalYen
     const hourlyYen = profitYen === null || workHours <= 0 ? null : Math.round(profitYen / workHours)
-    return { action, breakMinutes, workHours: Math.round(workHours * 100) / 100, revenueYen, rentalYen, profitYen, hourlyYen, returnDuringBreak }
+    return {
+      action,
+      breakMinutes,
+      moveMinutes: move ? move.minutes : 0,
+      areaName: move ? move.name : null,
+      arrivalLevel: move?.busyness ? busyLevelAt(move.busyness, startMs) : null,
+      workHours: Math.round(workHours * 100) / 100,
+      revenueYen,
+      rentalYen,
+      profitYen,
+      hourlyYen,
+      returnDuringBreak,
+    }
   }
   // 目標の時給があれば「目標より上回った分」で比べる（目標を下回る時間は、働く価値が低いとみなす）。なければ利益で比べる
   const target = input.targetHourlyYen
@@ -217,7 +247,11 @@ export function evaluateOutlook(input: OutlookInput): OutlookResult {
   // 休憩は、比べる値（目標を上回る分）が大きい長さを1つだけ候補にする
   const bestBreak = breaks.reduce<OutlookOption | null>((best, o) => (best === null || score(o) > score(best) ? o : best), null)
   if (bestBreak) options.push(bestBreak)
-  const stop: OutlookOption = { action: 'stop', breakMinutes: 0, workHours: 0, revenueYen: 0, rentalYen: 0, profitYen: 0, hourlyYen: null, returnDuringBreak: false }
+  // 移動は、着いてから少なくとも30分働けるエリアのうち、比べる値が一番大きい1つだけを候補にする
+  const moves = (input.moves ?? []).filter((m) => m.minutes > 0 && minutesLeft - m.minutes >= MIN_WORK_AFTER_BREAK_MINUTES).map((m) => option('move', 0, m))
+  const bestMove = moves.reduce<OutlookOption | null>((best, o) => (best === null || score(o) > score(best) ? o : best), null)
+  if (bestMove) options.push(bestMove)
+  const stop: OutlookOption = { action: 'stop', breakMinutes: 0, moveMinutes: 0, areaName: null, arrivalLevel: null, workHours: 0, revenueYen: 0, rentalYen: 0, profitYen: 0, hourlyYen: null, returnDuringBreak: false }
   options.push(stop)
 
   // ---- おすすめ ----
@@ -227,7 +261,9 @@ export function evaluateOutlook(input: OutlookInput): OutlookResult {
   } else if (input.deadlineMs != null && endMs + (input.minutesToHome ?? 0) * 60_000 > input.deadlineMs) {
     reasons.push(`終了予定のあと家に着くと、帰宅締切（${input.homeDeadline}）を過ぎます。終了予定を早めてください`)
   } else {
-    const best = options.reduce((a, b) => (score(b) > score(a) ? b : a))
+    // 移動は手間と外れのリスクがあるので、移動しない一番良い行動より200円以上良い時だけ選ぶ
+    const stay = options.filter((o) => o.action !== 'move').reduce((a, b) => (score(b) > score(a) ? b : a))
+    const best = bestMove && score(bestMove) - score(stay) >= OUTLOOK_TIE_YEN ? bestMove : stay
     // 差が小さい時は、今やめる（早く帰る）方を勧める
     const pick = best !== stop && score(best) - score(stop) < OUTLOOK_TIE_YEN ? stop : best
     recommended = pick.action
@@ -243,6 +279,13 @@ export function evaluateOutlook(input: OutlookInput): OutlookResult {
       const nowLevel = timeline[0]?.level ?? null
       if (resume?.level != null && nowLevel !== null && resume.level > nowLevel) reasons.push(`${bestBreak.breakMinutes}分後の${resume.hour}時台は、今より混む見込みです（段階${nowLevel}→${resume.level}）`)
       if (bestBreak.returnDuringBreak) reasons.push('休憩中はレンタルを返して、再開する時に借り直すと安くなります')
+    }
+    if (bestMove && recommended === 'move') {
+      const gain = (bestMove.profitYen ?? 0) - (stay.profitYen ?? 0)
+      reasons.push(
+        `「${bestMove.areaName}」へ移動（${bestMove.moveMinutes}分）すると、移動の時間を引いても ${gain >= 0 ? '+' : ''}${fmt(gain)}${bestMove.arrivalLevel !== null ? `（着く頃は段階${bestMove.arrivalLevel}）` : ''}の見込みです`,
+      )
+      reasons.push('混み具合の段階はそのエリアの中での比べっこなので、エリア同士の比較は目安です。できれば、そのエリアへ届けるオファーを受けて移動すると、移動の時間も稼げます')
     }
   }
   return { minutesLeft, soFar, paceRatio, paceFactor, recent, minutesSinceLastOffer, typicalGapMinutes, timeline, options, recommended, reasons }

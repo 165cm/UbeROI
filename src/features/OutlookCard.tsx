@@ -1,7 +1,7 @@
 // 稼働中の「🏁 終了までの見通し」。終了予定の時刻を決めると、今日のペースとこの先の混み具合から、
 // 続ける／休憩して再開／今やめるの、この先の利益を比べる。止まっている時に確かめる前提で、走行中の操作は求めない
 import { useEffect, useMemo, useState } from 'react'
-import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
+import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, tieredCapInfo, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
 import { CardTitle, IntInput, Tip } from '../components/fields'
 import { formatYen } from '../format'
 import { loadPrefs } from './ContinueCard'
@@ -112,6 +112,23 @@ export function OutlookCard({
   }, [minute, departedAt, stored, offers, allOffers, past.length, busyness, rental?.startAt, rental?.tariff, homeDeadline, targetHourlyYen, moveAreas.map((a) => `${a.name}:${a.minutes}`).join()])
 
   const { soFar } = result
+  // レンタル中の段階料金：終了予定までに上限に達するなら、その後は追加のレンタル代がかからないことを伝える
+  const capNote = (() => {
+    if (!rental || rental.tariff.kind !== 'tiered') return null
+    const cap = tieredCapInfo(rental.tariff)
+    if (!cap) return null
+    const start = Date.parse(rental.startAt)
+    const reachMs = start + cap.reachesCapAtSeconds * 1000
+    const untilMs = start + cap.coversUntilSeconds * 1000
+    const nowMs = Date.parse(minute)
+    const endMs = endTimeMs(minute, stored.end)
+    const clock = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(11, 16)
+    // 上限で乗れる時間（例：12時間）を過ぎた後は、追加料金なしとは言えない（見積の対象外）
+    if (nowMs >= untilMs || endMs <= reachMs) return null
+    const beyond = endMs > untilMs ? `。ただし ${clock(untilMs)} を過ぎるとレンタル代は見積の対象外です（返して借り直すと料金は最初から）` : ''
+    if (nowMs >= reachMs) return `レンタルは上限 ${formatYen(cap.capYen)} に達しています。${clock(untilMs)} までは追加のレンタル代がかかりません${beyond}`
+    return `レンタルは ${clock(reachMs)} に上限 ${formatYen(cap.capYen)} に達し、${clock(untilMs)} までは追加のレンタル代がかかりません（この差は上の利益に入っています）${beyond}`
+  })()
   return (
     <section className="card stack" aria-labelledby="outlook-title">
       <CardTitle
@@ -189,6 +206,7 @@ export function OutlookCard({
           {result.reasons.map((r) => (
             <li key={r}>{r}</li>
           ))}
+          {capNote && <li>{capNote}</li>}
         </ul>
       </div>
 

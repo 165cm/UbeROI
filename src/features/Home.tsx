@@ -1,7 +1,7 @@
 // ホーム（S02）：今日の状態・稼働中のレンタル料金・今月の成績
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { averageLevel, breakAdvice, busyAhead, calculateRental, localDate, timeSlotOf, type Tariff } from '../domain'
+import { averageLevel, breakAdvice, busyAhead, calculateRental, localDate, rentalCostByHours, tieredCapInfo, timeSlotOf, type Tariff } from '../domain'
 import { CardTitle, IntInput, Problems, Tip, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
@@ -229,6 +229,8 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
           </dd>
         </div>
       </dl>
+      {rental.startAt && rental.tariff.kind === 'tiered' && <CapLine tariff={rental.tariff} startAt={rental.startAt} now={now} />}
+      {rental.tariff.kind !== 'none' && <CostByLength tariff={rental.tariff} />}
       {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       <button type="button" onClick={onReturn}>
         🅿️ 返却した
@@ -357,6 +359,65 @@ function MapFold({ areas, now }: { areas: AreaRecord[]; now: string }) {
     <details className="map-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>🗺️ 地図で見る（▶ でこの先4時間を動かす）</summary>
       {open && <BusyMap areas={placed} now={now} />}
+    </details>
+  )
+}
+
+/** 上限まであとどれだけか。上限に達した後は、上限で乗れる最後の時刻まで追加の料金がかからない */
+function CapLine({ tariff, startAt, now }: { tariff: Extract<Tariff, { kind: 'tiered' }>; startAt: string; now: string }) {
+  const cap = tieredCapInfo(tariff)
+  if (!cap) return null
+  const start = Date.parse(startAt)
+  const elapsed = (Date.parse(now) - start) / 1000
+  const reachAt = new Date(start + cap.reachesCapAtSeconds * 1000).toISOString()
+  const untilAt = new Date(start + cap.coversUntilSeconds * 1000).toISOString()
+  if (elapsed >= cap.coversUntilSeconds) return null
+  const capped = elapsed >= cap.reachesCapAtSeconds
+  return (
+    // 残り時間は毎秒変わるので、読み上げの自動通知（role=status）にはしない
+    <p className={`cap-line${capped ? ' capped' : ''}`}>
+      {capped ? (
+        <>
+          🎉 上限 {formatYen(cap.capYen)} に到達。<strong>{formatClock(untilAt).slice(0, 5)}</strong> まで追加 0円（あと{formatDuration(cap.coversUntilSeconds - elapsed)}）
+        </>
+      ) : (
+        <>
+          上限 {formatYen(cap.capYen)} まで あと<strong>{formatDuration(cap.reachesCapAtSeconds - elapsed)}</strong>（{formatClock(reachAt).slice(0, 5)}）。そこから {formatClock(untilAt).slice(0, 5)} までは追加 0円
+        </>
+      )}
+    </p>
+  )
+}
+
+/** 乗る長さごとのレンタル代。上限があると、長く乗るほど1時間あたりが下がる */
+function CostByLength({ tariff }: { tariff: Tariff }) {
+  const rows = rentalCostByHours(tariff, [1, 2, 3, 4, 5, 6, 8])
+  const best = rows.filter((r) => r.perHourYen !== null).reduce<(typeof rows)[number] | null>((a, b) => (a === null || b.perHourYen! < a.perHourYen! ? b : a), null)
+  return (
+    <details>
+      <summary>📊 乗る長さとレンタル代（1時間あたり）</summary>
+      <div className="stack">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="乗る長さとレンタル代">
+          <table className="breakdown">
+            <thead>
+              <tr><th scope="col">乗る長さ</th><th scope="col">レンタル代</th><th scope="col">1時間あたり</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.hours} className={best?.hours === r.hours ? 'picked' : undefined}>
+                  <th scope="row">{r.hours}時間</th>
+                  <td>{r.yen === null ? '対象外' : formatYen(r.yen)}</td>
+                  <td>{r.perHourYen === null ? '—' : `${formatYen(r.perHourYen)}/時`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="hint">
+          上限のある料金では、1回の貸出で長く乗るほど1時間あたりのレンタル代が下がります。休憩で返して借り直すと、料金は最初から数え直しです。
+          電動アシストの電池がどれだけ持つかは車両と走り方しだいなので、上限に達した後に電池が切れそうな時は、返して別の車両を借りる（料金は最初から）か、帰る時間を考えてください。
+        </p>
+      </div>
     </details>
   )
 }

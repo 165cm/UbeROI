@@ -28,6 +28,7 @@ import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot } from '..
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 import { QuestWeek } from './QuestWeek'
+import { AreaRoutePlan } from './AreaRoutePlan'
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   invalid_time: '時間が正しくない',
@@ -216,6 +217,15 @@ export function Plan() {
         costPerHourYen={costPerHour}
         targetHourlyYen={target}
         onAddSlot={() => setEditing(newSlot())}
+      />
+
+      <AreaRoutePlan
+        now={new Date().toISOString()}
+        slots={inWeek}
+        chosenIds={chosen}
+        areas={data.areas}
+        primaryId={primaryArea(data.areas, data.settings)?.id ?? null}
+        past={past}
       />
 
       <section className="card">

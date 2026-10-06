@@ -14,12 +14,12 @@ export interface OrderRateSession {
   completedCount: number | null
 }
 
-/** 自分の1時間あたりの件数（件数の入った確定記録が3回以上ある時）。なければ目安の2件 */
+/** 自分の1時間あたりの件数（件数の入った確定記録が3回以上ある時。0件の記録ばかりなら0）。なければ目安の2件 */
 export function ordersPerHour(sessions: readonly OrderRateSession[]): { rate: number; source: 'personal' | 'reference'; samples: number } {
   const usable = sessions.filter((s) => s.completedCount !== null && s.hours > 0)
   const hours = usable.reduce((a, s) => a + s.hours, 0)
   const count = usable.reduce((a, s) => a + s.completedCount!, 0)
-  if (usable.length >= MIN_ORDER_SAMPLES && hours > 0 && count > 0) return { rate: Math.round((count / hours) * 100) / 100, source: 'personal', samples: usable.length }
+  if (usable.length >= MIN_ORDER_SAMPLES && hours > 0) return { rate: Math.round((count / hours) * 100) / 100, source: 'personal', samples: usable.length }
   return { rate: REFERENCE_ORDERS_PER_HOUR, source: 'reference', samples: usable.length }
 }
 
@@ -98,9 +98,11 @@ export function planQuest(input: QuestPlanInput): QuestPlan {
     if (reachedByPlan) expectedBonusYen += gains[i]!
     // 計画の後に必要な件数と時間（この段階までのボーナスは、届いていない段階の分をまとめて数える）
     const extraCount = Math.max(0, t.count - expectedCount)
-    const extraHours = Math.round((extraCount / input.ordersPerHour) * 10) / 10
+    // 1時間の件数が0の時は、時間を足しても件数が増えないので届かない
+    const canEarn = input.ordersPerHour > 0
+    const extraHours = canEarn ? Math.round((extraCount / input.ordersPerHour) * 10) / 10 : 0
     const unreachedGain = sorted.slice(0, i + 1).reduce((a, _, j) => (expectedCount >= sorted[j]!.count ? a : a + gains[j]!), 0)
-    const extraHourly = extraHours > 0 ? divide((input.revenuePerHourYen - input.costPerHourYen) * extraHours + unreachedGain, extraHours) : null
+    const extraHourly = canEarn && extraHours > 0 ? divide((input.revenuePerHourYen - input.costPerHourYen) * extraHours + unreachedGain, extraHours) : null
     tiers.push({
       tier: i + 1,
       count: t.count,
@@ -109,7 +111,7 @@ export function planQuest(input: QuestPlanInput): QuestPlan {
       reachedByPlan,
       extraHours,
       extraHourlyYen: extraHourly === null ? null : Math.round(extraHourly),
-      possible: remaining / input.ordersPerHour <= hoursLeft,
+      possible: canEarn && remaining / input.ordersPerHour <= hoursLeft,
     })
   })
   // 計画の次の段階で、追加の時間がボーナス込みで目標の時給以上になる最初のもの

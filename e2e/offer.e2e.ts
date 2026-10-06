@@ -1,16 +1,19 @@
-// オファー判定：ショートカットが読み取った文字（text=）から判定し、記録する。
-// 設定コード（cfg=）付きの URL は、保存場所が別のブラウザー（iPhone の Safari と同じ状況）でも同じ判定になる
-import { expect, test } from '@playwright/test'
+// オファー判定（手入力）：最初はオフ。設定でオンにすると、報酬・分・km・届け先の地名を手で入れて判定し、記録できる。
+// 配達アプリの画面のスクリーンショットや画面の読み取りは使わない
+import { expect, test, type Page } from '@playwright/test'
 
-const OCR = '配達 (2) 限定\n¥1,200\nUber 技術サービス契約が適用されます\n合計 24 分 (3.7 km)\n高円寺北2丁目\n承諾'
-
-test('読み取った文字から実質時給を出し、届け先の混み具合で判定して記録できる。設定コードで別のブラウザーでも同じ判定', async ({ page, browser }) => {
-  // 月曜 21:00（日本時間）
-  await page.clock.install({ time: new Date('2026-10-05T21:00:00+09:00') })
+/** 設定 → 基本で、目標の時給（任意）と帰宅締切（任意）を入れ、オファー判定をオンにする */
+async function enableOffer(page: Page, { target, deadline }: { target?: string; deadline?: string } = {}) {
   await page.goto('#settings')
-  await page.getByLabel('目標の営業純時給', { exact: true }).fill('1500')
+  if (target) await page.getByLabel('目標の営業純時給', { exact: true }).fill(target)
+  if (deadline) await page.getByLabel('帰宅締切（任意）').fill(deadline)
+  await page.getByLabel('オファー判定を使う（手入力）').check()
   await page.getByRole('button', { name: '💾 保存' }).click()
-  // エリア：月曜21時台は「混む」、地名に高円寺
+  await expect(page.getByText('使う（手入力）')).toBeVisible()
+}
+
+async function addArea(page: Page) {
+  await page.goto('#settings')
   await page.getByRole('tab', { name: 'エリア' }).click()
   await page.getByRole('button', { name: 'エリアを追加' }).click()
   await page.getByLabel('エリアの名前', { exact: true }).fill('中野・荻窪エリア')
@@ -19,11 +22,29 @@ test('読み取った文字から実質時給を出し、届け先の混み具�
   await page.getByLabel('このエリアに入る地名（任意）').fill('高円寺、阿佐谷')
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.locator('.tag', { hasText: '主なエリア' })).toBeVisible()
+}
 
-  // ショートカットと同じ形の URL で開く
-  await page.goto(`#offer?text=${encodeURIComponent(OCR)}`)
-  await expect(page.getByLabel('報酬', { exact: true })).toHaveValue('1200')
-  await expect(page.getByLabel('分', { exact: true })).toHaveValue('24')
+async function enter(page: Page, pay: string, minutes: string, km: string, town = '') {
+  await page.getByLabel('報酬', { exact: true }).fill(pay)
+  await page.getByLabel('分', { exact: true }).fill(minutes)
+  await page.getByLabel('距離', { exact: true }).fill(km)
+  await page.getByLabel('届け先の地名（任意）', { exact: true }).fill(town)
+}
+
+test('最初はオフ。オンにすると、手で入れた報酬・分・km と届け先の地名から判定して記録できる', async ({ page }) => {
+  // 月曜 21:00（日本時間）
+  await page.clock.install({ time: new Date('2026-10-05T21:00:00+09:00') })
+  await page.goto('#home')
+  await expect(page.getByRole('link', { name: '🧾 オファー判定' })).toHaveCount(0)
+  await page.goto('#offer')
+  await expect(page.getByRole('heading', { name: '🧾 オファー判定はオフです' })).toBeVisible()
+
+  await enableOffer(page, { target: '1500' })
+  await addArea(page)
+  await page.goto('#home')
+  await page.getByRole('link', { name: '🧾 オファー判定' }).click()
+  await expect(page.getByText(/スクリーンショットや画面の読み取りは使わないでください/)).toBeVisible()
+  await enter(page, '1200', '24', '3.7', '高円寺')
   // レンタル代（HELLO：15分160円 → 余裕5分を足した29分で309円）を引いて (1200 − 309) ÷ 29分 × 60 = 1,843円/時
   const status = page.getByRole('status').filter({ hasText: '受ける' })
   await expect(status).toContainText('✅ 受ける')
@@ -31,30 +52,15 @@ test('読み取った文字から実質時給を出し、届け先の混み具�
   await expect(page.getByText('中野・荻窪エリア：段階4 混む')).toBeVisible()
   // 混む届け先なので基準を10%下げる（1,500 → 1,350円）
   await expect(page.getByText('1,350円/時')).toBeVisible()
-
   await page.getByRole('button', { name: '✅ 受けた' }).click()
   await expect(page.getByText('「受けた」と記録しました')).toBeVisible()
-
-  // ショートカットに貼る URL（設定コード入り）を、保存場所が別のブラウザーで開く
-  await page.getByText('📲 iPhone のショートカットで使う').click()
-  const url = await page.getByLabel('ショートカットに貼る URL', { exact: true }).inputValue()
-  expect(url).toMatch(/^https:\/\/165cm\.github\.io\/UbeROI\/#offer\?cfg=[A-Za-z0-9_-]+&text=$/)
-  const other = await browser.newContext({ timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 844 } })
-  const safari = await other.newPage()
-  await safari.clock.install({ time: new Date('2026-10-05T21:00:00+09:00') })
-  await safari.goto(`/UbeROI/${url.slice(url.indexOf('#'))}${encodeURIComponent(OCR)}`)
-  await expect(safari.getByText(/設定コード（\d{4}-\d{2}-\d{2} 作成）で判定/)).toBeVisible()
-  await expect(safari.getByRole('status').filter({ hasText: '受ける' })).toContainText('1,843円/時')
-  await expect(safari.getByText('中野・荻窪エリア：段階4 混む')).toBeVisible()
-  await other.close()
+  // ショートカットの作り方の案内は出さない
+  await expect(page.getByText('📲 iPhone のショートカットで使う')).toHaveCount(0)
 })
 
 test('締切を過ぎる案件は断る。報酬と分がなければ判定しない', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-05T21:50:00+09:00') })
-  await page.goto('#settings')
-  await page.getByLabel('目標の営業純時給', { exact: true }).fill('1500')
-  await page.getByLabel('帰宅締切（任意）').fill('22:00')
-  await page.getByRole('button', { name: '💾 保存' }).click()
+  await enableOffer(page, { target: '1500', deadline: '22:00' })
   await page.goto('#offer')
   await expect(page.getByText('報酬と分を入れると判定します')).toBeVisible()
   await page.getByLabel('報酬', { exact: true }).fill('2000')
@@ -63,88 +69,29 @@ test('締切を過ぎる案件は断る。報酬と分がなければ判定し�
   await expect(page.getByText(/帰宅締切（22:00）を過ぎます/)).toBeVisible()
 })
 
-test('読み取った文字は URL から消える。続けて別のオファーを開くと、新しい値で判定し直す', async ({ page }) => {
+test('前のショートカットの URL で開いても、文字は URL から消える', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
+  await enableOffer(page)
   await page.goto(`#offer?text=${encodeURIComponent('¥900 合計 20 分 (2.0 km) 高円寺北2丁目')}`)
   await expect(page.getByLabel('報酬', { exact: true })).toHaveValue('900')
   await expect.poll(() => page.evaluate(() => location.hash)).toBe('#offer')
-  // 同じページのまま、次のオファーを開く（ショートカットを続けて使う時）
-  await page.evaluate(() => {
-    location.hash = `#offer?text=${encodeURIComponent('¥1,500 合計 30 分 (4.1 km)')}`
-  })
-  await expect(page.getByLabel('報酬', { exact: true })).toHaveValue('1500')
-  await expect(page.getByLabel('分', { exact: true })).toHaveValue('30')
 })
 
-test('設定コードの主なエリアは、届け先の地名が見つからない時に別のブラウザーでも使われる', async ({ page, browser }) => {
-  await page.clock.install({ time: new Date('2026-10-05T21:00:00+09:00') })
-  await page.goto('#settings')
-  await page.getByRole('tab', { name: 'エリア' }).click()
-  for (const [name, primary] of [['新宿エリア', false], ['中野・荻窪エリア', true]] as const) {
-    await page.getByRole('button', { name: 'エリアを追加' }).click()
-    await page.getByLabel('エリアの名前', { exact: true }).fill(name)
-    const h21 = page.getByRole('button', { name: /^月曜 21時/ })
-    for (let i = 0; i < (primary ? 4 : 1); i++) await h21.click()
-    const check = page.getByRole('checkbox', { name: /主なエリアにする/ })
-    if ((await check.isChecked()) !== primary) await check.click()
-    await page.getByRole('button', { name: '💾 保存' }).click()
-  }
-  await page.goto('#offer')
-  await page.getByText('📲 iPhone のショートカットで使う').click()
-  const url = await page.getByLabel('ショートカットに貼る URL', { exact: true }).inputValue()
-  const other = await browser.newContext({ timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 844 } })
-  const safari = await other.newPage()
-  await safari.clock.install({ time: new Date('2026-10-05T21:00:00+09:00') })
-  await safari.goto(`/UbeROI/${url.slice(url.indexOf('#'))}${encodeURIComponent('¥1,200 合計 24 分 (3.7 km) 地名なし')}`)
-  await expect(safari.getByText('中野・荻窪エリア：段階4 混む')).toBeVisible()
-  // 読み取った文字は URL から消え、設定コードだけ残る
-  await expect.poll(() => safari.evaluate(() => location.hash)).toMatch(/^#offer\?cfg=[A-Za-z0-9_-]+$/)
-  await other.close()
-})
-
-test('Safari で記録した分を持ち帰りコードでアプリへ移せる。地名の評価の一覧に出る', async ({ page, browser }) => {
+test('手入力で記録した地名から、地名の評価（次のオファーまでの待ち時間）を集める', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-05T18:00:00+09:00') })
-  // 地名は、エリアに登録したものだけを探す
-  await page.goto('#settings')
-  await page.getByRole('tab', { name: 'エリア' }).click()
-  await page.getByRole('button', { name: 'エリアを追加' }).click()
-  await page.getByLabel('エリアの名前', { exact: true }).fill('中野・荻窪エリア')
-  await page.getByLabel('このエリアに入る地名（任意）').fill('高円寺、阿佐谷')
-  await page.getByRole('button', { name: '💾 保存' }).click()
-  await expect(page.locator('.tag', { hasText: '主なエリア' })).toBeVisible()
+  await enableOffer(page)
+  await addArea(page)
+  // 18:00 高円寺 20分 → 18:20 に終わり、18:26 に次 → 待ち6分
   await page.goto('#offer')
-  await page.getByText('📲 iPhone のショートカットで使う').click()
-  const url = await page.getByLabel('ショートカットに貼る URL', { exact: true }).inputValue()
-
-  // 保存場所が別のブラウザー（Safari と同じ状況）で、2件記録する
-  const other = await browser.newContext({ timezoneId: 'Asia/Tokyo', viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] })
-  const safari = await other.newPage()
-  await safari.clock.install({ time: new Date('2026-10-05T18:00:00+09:00') })
-  await safari.goto(`/UbeROI/${url.slice(url.indexOf('#'))}${encodeURIComponent('¥900 合計 20 分 (2.0 km) 高円寺北2丁目')}`)
-  await safari.getByRole('button', { name: '✅ 受けた' }).click()
-  await expect(safari.getByText('「受けた」と記録しました')).toBeVisible()
-  await safari.clock.setFixedTime(new Date('2026-10-05T18:26:00+09:00'))
-  await safari.goto(`/UbeROI/${url.slice(url.indexOf('#'))}${encodeURIComponent('¥400 合計 15 分 (3.0 km)')}`)
-  await safari.getByRole('button', { name: '❌ 断った' }).click()
-  await expect(safari.getByText('「断った」と記録しました')).toBeVisible()
-  await safari.getByText('📤 アプリへ持ち帰る', { exact: true }).click()
-  await expect(safari.getByText('ここの記録 2件')).toBeVisible()
-  await safari.getByRole('button', { name: '📋 持ち帰りコードをコピー' }).click()
-  await expect(safari.getByText('2件分のコードをコピーしました')).toBeVisible()
-  const code = await safari.evaluate(() => navigator.clipboard.readText())
-  await other.close()
-
-  // ホーム画面のアプリで貼り付ける（2回目は重ならない）
-  await page.getByText('📥 Safari の記録を取り込む', { exact: true }).click()
-  const box = page.getByLabel('持ち帰りコード', { exact: true })
-  await box.fill(code)
-  await page.getByRole('button', { name: '📥 取り込む' }).click()
-  await expect(page.getByText('2件を取り込みました')).toBeVisible()
-  await box.fill(code)
-  await page.getByRole('button', { name: '📥 取り込む' }).click()
-  await expect(page.getByText('0件を取り込みました（2件は取り込み済み）')).toBeVisible()
-
-  // 18:00 高円寺 20分 → 18:20 に終わり、18:26 に次 → 待ち6分（まだ1件なので判定には使わない）
+  await enter(page, '900', '20', '2.0', '高円寺')
+  await page.getByRole('button', { name: '✅ 受けた' }).click()
+  await expect(page.getByText('「受けた」と記録しました')).toBeVisible()
+  await page.clock.setFixedTime(new Date('2026-10-05T18:26:00+09:00'))
+  await page.goto('#home')
+  await page.goto('#offer')
+  await enter(page, '400', '15', '3.0')
+  await page.getByRole('button', { name: '❌ 断った' }).click()
+  await expect(page.getByText('「断った」と記録しました')).toBeVisible()
   await page.getByText('🧠 地名の評価（記録から学習）', { exact: true }).click()
   await expect(page.getByText('判定に使用 0／1')).toBeVisible()
   const row = page.getByRole('region', { name: '地名の評価の一覧' }).getByRole('row', { name: /高円寺/ })

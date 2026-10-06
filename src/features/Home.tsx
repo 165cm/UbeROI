@@ -127,7 +127,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           </div>
         )}
         <Problems items={problems} />
-        <a className="button-link" href="#offer">🧾 オファー判定</a>
+        {data.settings?.offerJudgeEnabled && <a className="button-link" href="#offer">🧾 オファー判定</a>}
       </section>
 
       {active && (

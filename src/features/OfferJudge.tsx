@@ -7,7 +7,6 @@ import {
   TIME_BANDS,
   TOWN_LEARNING_MIN_SAMPLES,
   decodeOfferConfig,
-  encodeOfferConfig,
   evaluateOffer,
   findTown,
   learnTownRatings,
@@ -28,7 +27,6 @@ import { decodeOfferTransfer, encodeOfferTransfer } from '../storage/offerTransf
 import type { OfferRecord } from '../storage/schema'
 import { loadPrefs } from './ContinueCard'
 
-const APP_URL = 'https://165cm.github.io/UbeROI/'
 const DECISION_CLASS: Record<OfferDecision, string> = { accept: 'decision-go', maybe: 'decision-wait', decline: 'decision-stop' }
 const LEVEL_WORDS = ['', '空き', 'やや空き', 'やや混む', '混む'] as const
 
@@ -101,6 +99,7 @@ export function OfferJudge() {
   }, [params])
 
   if (!data) return <p className="loading">読み込み中…</p>
+  if (!data.settings?.offerJudgeEnabled) return <OfferJudgeOff hasCode={Boolean(fromCode)} offers={data.offers} />
 
   // 判定に使う設定：設定コードがあればそれ（Safari で開いた時）、なければこの端末の設定
   const prefs = loadPrefs()
@@ -189,8 +188,6 @@ export function OfferJudge() {
     }
   }
 
-  const shortcutUrl = `${APP_URL}#offer?cfg=${encodeOfferConfig(local)}&text=`
-
   return (
     <div className="stack">
       {fromCode && (
@@ -211,6 +208,13 @@ export function OfferJudge() {
           <IntInput label="分" unit="分" value={minutes} onChange={setMinutes} />
           <KmInput value={km} onChange={setKm} />
         </div>
+        <TextInput
+          label="届け先の地名（任意）"
+          value={text}
+          onChange={setText}
+          placeholder="例：高円寺"
+          tip="登録した地名から届け先のエリアを探し、地名ごとの待ち時間の学習にも使います。住所は入れないでください（地名まで）"
+        />
         {config.areas.length > 0 && (
           <label className="field">
             <span>届け先のエリア</span>
@@ -264,29 +268,6 @@ export function OfferJudge() {
         )}
       </section>
 
-      <details className="card fold">
-        <summary>
-          <strong>📄 読み取った文字</strong>
-          <span className="hint">{text ? `${text.length}文字` : 'なし'}</span>
-        </summary>
-        <div className="stack">
-          <label className="field">
-            <span>画面の文字（貼り付けても読めます）</span>
-            <textarea
-              rows={4}
-              value={text}
-              onChange={(e) => {
-                const next = e.target.value
-                setText(next)
-                const p = parseOfferText(next)
-                if (p.payYen !== null) setPayYen(p.payYen)
-                if (p.minutes !== null) setMinutes(p.minutes)
-                if (p.km !== null) setKm(p.km)
-              }}
-            />
-          </label>
-        </div>
-      </details>
 
       {fromCode ? <CarryHome offers={data.offers} /> : <ImportFromSafari />}
 
@@ -294,7 +275,9 @@ export function OfferJudge() {
 
       {!fromCode && <OfferSettings bufferMinutes={local.bufferMinutes} minKmYen={local.minKmYen} />}
 
-      {!fromCode && <ShortcutGuide url={shortcutUrl} />}
+      <p className="hint">
+        止まっている時に、配達アプリのオファーを見ながら報酬・分・km を手で入れてください。配達アプリの画面のスクリーンショットや画面の読み取りは使わないでください（配達アプリから警告されることがあります）。
+      </p>
     </div>
   )
 }
@@ -339,53 +322,6 @@ function OfferSettings({ bufferMinutes, minKmYen }: { bufferMinutes: number; min
   )
 }
 
-function ShortcutGuide({ url }: { url: string }) {
-  const [copied, setCopied] = useState<string | null>(null)
-  return (
-    <details className="card fold">
-      <summary>
-        <strong>📲 iPhone のショートカットで使う</strong>
-        <span className="hint">オファー画面から1回で判定</span>
-      </summary>
-      <div className="stack">
-        <p className="hint">
-          オファーが来た時に、背面を2回たたくと画面の文字を読み取って、この判定が開くようにします。ショートカットは画面の文字を読むだけで、承諾は押しません。
-        </p>
-        <ol className="steps">
-          <li>「ショートカット」アプリを開き、右上の「＋」で新しいショートカットを作る</li>
-          <li>「スクリーンショットを撮る」を追加</li>
-          <li>「画像からテキストを抽出」を追加（入力：スクリーンショット）</li>
-          <li>「URLエンコード」を追加（入力：抽出したテキスト）</li>
-          <li>「テキスト」を追加し、下の URL を貼り付け、最後に「URLエンコードされたテキスト」を差し込む</li>
-          <li>「URLを開く」を追加（入力：そのテキスト）</li>
-          <li>名前を「オファー判定」にして保存</li>
-          <li>「設定」→「アクセシビリティ」→「タッチ」→「背面タップ」→「ダブルタップ」で「オファー判定」を選ぶ</li>
-        </ol>
-        <TextInput label="ショートカットに貼る URL" value={url} onChange={() => undefined} tip="判定に使う設定（目標・余裕・レンタル代・締切・エリア）が入っています。設定を変えたら、ここからコピーし直してショートカットの URL を貼り替えてください" />
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(url)
-              setCopied('📋 コピーしました')
-            } catch {
-              setCopied('コピーできませんでした。上の欄を長押しして全選択・コピーしてください')
-            }
-          }}
-        >
-          📋 URL をコピー
-        </button>
-        {copied && <p className="hint" role="status">{copied}</p>}
-        <div className="line">
-          <span className="grow hint">ショートカットから開くと Safari で開くので、「受けた／断った」の記録はときどきアプリへ持ち帰ってください</span>
-          <Tip label="記録の保存場所">
-            iPhone では、ショートカットから開いたページは Safari で開き、ホーム画面に追加したアプリとは保存場所が別になります。そのため判定に必要な設定は URL に入れて渡しています。Safari で記録した分は、Safari の判定画面の「📤 アプリへ持ち帰る」でコードをコピーし、ホーム画面のアプリのこの画面の「📥 Safari の記録を取り込む」に貼り付けると1か所にまとまります。
-          </Tip>
-        </div>
-      </div>
-    </details>
-  )
-}
 
 /** Safari（設定コードで開いた時）：ここにたまった記録を、ホーム画面のアプリへ持ち帰るコードにする */
 function CarryHome({ offers }: { offers: OfferRecord[] }) {
@@ -507,5 +443,22 @@ function TownRatings({ ratings }: { ratings: TownRating[] }) {
         )}
       </div>
     </details>
+  )
+}
+
+/** オファー判定がオフの時（設定 → 基本で切り替え）。Safari に残った記録は、ここから持ち帰れる */
+function OfferJudgeOff({ hasCode, offers }: { hasCode: boolean; offers: OfferRecord[] }) {
+  return (
+    <div className="stack">
+      <section className="card stack" aria-labelledby="offer-off-title">
+        <h3 id="offer-off-title">🧾 オファー判定はオフです</h3>
+        <p className="hint">
+          使う時は「設定 → 基本 → オファー判定を使う（手入力）」をオンにしてください。止まっている時に、オファーを見ながら報酬・分・km を手で入れる形です。配達アプリの画面のスクリーンショットや画面の読み取りは使いません。
+        </p>
+        {hasCode && <p className="hint">⚠️ iPhone のショートカットからこの画面を開いた時は、そのショートカットを削除してください。</p>}
+        <a className="button-link" href="#settings">⚙️ 設定を開く</a>
+      </section>
+      {hasCode && offers.length > 0 && <CarryHome offers={offers} />}
+    </div>
   )
 }

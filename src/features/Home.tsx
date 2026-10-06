@@ -315,8 +315,13 @@ function BusyAhead({ areas, primaryId, now }: { areas: AreaRecord[]; primaryId: 
                 {cells.map((c) => (
                   <td key={c.startMs} aria-label={c.level === null ? '未入力' : `段階${c.level} ${BUSY_WORDS[c.level]}`}>
                     <span className={`ahead-cell level-${c.level ?? 0}`} aria-hidden="true">
-                      <span className="ahead-bar" style={{ height: `${(c.level ?? 0) * 25}%` }} />
-                      <span className="ahead-num">{c.level ?? '·'}</span>
+                      {c.level !== null ? (
+                        <span className="ahead-bar" style={{ height: `${c.level * 25}%` }}>
+                          <span className="ahead-num">{c.level}</span>
+                        </span>
+                      ) : (
+                        <span className="ahead-num ahead-empty">·</span>
+                      )}
                     </span>
                   </td>
                 ))}

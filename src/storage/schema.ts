@@ -8,7 +8,7 @@ import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, Tariff 
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 interface Stamped {
   createdAt: string
@@ -221,6 +221,9 @@ export interface AreaRecord extends Stamped {
   moveMinutes?: number | null
   /** 移動の分をどのエリア（その時の主なエリア）から測ったか。主なエリアが変わったら、その分は使わない（版7で追加） */
   moveFromAreaId?: string | null
+  /** 地図に描く円の中心と半径（m）。配達アプリのエリアの形は写さず、円での目安にする（版9で追加。未設定なら地図に出さない） */
+  center?: { lat: number; lng: number } | null
+  radiusM?: number | null
 }
 
 /**

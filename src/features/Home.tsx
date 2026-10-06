@@ -8,6 +8,7 @@ import { useData } from '../storage/context'
 import { arriveHome, departNow, endRental, listTariffs, pickDefaultTariff, primaryArea, startRental } from '../storage/repo'
 import { pastSessionsFor, periodFor } from '../storage/toDomain'
 import type { AreaRecord } from '../storage/schema'
+import { BusyMap } from './AreaMap'
 import { CashChange } from './CashChange'
 import { ContinueCard } from './ContinueCard'
 import { OutlookCard } from './OutlookCard'
@@ -330,6 +331,7 @@ function BusyAhead({ areas, primaryId, now }: { areas: AreaRecord[]; primaryId: 
           </tbody>
         </table>
       </div>
+      <MapFold areas={rows.map((r) => r.area)} now={now} />
       {(best || skipped > 0) && (
         <p className="hint" role="status">
           {best && (
@@ -341,5 +343,20 @@ function BusyAhead({ areas, primaryId, now }: { areas: AreaRecord[]; primaryId: 
         </p>
       )}
     </div>
+  )
+}
+
+/** 地図の場所を登録したエリアがある時だけ出す。開いた時だけ地図を作る（開かない時は地図の画像を読み込まない） */
+function MapFold({ areas, now }: { areas: AreaRecord[]; now: string }) {
+  const [open, setOpen] = useState(false)
+  const placed = areas
+    .filter((a) => a.center && a.radiusM)
+    .map((a) => ({ id: a.id, name: a.name, center: a.center!, radiusM: a.radiusM!, levels: a.levels }))
+  if (placed.length === 0) return null
+  return (
+    <details className="map-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>🗺️ 地図で見る（▶ でこの先4時間を動かす）</summary>
+      {open && <BusyMap areas={placed} now={now} />}
+    </details>
   )
 }

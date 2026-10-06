@@ -1156,3 +1156,40 @@ select.shot-day {
   display: block;
   font-weight: 400;
 }
+
+/* エリアの地図（OpenStreetMap）。下のメニューより前に出ないよう、地図の中だけで重なりを閉じる */
+.area-map {
+  position: relative;
+  z-index: 0;
+  height: 260px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.map-fold > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  font-size: 0.875rem;
+}
+.leaflet-tooltip.map-label {
+  padding: 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1b1f1d;
+  border: none;
+  box-shadow: none;
+}
+.leaflet-tooltip.map-label::before {
+  display: none;
+}
+.line.wrap {
+  flex-wrap: wrap;
+}
+select.inline-select {
+  width: auto;
+  flex: none;
+}
+.nowrap {
+  white-space: nowrap;
+}

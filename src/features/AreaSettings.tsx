@@ -6,6 +6,7 @@ import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, l
 import { useData } from '../storage/context'
 import { deleteArea, newId, primaryArea, saveArea, saveSettings } from '../storage/repo'
 import type { AreaRecord } from '../storage/schema'
+import { MapPicker } from './AreaMap'
 
 /** 配達アプリの表と同じ、月曜始まりの並び */
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const
@@ -35,6 +36,7 @@ export function AreaSettings() {
         initial={editing.area}
         initialPrimary={editing.primary}
         primaryId={primary?.id ?? null}
+        others={data.areas.filter((a) => a.id !== editing.area.id && a.center && a.radiusM).map((a) => ({ name: a.name, center: a.center!, radiusM: a.radiusM! }))}
         onCancel={() => setEditing(null)}
         onSave={async (area, makePrimary) => {
           // エリアと主なエリアの指定は、同じ1回の書き込みで保存する
@@ -111,9 +113,12 @@ function AreaForm({
   initial,
   initialPrimary,
   primaryId,
+  others,
   onSave,
   onCancel,
 }: {
+  /** 地図に薄く出す、ほかのエリアの円 */
+  others: { name: string; center: { lat: number; lng: number }; radiusM: number }[]
   initial: AreaRecord
   initialPrimary: boolean
   /** 今の主なエリア（移動の分をどこから測ったかとして保存する） */
@@ -126,6 +131,8 @@ function AreaForm({
   const [day, setDay] = useState<number>(WEEK_ORDER[0])
   const [townsText, setTownsText] = useState(initial.towns.join('、'))
   const [problems, setProblems] = useState<string[]>([])
+  // 地図は開いた時だけ作る（開かない時は地図の画像を読み込まない）
+  const [mapOpen, setMapOpen] = useState(false)
   const row = area.levels[day]!
 
   const setLevels = (levels: BusynessTable) => setArea({ ...area, levels })
@@ -237,6 +244,26 @@ function AreaForm({
           <button type="button" onClick={() => copyTo([0, 1, 2, 3, 4, 5, 6])}>📋 全曜日に写す</button>
         </div>
       </section>
+
+      <details className="card fold" onToggle={(e) => setMapOpen(e.currentTarget.open)}>
+        <summary>
+          <strong>🗺️ 地図の場所（任意）</strong>
+          <span className="hint">{area.center ? `設定済み・半径${(area.radiusM ?? 1000) >= 1000 ? `${(area.radiusM ?? 1000) / 1000}km` : `${area.radiusM}m`}` : '未設定'}</span>
+        </summary>
+        <div className="stack">
+          <p className="hint">
+            ホームの地図で、このエリアを混み具合の色の円で出します。配達アプリのエリアの形は写さず、中心と半径の円での目安です。地図は OpenStreetMap から読み込みます（記録や現在地は送りません）。
+          </p>
+          {mapOpen && (
+            <MapPicker
+              center={area.center ?? null}
+              radiusM={area.radiusM ?? 1000}
+              others={others}
+              onChange={(center, radiusM) => setArea((a) => ({ ...a, center, radiusM: center ? radiusM : null }))}
+            />
+          )}
+        </div>
+      </details>
 
       <section className="card stack">
         <label className="field">

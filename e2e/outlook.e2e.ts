@@ -85,8 +85,11 @@ test('移動の分を入れたエリアの方が見込みが良ければ、エ�
 
   await page.goto('#home')
   await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  // 出発が保存されてから（カードが出てから）時刻を進めて読み直す
+  await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
   await page.clock.setFixedTime(new Date('2026-10-05T19:00:00+09:00'))
   await page.reload()
+  await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
   await page.getByLabel('終了予定（配達をやめる時刻）', { exact: true }).fill('21:00')
   const options = page.getByRole('list', { name: '行動ごとのこの先の利益' }).getByRole('listitem')
   await expect(options.filter({ hasText: 'おすすめ' })).toContainText('新宿エリアへ移動（15分）')

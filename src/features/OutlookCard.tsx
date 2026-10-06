@@ -116,12 +116,18 @@ export function OutlookCard({
   const capNote = (() => {
     if (!rental || rental.tariff.kind !== 'tiered') return null
     const cap = tieredCapInfo(rental.tariff)
+    if (!cap) return null
     const start = Date.parse(rental.startAt)
     const reachMs = start + cap.reachesCapAtSeconds * 1000
+    const untilMs = start + cap.coversUntilSeconds * 1000
+    const nowMs = Date.parse(minute)
     const endMs = endTimeMs(minute, stored.end)
-    if (Date.parse(minute) >= reachMs) return `レンタルは上限 ${formatYen(cap.capYen)} に達しています。この先（貸出から12時間まで）は追加のレンタル代がかかりません`
-    if (endMs > reachMs) return `レンタルは ${new Date(reachMs + 9 * 3_600_000).toISOString().slice(11, 16)} に上限 ${formatYen(cap.capYen)} に達し、その後は追加のレンタル代がかかりません（この差は上の利益に入っています）`
-    return null
+    const clock = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(11, 16)
+    // 上限で乗れる時間（例：12時間）を過ぎた後は、追加料金なしとは言えない（見積の対象外）
+    if (nowMs >= untilMs || endMs <= reachMs) return null
+    const beyond = endMs > untilMs ? `。ただし ${clock(untilMs)} を過ぎるとレンタル代は見積の対象外です（返して借り直すと料金は最初から）` : ''
+    if (nowMs >= reachMs) return `レンタルは上限 ${formatYen(cap.capYen)} に達しています。${clock(untilMs)} までは追加のレンタル代がかかりません${beyond}`
+    return `レンタルは ${clock(reachMs)} に上限 ${formatYen(cap.capYen)} に達し、${clock(untilMs)} までは追加のレンタル代がかかりません（この差は上の利益に入っています）${beyond}`
   })()
   return (
     <section className="card stack" aria-labelledby="outlook-title">

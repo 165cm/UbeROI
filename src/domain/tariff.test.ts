@@ -16,4 +16,10 @@ describe('上限の使い方（HELLO CYCLING）', () => {
       { hours: 13, yen: null, perHourYen: null },
     ])
   })
+
+  it('上限に届かない料金（加算0円・上限の時間内に届かない）は上限の案内をしない', () => {
+    expect(tieredCapInfo({ ...HELLO_TOKYO_CITY, stepYen: 0 })).toBeNull()
+    expect(tieredCapInfo({ ...HELLO_TOKYO_CITY, capMinutes: 200 })).toBeNull()
+    expect(tieredCapInfo({ ...HELLO_TOKYO_CITY, initialYen: 3000 })).toMatchObject({ reachesCapAtSeconds: 1 })
+  })
 })

@@ -366,6 +366,7 @@ function MapFold({ areas, now }: { areas: AreaRecord[]; now: string }) {
 /** 上限まであとどれだけか。上限に達した後は、上限で乗れる最後の時刻まで追加の料金がかからない */
 function CapLine({ tariff, startAt, now }: { tariff: Extract<Tariff, { kind: 'tiered' }>; startAt: string; now: string }) {
   const cap = tieredCapInfo(tariff)
+  if (!cap) return null
   const start = Date.parse(startAt)
   const elapsed = (Date.parse(now) - start) / 1000
   const reachAt = new Date(start + cap.reachesCapAtSeconds * 1000).toISOString()
@@ -373,7 +374,8 @@ function CapLine({ tariff, startAt, now }: { tariff: Extract<Tariff, { kind: 'ti
   if (elapsed >= cap.coversUntilSeconds) return null
   const capped = elapsed >= cap.reachesCapAtSeconds
   return (
-    <p className={`cap-line${capped ? ' capped' : ''}`} role="status">
+    // 残り時間は毎秒変わるので、読み上げの自動通知（role=status）にはしない
+    <p className={`cap-line${capped ? ' capped' : ''}`}>
       {capped ? (
         <>
           🎉 上限 {formatYen(cap.capYen)} に到達。<strong>{formatClock(untilAt).slice(0, 5)}</strong> まで追加 0円（あと{formatDuration(cap.coversUntilSeconds - elapsed)}）

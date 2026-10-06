@@ -21,4 +21,11 @@ test('レンタル中は上限までの残りと、上限の後は追加 0円に
   await page.clock.setFixedTime(new Date('2026-10-05T18:30:00+09:00'))
   await page.reload()
   await expect(page.getByText(/上限 2,500円 に到達。02:00 まで追加 0円/)).toBeVisible()
+
+  // 終了までの見通しにも出る。上限で乗れる時間（翌2:00）を過ぎる終了予定なら、その先は見積の対象外と伝える
+  const end = page.getByLabel('終了予定（配達をやめる時刻）', { exact: true })
+  await end.fill('23:00')
+  await expect(page.getByText('レンタルは上限 2,500円 に達しています。02:00 までは追加のレンタル代がかかりません')).toBeVisible()
+  await end.fill('03:00')
+  await expect(page.getByText(/02:00 までは追加のレンタル代がかかりません。ただし 02:00 を過ぎるとレンタル代は見積の対象外です/)).toBeVisible()
 })

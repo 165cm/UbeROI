@@ -58,7 +58,11 @@ export function WeekBoard({
   weatherOverrides,
   weatherFactors,
   onCycleWeather,
+  needsSetup,
+  estimateNote,
 }: {
+  needsSetup: boolean
+  estimateNote: string
   now: string
   /** 週の月曜（YYYY-MM-DD・端末の日付） */
   weekFrom: string
@@ -161,7 +165,7 @@ export function WeekBoard({
             <dd className="big">{fmtH(doneHours)}</dd>
           </div>
           <div>
-            <dt>これから</dt>
+            <dt>登録済み候補から</dt>
             <dd className="big accent">{fmtH(plannedHours)}</dd>
           </div>
           <div>
@@ -181,7 +185,7 @@ export function WeekBoard({
         <p className="line">
           <span className="grow hint">{budgetHours === null ? '設定 → 基本で「週に使える時間」を入れると、上限までの残りが出ます' : total > budgetHours ? '⚠️ 上限を超えています' : `上限 ${fmtH(budgetHours)}`}</span>
           <span>
-            見込み利益 <strong className="num">{profitYen === null ? '算出不可' : formatYen(profitYen)}</strong>
+            登録済み候補の見込み利益 <strong className="num">{profitYen === null ? '算出不可' : formatYen(profitYen)}</strong>
           </span>
         </p>
       </section>
@@ -193,7 +197,9 @@ export function WeekBoard({
         >
           🧭 今週の作戦
         </CardTitle>
-        {options.length === 0 || options.every((o) => o.hours === 0) ? (
+        <p className="hint">未登録の提案です。候補に追加するまで、上の集計には入りません。</p>
+        <p className="hint">{estimateNote}</p>
+        {needsSetup ? <p>週に使える時間を設定すると、無理のない範囲で提案します。</p> : options.length === 0 || options.every((o) => o.hours === 0) ? (
           <p className="hint">この週の残りに働ける時間がないか、働いても得にならない見込みです（働ける時間・週の上限・天気を確かめてください）</p>
         ) : (
           <div className="week-options" role="radiogroup" aria-label="作戦の選択肢">
@@ -204,7 +210,7 @@ export function WeekBoard({
                   {o.workDays}日・{fmtH(o.hours)}・約{o.orders}件
                 </span>
                 <span>
-                  利益 <strong>{formatYen(o.profitYen)}</strong>
+                  見込み利益 <strong>{formatYen(o.profitYen)}</strong>
                   {o.hourlyYen !== null && <span className="hint">（{formatYen(o.hourlyYen)}/時）</span>}
                 </span>
                 <span className="hint">
@@ -331,10 +337,10 @@ export function WeekBoard({
           </ul>
         </div>
         <p className="wb-legend hint" aria-hidden="true">
-          <span className="key chosen" />予定 <span className="key cand" />候補 <span className="key done" />実績{planShifts.length > 0 && (
+          <span className="key chosen" />登録済み・おすすめ <span className="key cand" />候補 <span className="key done" />実績{planShifts.length > 0 && (
             <>
               {' '}
-              <span className="key quest" />作戦
+              <span className="key quest" />未登録の提案
             </>
           )}
           {allowed && (
@@ -366,12 +372,12 @@ export function WeekBoard({
           <div className="stack strategy-plan" role="group" aria-label="作戦の日ごとの時間">
             <p className="line">
               <span className="grow">
-                🧭 <strong>{plan.label}</strong>：{plan.workDays}日・<strong>{fmtH(plan.hours)}</strong>・約{plan.orders}件・利益 {formatYen(plan.profitYen)}
+                🧭 <strong>{plan.label}（見込み）</strong>：{plan.workDays}日・<strong>{fmtH(plan.hours)}</strong>・約{plan.orders}件・利益 {formatYen(plan.profitYen)}
                 {plan.bonusYen > 0 && `（クエスト+${formatYen(plan.bonusYen)}）`}
               </span>
               {planShifts.length > 0 && (
-                <button type="button" className="icon" aria-label="作戦の時間を候補枠に入れる" onClick={() => onAddPlan(planShifts)}>
-                  ＋
+                <button type="button" className="primary" aria-label="作戦の時間を候補枠に入れる" onClick={() => onAddPlan(planShifts)}>
+                  この提案を候補に追加
                 </button>
               )}
             </p>

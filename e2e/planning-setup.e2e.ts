@@ -1,0 +1,31 @@
+import { expect, test } from '@playwright/test'
+
+test('初回は長時間の作戦を出さず、条件を保存して初めて推計を表示する', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
+  await page.goto('#plan')
+  await expect(page.getByRole('radiogroup', { name: '作戦の選択肢' })).toHaveCount(0)
+  const setup = page.getByRole('form', { name: '計画の初期設定' })
+  await setup.getByRole('button', { name: '条件を保存して提案を見る' }).click()
+  await expect(setup.getByText(/週の時間・目標時給・料金/)).toBeVisible()
+  await setup.getByLabel('計画に使う週の時間', { exact: true }).fill('12')
+  await setup.getByLabel('計画の目標時給', { exact: true }).fill('1000')
+  await setup.getByLabel('利用する自転車・料金', { exact: true }).selectOption({ label: '自分の自転車・月額サブスク' })
+  await setup.getByLabel('働ける時間帯', { exact: true }).selectOption('weekend')
+  await setup.getByRole('button', { name: '条件を保存して提案を見る' }).click()
+  await expect(setup).toHaveCount(0)
+  await expect(page.getByRole('radiogroup', { name: '作戦の選択肢' })).toBeVisible()
+  await expect(page.getByText('未登録の提案です。候補に追加するまで、上の集計には入りません。')).toBeVisible()
+  await expect(page.getByRole('region', { name: '⏱️ この週の稼働' }).getByRole('definition')).toHaveText(['0h', '0h', '12h'])
+  await page.reload()
+  await expect(setup).toHaveCount(0)
+  await expect(page.getByRole('radiogroup', { name: '作戦の選択肢' })).toBeVisible()
+})
+
+test('週0時間は未設定扱いせず、作戦を提案しない', async ({ page }) => {
+  await page.goto('#settings')
+  await page.getByLabel('週に使える時間', { exact: true }).fill('0')
+  await page.getByRole('button', { name: '💾 保存' }).first().click()
+  await page.goto('#plan')
+  await expect(page.getByRole('form', { name: '計画の初期設定' })).toHaveCount(0)
+  await expect(page.getByRole('radiogroup', { name: '作戦の選択肢' })).toHaveCount(0)
+})

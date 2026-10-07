@@ -5,6 +5,9 @@ import { expect, test } from '@playwright/test'
 test('順位と件数・賞金を入れると、上との差と攻める目標が出て、計画に「攻める」の選択肢が出る', async ({ page }) => {
   // 土曜 16時（金4:00〜月4:00 の期間のちょうど半分）
   await page.clock.install({ time: new Date('2026-10-10T16:00:00+09:00') })
+  await page.goto('#settings')
+  await page.getByLabel('週に使える時間', { exact: true }).fill('30')
+  await page.getByRole('button', { name: '💾 保存' }).first().click()
   await page.goto('#home')
   await page.getByRole('button', { name: 'クエストを追加' }).click()
   await page.getByLabel('名前', { exact: true }).fill('日跨ぎ')

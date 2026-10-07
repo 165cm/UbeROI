@@ -13,12 +13,14 @@ test('初回は長時間の作戦を出さず、条件を保存して初めて�
   await setup.getByLabel('働ける時間帯', { exact: true }).selectOption('weekend')
   await setup.getByRole('button', { name: '条件を保存して提案を見る' }).click()
   await expect(setup).toHaveCount(0)
-  await expect(page.getByRole('radiogroup', { name: '作戦の選択肢' })).toBeVisible()
-  await expect(page.getByText('未登録の提案です。候補に追加するまで、上の集計には入りません。')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '💡 おすすめの提案' })).toBeVisible()
+  await expect(page.locator('.proposal-big')).toContainText(/\d+時間 \/ \d+日/)
+  await expect(page.getByText(/未採用（予定に追加するまで集計に入りません）/)).toBeVisible()
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('region', { name: '⏱️ この週の稼働' }).getByRole('definition')).toHaveText(['0h', '0h', '12h'])
   await page.reload()
   await expect(setup).toHaveCount(0)
-  await expect(page.getByRole('radiogroup', { name: '作戦の選択肢' })).toBeVisible()
+  await expect(page.locator('.proposal-big')).toContainText(/\d+時間 \/ \d+日/)
 })
 
 test('週0時間は未設定扱いせず、作戦を提案しない', async ({ page }) => {

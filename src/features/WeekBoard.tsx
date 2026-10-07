@@ -60,7 +60,10 @@ export function WeekBoard({
   onCycleWeather,
   needsSetup,
   estimateNote,
+  view,
 }: {
+  /** proposal＝提案（おすすめの作戦）、schedule＝予定（稼働の量と7日の帯） */
+  view: 'proposal' | 'schedule'
   needsSetup: boolean
   estimateNote: string
   now: string
@@ -103,6 +106,8 @@ export function WeekBoard({
   const plan = options.find((o) => o.key === selectedKey) ?? options[0] ?? null
   /** 作戦で新しく働く時間（すでに選んだ候補枠の日は除く） */
   const planShifts = plan ? plan.days.filter((d) => !d.fixed).flatMap((d) => d.shifts) : []
+  /** 7日の帯に提案（🧭）を重ねるのは、提案の画面の中だけ */
+  const boardPlan = view === 'proposal' ? planShifts : []
   /** その日の、働けない時間（帯に斜線で出す） */
   const offSpans = (start: number, end: number): [number, number][] => {
     if (!allowed) return []
@@ -150,8 +155,7 @@ export function WeekBoard({
   const scale = Math.max(budgetHours ?? 0, total, 1)
   const pct = (h: number) => `${(h / scale) * 100}%`
 
-  return (
-    <>
+  const amountCard = (
       <section className="card stack" aria-labelledby="week-amount-title">
         <CardTitle
           id="week-amount-title"
@@ -189,41 +193,9 @@ export function WeekBoard({
           </span>
         </p>
       </section>
+  )
 
-      <section className="card stack" aria-labelledby="week-plan-title">
-        <CardTitle
-          id="week-plan-title"
-          tip="この週の残りの時間で、どの日に・何時から何時まで働くと利益が一番大きいかを、目標ごとに比べます。天気（雨は件数と単価が上がる・荒天は入れない）、混み具合と自分の実績、レンタルの上限（長く1回借りる方が安い）、1日は1回か昼と夜の2回まで（間で返すか借りたままかは安い方）、働ける時間・週の上限・帰宅締切、日跨ぎとピークのクエストの報酬を入れて計算します。目標時給があれば「利益−目標時給×時間」が一番大きいものをおすすめにします。見込みなので実績には入りません。"
-        >
-          🧭 今週の作戦
-        </CardTitle>
-        <p className="hint">未登録の提案です。候補に追加するまで、上の集計には入りません。</p>
-        <p className="hint">{estimateNote}</p>
-        {needsSetup ? <p>週に使える時間を設定すると、無理のない範囲で提案します。</p> : options.length === 0 || options.every((o) => o.hours === 0) ? (
-          <p className="hint">この週の残りに働ける時間がないか、働いても得にならない見込みです（働ける時間・週の上限・天気を確かめてください）</p>
-        ) : (
-          <div className="week-options" role="radiogroup" aria-label="作戦の選択肢">
-            {options.map((o) => (
-              <button key={o.key} type="button" role="radio" aria-checked={o.key === plan?.key} className="week-option" onClick={() => onSelect(o.key)}>
-                <strong>{o.label}</strong>
-                <span>
-                  {o.workDays}日・{fmtH(o.hours)}・約{o.orders}件
-                </span>
-                <span>
-                  見込み利益 <strong>{formatYen(o.profitYen)}</strong>
-                  {o.hourlyYen !== null && <span className="hint">（{formatYen(o.hourlyYen)}/時）</span>}
-                </span>
-                <span className="hint">
-                  🚲{formatYen(o.rentalYen)}
-                  {o.bonusYen > 0 && `・クエスト+${formatYen(o.bonusYen)}`}
-                  {o.prizeYen > 0 && `・🏆届けば+${formatYen(o.prizeYen)}`}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-
+  const boardCard = (
       <section className="card stack" aria-labelledby="week-board-title">
         <CardTitle
           id="week-board-title"
@@ -304,7 +276,7 @@ export function WeekBoard({
                     {dayDone.map((x) => (
                       <span key={x.startsAt} className="wb-done" style={pos(...range(x))} title={`実績 ${hm(Date.parse(x.startsAt))}〜${hm(Date.parse(x.endsAt))}`} />
                     ))}
-                    {planShifts
+                    {boardPlan
                       .filter((w) => Date.parse(w.startsAt) < d.end && Date.parse(w.endsAt) > d.start)
                       .map((w) => (
                         <span key={w.startsAt} className="wb-quest" style={pos(...range(w))} aria-hidden="true">
@@ -326,8 +298,8 @@ export function WeekBoard({
                   <span className="wb-hours num">{hours > 0 ? fmtH(hours) : ''}</span>
                   <span className="wb-readable">
                     {daySlots.filter((s) => s.chosen).map((s) => <span key={s.id}>登録済み {hm(Date.parse(s.startsAt))}〜{hm(Date.parse(s.endsAt))}</span>)}
-                    {planShifts.filter((s) => Date.parse(s.startsAt) < d.end && Date.parse(s.endsAt) > d.start).map((s) => <span key={s.startsAt}>提案 {hm(Date.parse(s.startsAt))}〜{hm(Date.parse(s.endsAt))}</span>)}
-                    {!daySlots.some((s) => s.chosen) && !planShifts.some((s) => Date.parse(s.startsAt) < d.end && Date.parse(s.endsAt) > d.start) && <span>{past ? '終了した日' : '予定なし'}</span>}
+                    {boardPlan.filter((s) => Date.parse(s.startsAt) < d.end && Date.parse(s.endsAt) > d.start).map((s) => <span key={s.startsAt}>提案 {hm(Date.parse(s.startsAt))}〜{hm(Date.parse(s.endsAt))}</span>)}
+                    {!daySlots.some((s) => s.chosen) && !boardPlan.some((s) => Date.parse(s.startsAt) < d.end && Date.parse(s.endsAt) > d.start) && <span>{past ? '終了した日' : '予定なし'}</span>}
                   </span>
                   {past ? (
                     <span className="wb-add" />
@@ -342,7 +314,7 @@ export function WeekBoard({
           </ul>
         </div>
         <p className="wb-legend hint" aria-hidden="true">
-          <span className="key chosen" />登録済み・おすすめ <span className="key cand" />候補 <span className="key done" />実績{planShifts.length > 0 && (
+          <span className="key chosen" />登録済み・おすすめ <span className="key cand" />候補 <span className="key done" />実績{boardPlan.length > 0 && (
             <>
               {' '}
               <span className="key quest" />未登録の提案
@@ -373,42 +345,114 @@ export function WeekBoard({
                 : `🌦️ 天気：Open-Meteo（気象庁）${forecast.fetchedAt ? `・${hm(Date.parse(forecast.fetchedAt))}取得` : ''}${forecast.status === 'error' ? '（前に取得した予報）' : ''}`}
           ・雨の日 件数×{weatherFactors.rainOrders}・1件×{weatherFactors.rainPerOrder}（{weatherFactors.source === 'personal' ? '自分の記録' : '目安'}）
         </p>
-        {plan && plan.days.some((d) => d.shifts.length > 0) && (
-          <div className="stack strategy-plan" role="group" aria-label="作戦の日ごとの時間">
-            <p className="line">
-              <span className="grow">
-                🧭 <strong>{plan.label}（見込み）</strong>：{plan.workDays}日・<strong>{fmtH(plan.hours)}</strong>・約{plan.orders}件・利益 {formatYen(plan.profitYen)}
-                {plan.bonusYen > 0 && `（クエスト+${formatYen(plan.bonusYen)}）`}
-              </span>
-              {planShifts.length > 0 && (
-                <button type="button" className="primary" aria-label="作戦の時間を候補枠に入れる" onClick={() => onAddPlan(planShifts)}>
-                  この提案を候補に追加
-                </button>
-              )}
-            </p>
-            <ul className="list" aria-label="作戦の日ごと">
-              {plan.days
-                .filter((d) => d.shifts.length > 0)
-                .map((d) => (
-                  <li key={d.dayStart} className="stack strategy-row">
-                    <span className="line">
-                      <strong className="strategy-day">{dayLabel(d.dayStart)}</strong>
-                      <span className="grow">{d.shifts.map((x) => `${hm(Date.parse(x.startsAt))}〜${hm(Date.parse(x.endsAt))}`).join('・')}</span>
-                      <span className="num">{fmtH(d.hours)}</span>
-                    </span>
+      </section>
+  )
+
+  /** 提案の日ごとの行で使う、その日の天気の絵 */
+  const dayWeatherIcon = (dayStartIso: string): string | null => {
+    const start = Date.parse(dayStartIso)
+    const d = days.find((x) => x.start <= start && start < x.end)
+    if (!d) return null
+    const { cond } = dayCond(d.date, d.start)
+    return cond ? PLAN_WEATHER_ICONS[cond] : null
+  }
+  const workDays = plan ? plan.days.filter((d) => d.shifts.length > 0) : []
+  const maxDayHours = Math.max(1, ...workDays.map((d) => d.hours))
+
+  /** デザイン案「週間計画・提案」：おすすめの提案のカード・日ごとの行・条件と計算根拠は畳む・下に固定の「この提案を予定に追加」 */
+  const proposal = (
+    <div className="stack strategy-plan" role="group" aria-label="作戦の日ごとの時間">
+      <section className="proposal-card stack" aria-labelledby="week-plan-title">
+        <CardTitle
+          id="week-plan-title"
+          tip="この週の残りの時間で、どの日に・何時から何時まで働くと利益が一番大きいかを、目標ごとに比べます。天気（雨は件数と単価が上がる・荒天は入れない）、混み具合と自分の実績、レンタルの上限（長く1回借りる方が安い）、1日は1回か昼と夜の2回まで（間で返すか借りたままかは安い方）、働ける時間・週の上限・帰宅締切、日跨ぎとピークのクエストの報酬を入れて計算します。目標時給があれば「利益−目標時給×時間」が一番大きいものをおすすめにします。見込みなので実績には入りません。"
+        >
+          💡 おすすめの提案
+        </CardTitle>
+        {needsSetup ? (
+          <p>週に使える時間を設定すると、無理のない範囲で提案します。</p>
+        ) : options.length === 0 || options.every((o) => o.hours === 0) || !plan ? (
+          <p className="hint">この週の残りに働ける時間がないか、働いても得にならない見込みです（働ける時間・週の上限・天気を確かめてください）</p>
+        ) : (
+          <>
+            {options.length > 1 && (
+              <div className="week-options chips" role="radiogroup" aria-label="作戦の選択肢">
+                {options.map((o) => (
+                  <button key={o.key} type="button" role="radio" aria-checked={o.key === plan.key} className="week-option" onClick={() => onSelect(o.key)}>
+                    <strong>{o.label}</strong>
                     <span className="hint">
-                      約{d.orders}件・{formatYen(d.revenueYen)}
-                      {d.rentalYen > 0 && `・🚲${formatYen(d.rentalYen)}${d.shifts.length > 1 ? (d.returnBetween ? '（間で返す）' : '（借りたまま）') : ''}`}
-                      {d.peakBonusYen > 0 && `・ピーク+${formatYen(d.peakBonusYen)}`}
-                      {d.fixed && '・選んだ候補枠'}
+                      {o.workDays}日・{fmtH(o.hours)}・{formatYen(o.profitYen)}
+                      {o.prizeYen > 0 && `・🏆届けば+${formatYen(o.prizeYen)}`}
                     </span>
-                  </li>
+                  </button>
                 ))}
-            </ul>
-          </div>
+              </div>
+            )}
+            <p className="proposal-big num">
+              <strong>{Math.round(plan.hours * 10) / 10}</strong>時間 / <strong>{plan.workDays}</strong>日
+            </p>
+            <p className="proposal-profit">
+              見込み利益 <strong className="num">{formatYen(plan.profitYen)}</strong>
+              {plan.hourlyYen !== null && <span className="hint">（{formatYen(plan.hourlyYen)}/時）</span>}
+            </p>
+            <p className="hint">
+              {plan.label}・約{plan.orders}件・🚲{formatYen(plan.rentalYen)}
+              {plan.bonusYen > 0 && `・クエスト+${formatYen(plan.bonusYen)}`}
+              {plan.prizeYen > 0 && `・🏆届けば+${formatYen(plan.prizeYen)}`}
+            </p>
+            <p className="hint">{estimateNote}・未採用（予定に追加するまで集計に入りません）</p>
+          </>
         )}
       </section>
+      {plan && workDays.length > 0 && (
+        <ul className="list proposal-days" aria-label="作戦の日ごと">
+          {workDays.map((d) => {
+            const dt = new Date(Date.parse(d.dayStart))
+            const icon = dayWeatherIcon(d.dayStart)
+            return (
+              <li key={d.dayStart} className="proposal-day">
+                <span className="day-badge" aria-hidden="true">
+                  <span>{WEEKDAYS[dt.getDay()]}</span>
+                  <strong>{dt.getDate()}</strong>
+                </span>
+                <span className="grow stack">
+                  <span className="visually-hidden">{dayLabel(d.dayStart)}</span>
+                  <span className="num">{d.shifts.map((x) => `${hm(Date.parse(x.startsAt))}–${hm(Date.parse(x.endsAt))}`).join('・')}</span>
+                  <strong className="num">{Math.round(d.hours * 10) / 10}時間</strong>
+                  <span className="day-bar" aria-hidden="true"><span style={{ width: `${(d.hours / maxDayHours) * 100}%` }} /></span>
+                  <span className="hint">
+                    約{d.orders}件・{formatYen(d.revenueYen)}
+                    {d.rentalYen > 0 && `・🚲${formatYen(d.rentalYen)}${d.shifts.length > 1 ? (d.returnBetween ? '（間で返す）' : '（借りたまま）') : ''}`}
+                    {d.peakBonusYen > 0 && `・ピーク+${formatYen(d.peakBonusYen)}`}
+                    {d.fixed && '・選んだ候補枠'}
+                  </span>
+                </span>
+                {icon && <span className="day-weather" role="img" aria-label="天気">{icon}</span>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <details className="more reasons-fold">
+        <summary>条件と計算根拠を見る</summary>
+        <div className="stack">{boardCard}</div>
+      </details>
+      {planShifts.length > 0 && (
+        <div className="settle-bar">
+          <button type="button" className="primary" onClick={() => onAddPlan(planShifts)}>
+            この提案を予定に追加
+          </button>
+        </div>
+      )}
+    </div>
+  )
 
+  return view === 'proposal' ? (
+    proposal
+  ) : (
+    <>
+      {amountCard}
+      {boardCard}
     </>
   )
 }

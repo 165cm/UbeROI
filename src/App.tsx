@@ -92,7 +92,7 @@ function Shell() {
       <main className="app-main" aria-labelledby="page-title">
         {/* メニューに加え、画面の見出しでも現在地を示す */}
         {/* 「今日」は見出しを画面に出さず（カードの題で分かる）、読み上げだけに残す */}
-        <h2 id="page-title" className={tab === 'home' ? 'visually-hidden' : undefined}>{tab === 'offer' ? 'オファー判定' : tab === 'settings' ? '設定' : active?.label}</h2>
+        <h2 id="page-title" className={tab === 'home' ? 'visually-hidden' : undefined}>{tab === 'offer' ? 'オファー判定' : tab === 'settings' ? '設定' : tab === 'plan' ? '週間計画' : active?.label}</h2>
         {tab === 'home' && (
           <Home
             onSettle={(id) => {

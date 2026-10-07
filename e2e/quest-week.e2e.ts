@@ -11,6 +11,7 @@ test('毎週のクエストと候補枠から、届く段階と、足す価値�
 
   // クエストがなければ、計画にカードは出ない
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('heading', { name: /この週の稼働/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: /クエストから見たこの週/ })).toHaveCount(0)
 
@@ -26,6 +27,7 @@ test('毎週のクエストと候補枠から、届く段階と、足す価値�
 
   // 計画：月曜 17〜21時（4時間）の候補枠
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await page.getByRole('button', { name: '候補枠を追加' }).click()
   await page.getByLabel('出発', { exact: true }).fill('17:00')
   await page.getByLabel('帰宅', { exact: true }).fill('21:00')
@@ -67,6 +69,7 @@ test('毎日のクエストは、表示している週のこれからの回を�
   await expect(page.locator('.subcard', { hasText: '毎日クエスト' }).first()).toBeVisible()
 
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   const card = page.getByRole('region', { name: '🎯 クエストから見たこの週' })
   await expect(card.getByText('段階ごとの見込み（1段階）')).toHaveCount(3)
   await expect(card).toContainText(/10\/9.*〜10\/10/)

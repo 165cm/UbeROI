@@ -1775,3 +1775,27 @@ details.time-band[open] { padding-bottom: 14px; }
   .money-field.wide .field { grid-template-columns: 1fr; }
 }
 details.time-band > summary { color: var(--text); }
+
+/* UI刷新 第4段階：デザイン案「週間計画」 */
+.plan-conditions { margin: -6px 0 0; text-align: center; }
+.view-switch { display: grid; grid-template-columns: 1fr 1fr; }
+.view-switch button[aria-selected='true'] { background: var(--estimate); color: #fff; }
+@media (prefers-color-scheme: dark) { .view-switch button[aria-selected='true'] { color: #0e1a2b; } }
+.proposal-card { background: var(--estimate-bg); border: 1px solid color-mix(in srgb, var(--estimate) 25%, transparent); border-radius: 16px; padding: 16px; }
+.proposal-card .card-title h3 { color: var(--estimate); font-size: 1rem; }
+.proposal-big { margin: 0; color: var(--estimate); font-size: 1.5rem; font-weight: 800; line-height: 1.15; }
+.proposal-big strong { font-size: min(3.25rem, 14vw); font-weight: 850; }
+.proposal-profit { margin: 0; color: var(--estimate); font-weight: 700; }
+.proposal-profit strong { font-size: min(2rem, 9vw); font-weight: 850; margin-left: 6px; }
+.week-options.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.week-options.chips > button.week-option { flex: 1 1 8rem; padding: 8px 10px; font-size: .875rem; gap: 2px; min-height: 44px; }
+.week-options.chips .week-option strong { font-size: .9375rem; }
+.proposal-days { display: grid; gap: 8px; }
+.proposal-days > li.proposal-day { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.proposal-day .stack { gap: 2px; }
+.day-badge { display: grid; justify-items: center; min-width: 2.25rem; line-height: 1.1; }
+.day-badge strong { font-size: 1.5rem; font-weight: 850; }
+.day-bar { display: block; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; margin: 4px 0; }
+.day-bar > span { display: block; height: 100%; background: var(--busy-4); border-radius: 3px; }
+.day-weather { font-size: 1.5rem; }
+.reasons-fold > summary { color: var(--estimate); font-weight: 650; text-align: center; }

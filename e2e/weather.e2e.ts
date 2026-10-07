@@ -48,6 +48,7 @@ test('主なエリアの場所（約10kmに丸めた緯度経度だけ）から�
   expect(asked).toEqual([])
 
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByText(/天気：Open-Meteo（気象庁）/)).toBeVisible()
   expect(asked).toHaveLength(1)
   const url = new URL(asked[0]!)
@@ -71,6 +72,7 @@ test('主なエリアの場所（約10kmに丸めた緯度経度だけ）から�
   await page.getByRole('button', { name: /^金 9日の天気/ }).click()
   await expect(page.getByRole('button', { name: '金 9日の天気：雨（手で直した）。押すと変える' })).toHaveText('☔')
   await page.reload()
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('button', { name: '金 9日の天気：雨（手で直した）。押すと変える' })).toBeVisible()
   // 3時間は端末に覚えた予報を使い、取り直さない
   expect(asked).toHaveLength(1)
@@ -88,10 +90,12 @@ test('天気予報が届かない時は、手で入れるよう案内する。�
     return route.fulfill({ status: 503, body: '' })
   })
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByText(/主なエリアに地図の場所を入れると、天気予報を自動で入れます/)).toBeVisible()
   expect(asked).toBe(0)
   await primaryAreaWithCenter(page)
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByText('天気予報を取得できませんでした。日ごとの天気を押して手で入れられます', { exact: false })).toBeVisible()
   await page.getByRole('button', { name: /^土 10日の天気/ }).click()
   await expect(page.getByRole('button', { name: '土 10日の天気：晴れ（手で直した）。押すと変える' })).toBeVisible()

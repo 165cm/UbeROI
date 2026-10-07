@@ -71,8 +71,8 @@ test('この週の実績の時間を上限から引いて、残りの時間に�
   await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
   await page.clock.fastForward('03:00:00')
   await page.getByRole('button', { name: '帰宅して精算' }).click()
-  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('4000')
-  await page.getByRole('button', { name: '✅ 確定して保存' }).click()
+  await page.getByLabel('基本報酬', { exact: true }).fill('4000')
+  await page.getByRole('button', { name: '精算を保存' }).click()
   await expect(page.locator('.list-item').first()).toBeVisible()
 
   // 水曜 17〜21時（4時間）と木曜 17〜20時（3時間）。残りは 6 − 3 = 3時間なので、入るのは木曜だけ

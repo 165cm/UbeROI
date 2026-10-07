@@ -57,6 +57,12 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
 
   const onlineMinutes = s.summaryOnlineSeconds === null ? null : Math.round(s.summaryOnlineSeconds / 60)
 
+  const clock = (iso: string) => new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  const hours = s.returnedAt ? (Date.parse(s.returnedAt) - Date.parse(s.departedAt)) / 3_600_000 : null
+  const ok = !('error' in preview) && preview.errors.length === 0
+  // 件数・天気・メモなど、毎回は入れない項目。入っている時だけ最初から開く
+  const extrasFilled = [s.completedCount !== null, s.weather !== null, Boolean(s.areaLabel || s.note), adjustmentAmount(s, 'other') !== null, onlineMinutes !== null].filter(Boolean).length
+
   return (
     <form
       className="stack settlement-form"
@@ -65,39 +71,35 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         void save('completed')
       }}
     >
-      <details className="card stack" open={!initial.returnedAt}>
-        <summary>時間を確認・修正{initial.returnedAt && `：${new Date(s.departedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} → ${s.returnedAt ? new Date(s.returnedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '未入力'}`}</summary>
-        <div className="row">
-          <DateTimeInput label="出発（自宅を出た時刻）" value={s.departedAt} onChange={(v) => v && set({ departedAt: v })} />
-          <DateTimeInput label="帰宅" value={s.returnedAt} onChange={(v) => set({ returnedAt: v })} tip="空欄なら下書き（確定の集計に入りません）" />
+      <details className="time-band" open={!initial.returnedAt}>
+        <summary>
+          <span className="grow">
+            出発 <strong className="num">{clock(s.departedAt)}</strong> → 帰宅 <strong className="num">{s.returnedAt ? clock(s.returnedAt) : '未入力'}</strong>
+          </span>
+          {hours !== null && hours >= 0 && <strong className="num">{Math.round(hours * 10) / 10}時間</strong>}
+        </summary>
+        <div className="stack">
+          <div className="row">
+            <DateTimeInput label="出発（自宅を出た時刻）" value={s.departedAt} onChange={(v) => v && set({ departedAt: v })} />
+            <DateTimeInput label="帰宅" value={s.returnedAt} onChange={(v) => set({ returnedAt: v })} tip="空欄なら下書き（確定の集計に入りません）" />
+          </div>
         </div>
-        <IntInput
-          label="オンライン時間"
-          unit="分"
-          value={onlineMinutes}
-          onChange={(v) => set({ summaryOnlineSeconds: v === null ? null : v * 60 })}
-          tip="配達アプリをオンラインにしていた合計。自宅との往復は含めない"
-        />
       </details>
 
-      <section className="card stack">
-        <h3>💴 売上</h3>
-        <div className="row">
-          <IntInput label="基本報酬（配送料の合計）" unit="円" value={s.baseYen} onChange={(v) => set({ baseYen: v })} />
-          <IntInput label="チップ" unit="円" value={s.tipsYen} onChange={(v) => set({ tipsYen: v })} />
+      <section className="settle-section stack" aria-labelledby="settle-revenue">
+        <h3 id="settle-revenue">売上</h3>
+        <div className="money-field wide">
+          <IntInput label="基本報酬" unit="円" value={s.baseYen} onChange={(v) => set({ baseYen: v })} tip="配送料の合計（配達アプリの今日の売上の明細）" />
         </div>
-        <div className="row">
-          <IntInput label="確定ボーナス" unit="円" value={adjustmentAmount(s, 'quest')} onChange={(v) => setS((cur) => withAdjustment(cur, 'quest', v))} tip="クエスト・ボーナスのうち、確定した額だけ（見込みは入れない）" />
-          <IntInput label="その他の調整（±）" unit="円" allowNegative value={adjustmentAmount(s, 'other')} onChange={(v) => setS((cur) => withAdjustment(cur, 'other', v))} tip="キャンセル報酬など。マイナスも可" />
-        </div>
-        <div className="row">
-          <IntInput label="完了件数" unit="件" value={s.completedCount} onChange={(v) => set({ completedCount: v })} />
-          <Select label="サービス" value={s.platform} options={(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))} onChange={(v) => set({ platform: v })} />
+        <div className="money-grid">
+          <div className="money-field"><IntInput label="チップ" unit="円" value={s.tipsYen} onChange={(v) => set({ tipsYen: v })} /></div>
+          <div className="money-field"><IntInput label="確定ボーナス" unit="円" value={adjustmentAmount(s, 'quest')} onChange={(v) => setS((cur) => withAdjustment(cur, 'quest', v))} tip="クエスト・ボーナスのうち、確定した額だけ（見込みは入れない）" /></div>
         </div>
       </section>
 
-      <section className="card stack">
+      <section className="settle-section stack" aria-labelledby="settle-cost">
         <CardTitle
+          id="settle-cost"
           right={
             defaultTariff && (
               <button
@@ -114,45 +116,42 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
             )
           }
         >
-          🚲 レンタル
+          経費
         </CardTitle>
-        {s.rentals.length === 0 && <p className="hint">なし（自分の自転車など）</p>}
         {s.rentals.map((r, i) => {
           const est = calculateRental({ tariff: r.tariff, startAt: r.startAt, endAt: r.endAt })
           const update = (patch: Partial<typeof r>) => set({ rentals: s.rentals.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
           return (
-            <div key={r.id} className="subcard stack">
-              <div className="line">
-                <span className="grow hint">{r.tariffName}</span>
-                <span>
-                  見積 <strong>{est.status === 'unsupported' ? '算出不可' : formatYen(est.estimatedYen)}</strong>
-                </span>
-                <button type="button" className="icon danger-text" aria-label="このレンタルを外す" onClick={() => set({ rentals: s.rentals.filter((_, j) => j !== i) })}>
-                  ✕
-                </button>
-              </div>
+            <div key={r.id} className="money-field wide stack">
+              <IntInput
+                label={s.rentals.length > 1 ? `レンタル実請求（${i + 1}）` : 'レンタル実請求'}
+                unit="円"
+                value={r.billedYen}
+                onChange={(v) => update({ billedYen: v })}
+                placeholder={est.status === 'unsupported' ? '算出不可' : `見積 ${formatYen(est.estimatedYen)}`}
+                tip="シェアサイクルのアプリに出た請求額。空欄なら見積を使います。0円も有効です"
+              />
               {est.reason && <p className="hint">{est.reason}</p>}
-              <details><summary>貸出・返却の時刻を修正</summary><div className="row">
-                <DateTimeInput label="貸出" value={r.startAt} onChange={(v) => update({ startAt: v })} />
-                <DateTimeInput label="返却" value={r.endAt} onChange={(v) => update({ endAt: v })} />
-              </div></details>
-              <IntInput label="実請求額" unit="円" value={r.billedYen} onChange={(v) => update({ billedYen: v })} tip="入力すると見積より優先します。0円も有効です" />
+              <details>
+                <summary className="hint">{r.tariffName}・貸出・返却の時刻を修正</summary>
+                <div className="row">
+                  <DateTimeInput label="貸出" value={r.startAt} onChange={(v) => update({ startAt: v })} />
+                  <DateTimeInput label="返却" value={r.endAt} onChange={(v) => update({ endAt: v })} />
+                </div>
+                <button type="button" className="danger-text" onClick={() => set({ rentals: s.rentals.filter((_, j) => j !== i) })}>
+                  このレンタルを外す
+                </button>
+              </details>
             </div>
           )
         })}
-      </section>
-
-      <section className="card stack">
-        <CardTitle
-          right={
-            <button type="button" className="icon" aria-label="経費を追加" onClick={() => set({ directExpenses: [...s.directExpenses, { id: newId(), category: 'other', amountYen: 0, memo: '' }] })}>
-              ＋
-            </button>
-          }
-        >
-          🧾 その他の経費
-        </CardTitle>
-        {s.directExpenses.length === 0 && <p className="hint">なし</p>}
+        <div className="line">
+          <strong className="grow">その他</strong>
+          <button type="button" className="icon" aria-label="経費を追加" onClick={() => set({ directExpenses: [...s.directExpenses, { id: newId(), category: 'other', amountYen: 0, memo: '' }] })}>
+            ＋
+          </button>
+        </div>
+        {s.directExpenses.length === 0 && <p className="hint">なし（＋で追加）</p>}
         {s.directExpenses.map((e, i) => (
           <div key={e.id} className="row">
             <IntInput label="金額" unit="円" value={e.amountYen} onChange={(v) => set({ directExpenses: s.directExpenses.map((x, j) => (j === i ? { ...x, amountYen: v ?? 0 } : x)) })} />
@@ -164,60 +163,88 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         ))}
       </section>
 
-      <section className="card stack" aria-labelledby="session-weather-title">
-        <CardTitle id="session-weather-title" tip="天気ごとの時給・件数を分析と計画（雨の日の倍率）に使います。走っていた時間の多くの天気を1つ選んでください">
-          🌦️ 天気
-        </CardTitle>
-        <div className="buttons weather-chips" role="group" aria-label="天気">
-          {(Object.keys(WEATHER_LABELS) as Weather[]).map((w) => (
-            <button key={w} type="button" aria-pressed={s.weather === w} onClick={() => set({ weather: s.weather === w ? null : w })}>
-              {WEATHER_LABELS[w]}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <details className="card fold" open={memoOpen} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
+      <details className="card fold extras" open={memoOpen || extrasFilled > 0 || undefined} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
         <summary>
-          <strong>🏷️ エリア・メモ</strong>
-          <span className="hint">{[s.areaLabel, s.note].filter(Boolean).join('・') || '任意'}</span>
+          <strong>📝 件数・天気・メモを追加</strong>
+          <span className="hint">{[s.completedCount !== null && `${s.completedCount}件`, s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note].filter(Boolean).join('・') || '任意'}</span>
         </summary>
         <div className="stack">
+          <div className="row">
+            <IntInput label="完了件数" unit="件" value={s.completedCount} onChange={(v) => set({ completedCount: v })} />
+            <Select label="サービス" value={s.platform} options={(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))} onChange={(v) => set({ platform: v })} />
+          </div>
+          <div role="group" aria-labelledby="session-weather-title" className="stack">
+            <CardTitle id="session-weather-title" tip="天気ごとの時給・件数を分析と計画（雨の日の倍率）に使います。走っていた時間の多くの天気を1つ選んでください">
+              🌦️ 天気
+            </CardTitle>
+            <div className="buttons weather-chips" role="group" aria-label="天気">
+              {(Object.keys(WEATHER_LABELS) as Weather[]).map((w) => (
+                <button key={w} type="button" aria-pressed={s.weather === w} onClick={() => set({ weather: s.weather === w ? null : w })}>
+                  {WEATHER_LABELS[w]}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="row">
             <TextInput label="エリア（任意）" value={s.areaLabel} onChange={(v) => set({ areaLabel: v })} placeholder="例：駅前" />
             <TextInput label="メモ（任意）" value={s.note} onChange={(v) => set({ note: v })} />
           </div>
+          <div className="row">
+            <IntInput label="その他の調整（±）" unit="円" allowNegative value={adjustmentAmount(s, 'other')} onChange={(v) => setS((cur) => withAdjustment(cur, 'other', v))} tip="キャンセル報酬など。マイナスも可" />
+            <IntInput
+              label="オンライン時間"
+              unit="分"
+              value={onlineMinutes}
+              onChange={(v) => set({ summaryOnlineSeconds: v === null ? null : v * 60 })}
+              tip="配達アプリをオンラインにしていた合計。自宅との往復は含めない"
+            />
+          </div>
         </div>
       </details>
 
-      <section className="card stack settlement-result" aria-live="polite">
-        <CardTitle tip={<>税引前。毎月の固定費と装備の配賦は、分析で月ごとに配ります。{!s.returnedAt && '帰宅が未入力なので、レンタルは今の時刻までの見積です。'}</>}>🧮 計算明細</CardTitle>
-        <p className="hint">税引前・出発〜帰宅の時間で計算。固定費と装備費は月の分析で反映します。</p>
+      <section className="settlement-result stack" aria-live="polite" aria-labelledby="settle-result-title">
+        <h3 id="settle-result-title" className="visually-hidden">今日の利益</h3>
         {'error' in preview ? (
           <Problems items={preview.error} />
         ) : (
           <>
-            <dl className="stats">
-              <div><dt>売上</dt><dd>{formatYen(preview.revenueYen)}</dd></div>
-              <div><dt>− レンタル</dt><dd>{formatYen(preview.rentalYen)}</dd></div>
-              <div><dt>− その他経費</dt><dd>{formatYen(preview.directExpenseYen)}</dd></div>
-              <div><dt>＝ 営業純利益</dt><dd className="big">{formatYen(preview.operatingProfitYen)}</dd></div>
-              <div><dt>営業純時給（出発〜帰宅）</dt><dd>{preview.hourlyYen === null ? '算出不可' : `${formatYen(preview.hourlyYen)}/時`}</dd></div>
-              <div><dt>売上時給（オンライン中）</dt><dd>{preview.onlineRevenueHourlyYen === null ? '算出不可' : `${formatYen(preview.onlineRevenueHourlyYen)}/時`}</dd></div>
-            </dl>
+            <div className="result-row">
+              <div>
+                <span className="label">今日の利益</span>
+                <strong className="result-big num">{formatYen(preview.operatingProfitYen)}</strong>
+              </div>
+              <div className="result-hourly">
+                <span className="label">実質時給</span>
+                <strong className="num">{preview.hourlyYen === null ? '算出不可' : formatYen(preview.hourlyYen)}</strong>
+                {preview.hourlyYen !== null && <span className="unit">/時間</span>}
+              </div>
+            </div>
+            <details>
+              <summary className="hint">🧮 計算明細</summary>
+              <dl className="stats">
+                <div><dt>売上</dt><dd>{formatYen(preview.revenueYen)}</dd></div>
+                <div><dt>− レンタル</dt><dd>{formatYen(preview.rentalYen)}</dd></div>
+                <div><dt>− その他経費</dt><dd>{formatYen(preview.directExpenseYen)}</dd></div>
+                <div><dt>売上時給（オンライン中）</dt><dd>{preview.onlineRevenueHourlyYen === null ? '算出不可' : `${formatYen(preview.onlineRevenueHourlyYen)}/時`}</dd></div>
+              </dl>
+            </details>
             <Problems items={preview.errors} />
           </>
         )}
+        <p className="hint">
+          税引前・出発〜帰宅の時間で計算。固定費・装備費は月の分析で反映
+          {!s.returnedAt && '。帰宅が未入力なので、レンタルは今の時刻までの見積です'}
+        </p>
       </section>
 
       <Problems items={problems} />
-      <div className="actions settlement-actions">
-        {s.returnedAt && s.baseYen !== null && !('error' in preview) && preview.errors.length === 0 && <p className="settlement-summary">今回の利益 <strong>{formatYen(preview.operatingProfitYen)}</strong> · 時給 {preview.hourlyYen === null ? '算出不可' : `${formatYen(preview.hourlyYen)}/時`}</p>}
+      <div className="settlement-actions">
+        {s.returnedAt && s.baseYen !== null && ok && <p className="settlement-summary">今回の利益 <strong>{formatYen(preview.operatingProfitYen)}</strong> · 時給 {preview.hourlyYen === null ? '算出不可' : `${formatYen(preview.hourlyYen)}/時`}</p>}
         <button type="submit" className="primary" disabled={!s.returnedAt}>
-          ✅ 確定して保存
+          精算を保存
         </button>
-        <button type="button" onClick={() => void save('draft')}>
-          📝 下書き保存
+        <button type="button" className="outline" onClick={() => void save('draft')}>
+          下書き保存
         </button>
       </div>
     </form>

@@ -16,6 +16,11 @@ const STATUS_LABELS: Record<SessionRecord['status'], string> = {
   completed: '✅ 確定',
 }
 
+/** 出発が今日（端末の日付）か */
+function isToday(iso: string): boolean {
+  return new Date(iso).toDateString() === new Date().toDateString()
+}
+
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })
 }
@@ -34,11 +39,14 @@ export function Records({ editId, onEdit }: { editId: string | null; onEdit: (id
   if (editing) {
     return (
       <div className="stack">
-        <div className="page-head">
-          <button type="button" className="link back" onClick={() => (setCreating(null), onEdit(null))}>
-            ← 一覧
+        <div className="settle-head">
+          <button type="button" className="icon back-button" aria-label="一覧に戻る" onClick={() => (setCreating(null), onEdit(null))}>
+            ←
           </button>
-          <h3>{creating ? '記録を追加' : `${formatDateTime(editing.departedAt)} の記録`}</h3>
+          <div className="settle-title">
+            <h3>{creating ? '記録を追加' : editing.status === 'completed' ? '記録の編集' : isToday(editing.departedAt) ? '今日の精算' : '精算'}</h3>
+            <span className="hint">{creating ? '過去の稼働' : formatDateTime(editing.departedAt)}</span>
+          </div>
         </div>
         <SessionForm
           key={editing.id}

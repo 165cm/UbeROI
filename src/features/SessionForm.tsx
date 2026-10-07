@@ -59,14 +59,14 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
 
   return (
     <form
-      className="stack"
+      className="stack settlement-form"
       onSubmit={(e) => {
         e.preventDefault()
         void save('completed')
       }}
     >
-      <section className="card stack">
-        <h3>⏱️ 時間</h3>
+      <details className="card stack" open={!initial.returnedAt}>
+        <summary>時間を確認・修正{initial.returnedAt && `：${new Date(s.departedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} → ${s.returnedAt ? new Date(s.returnedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '未入力'}`}</summary>
         <div className="row">
           <DateTimeInput label="出発（自宅を出た時刻）" value={s.departedAt} onChange={(v) => v && set({ departedAt: v })} />
           <DateTimeInput label="帰宅" value={s.returnedAt} onChange={(v) => set({ returnedAt: v })} tip="空欄なら下書き（確定の集計に入りません）" />
@@ -78,7 +78,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
           onChange={(v) => set({ summaryOnlineSeconds: v === null ? null : v * 60 })}
           tip="配達アプリをオンラインにしていた合計。自宅との往復は含めない"
         />
-      </section>
+      </details>
 
       <section className="card stack">
         <h3>💴 売上</h3>
@@ -132,10 +132,10 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
                 </button>
               </div>
               {est.reason && <p className="hint">{est.reason}</p>}
-              <div className="row">
+              <details><summary>貸出・返却の時刻を修正</summary><div className="row">
                 <DateTimeInput label="貸出" value={r.startAt} onChange={(v) => update({ startAt: v })} />
                 <DateTimeInput label="返却" value={r.endAt} onChange={(v) => update({ endAt: v })} />
-              </div>
+              </div></details>
               <IntInput label="実請求額" unit="円" value={r.billedYen} onChange={(v) => update({ billedYen: v })} tip="入力すると見積より優先します。0円も有効です" />
             </div>
           )
@@ -190,8 +190,9 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         </div>
       </details>
 
-      <section className="card stack" aria-live="polite">
+      <section className="card stack settlement-result" aria-live="polite">
         <CardTitle tip={<>税引前。毎月の固定費と装備の配賦は、分析で月ごとに配ります。{!s.returnedAt && '帰宅が未入力なので、レンタルは今の時刻までの見積です。'}</>}>🧮 計算明細</CardTitle>
+        <p className="hint">税引前・出発〜帰宅の時間で計算。固定費と装備費は月の分析で反映します。</p>
         {'error' in preview ? (
           <Problems items={preview.error} />
         ) : (
@@ -210,7 +211,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
       </section>
 
       <Problems items={problems} />
-      <div className="actions">
+      <div className="actions settlement-actions">
         <button type="submit" className="primary" disabled={!s.returnedAt}>
           ✅ 確定して保存
         </button>

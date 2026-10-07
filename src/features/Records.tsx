@@ -23,6 +23,7 @@ function formatDateTime(iso: string): string {
 export function Records({ editId, onEdit }: { editId: string | null; onEdit: (id: string | null) => void }) {
   const { db } = useData()
   const sessions = useLiveQuery(() => db.sessions.orderBy('departedAt').reverse().toArray(), [db])
+  const [filter, setFilter] = useState<'all' | 'draft'>('all')
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
   const [creating, setCreating] = useState<SessionRecord | null>(null)
   const closeNotice = useCallback(() => setNotice(null), [])
@@ -72,11 +73,16 @@ export function Records({ editId, onEdit }: { editId: string | null; onEdit: (id
       <button type="button" onClick={() => setCreating(emptySession(new Date(Date.now() - 3 * 3_600_000).toISOString(), 'draft'))}>
         ＋ 過去の稼働をまとめて入力
       </button>
+      <div className="segmented wrap" role="group" aria-label="記録の絞り込み">
+        <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>すべて</button>
+        <button type="button" aria-pressed={filter === 'draft'} onClick={() => setFilter('draft')}>未精算・下書き（{sessions.filter((s) => s.status === 'draft').length}）</button>
+      </div>
+      {filter === 'draft' && !sessions.some((s) => s.status === 'draft') && <p className="card">未精算・下書きはありません。</p>}
       {sessions.length === 0 ? (
         <p className="card hint">まだ記録がありません。ホームの「出発」か、上のボタンから入力します。</p>
       ) : (
         <ul className="list">
-          {sessions.map((s) => {
+          {sessions.filter((s) => filter === 'all' || s.status === 'draft').map((s) => {
             let main = ''
             let sub = ''
             try {

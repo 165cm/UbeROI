@@ -27,4 +27,13 @@ test('クエストの進捗の画面のスクショから、期間と段階を�
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.locator('.subcard', { hasText: '日跨ぎクエスト' })).toContainText('0件／あと40件で+3,770円')
   expect(external).toEqual([])
+
+  // 保存済みのクエストを開いて読み取り直しても、付けた名前は変えない
+  await page.locator('.subcard', { hasText: '日跨ぎクエスト' }).getByRole('button', { name: '日跨ぎクエストを編集・件数の調整' }).click()
+  await page.getByLabel('名前', { exact: true }).fill('週末50回ボーナス')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await page.locator('.subcard', { hasText: '週末50回ボーナス' }).getByRole('button', { name: '週末50回ボーナスを編集・件数の調整' }).click()
+  await page.getByLabel('📷 スクショから読み取る').setInputFiles('e2e/fixtures/quest-weekend.png')
+  await expect(page.getByRole('status').filter({ hasText: '読み取りました' })).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByLabel('名前', { exact: true })).toHaveValue('週末50回ボーナス')
 })

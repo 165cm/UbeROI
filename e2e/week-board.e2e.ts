@@ -112,10 +112,10 @@ test('この週の実績の時間を上限から引いて、残りの時間に�
   await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').first()).toContainText('3h')
 })
 
-test('クエストの次の段階まで足す時間を逆算し、その時間を働くとよい時間を帯に出して、まとめて候補枠に入れられる', async ({ page }) => {
+test('クエスト達成に足す時間を逆算し、作戦の時間を帯に出して、まとめて候補枠に入れられる。作戦の軸でないクエストは 🎯 で出す', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
   await addBusyArea(page)
-  // 平日クエスト：20件で +3,000円、今 4件
+  // 平日クエスト（Uber）：20件で +3,000円、今 4件。週の終わりまでの出前館のクエスト：10件で +1,000円
   await page.goto('#home')
   await page.getByRole('button', { name: 'クエストを追加' }).click()
   await page.getByRole('button', { name: '🔁 毎週の平日（月4:00〜金4:00）' }).click()
@@ -125,8 +125,17 @@ test('クエストの次の段階まで足す時間を逆算し、その時間�
   await page.getByLabel('この回の件数の調整（±）', { exact: true }).fill('4')
   await page.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.locator('.subcard', { hasText: '平日クエスト' })).toContainText('4件／あと16件')
+  await page.getByRole('button', { name: 'クエストを追加' }).click()
+  await page.getByLabel('名前', { exact: true }).fill('出前館の週')
+  await page.getByLabel('対象のサービス', { exact: true }).selectOption({ index: 1 })
+  await page.getByLabel('開始', { exact: true }).fill('2026-10-05T04:00')
+  await page.getByLabel('終了', { exact: true }).fill('2026-10-12T04:00')
+  await page.getByLabel('第1段階の件数', { exact: true }).fill('10')
+  await page.getByLabel('報酬', { exact: true }).fill('1000')
+  await page.getByRole('button', { name: '💾 保存' }).click()
+  await expect(page.locator('.subcard', { hasText: '出前館の週' })).toBeVisible()
 
-  // 月曜 17〜21時（4時間 × 2件 = 8件）を入れると 12件。20件まで あと8件 = 4時間
+  // 月曜 17〜21時の候補枠
   await page.goto('#plan')
   await page.getByRole('button', { name: '候補枠を追加' }).click()
   await page.getByLabel('出発', { exact: true }).fill('17:00')
@@ -134,26 +143,33 @@ test('クエストの次の段階まで足す時間を逆算し、その時間�
   await page.getByRole('button', { name: '🔮 見込みを自動で入れる' }).click()
   await page.getByRole('button', { name: '💾 保存' }).click()
 
+  // 先に終わる平日クエストが作戦の軸：あと16件を 月〜木に4件ずつ（2時間ずつ）。月曜は候補枠の4時間で足り、余りの2時間で木曜をまかなう
+  const plan = page.getByRole('group', { name: 'クエスト作戦の時間' })
+  await expect(plan).toContainText('🧭 平日クエスト 本命20件：この週 8h')
+  const days = plan.getByRole('list', { name: '作戦の日ごとの時間' }).getByRole('listitem')
+  await expect(days).toHaveCount(4)
+  await expect(days.nth(0)).toContainText('選んだ枠で足りる')
+  await expect(days.nth(1)).toContainText('火 10/6')
+  await expect(days.nth(1)).toContainText('17:00〜19:00')
+  await expect(days.nth(2)).toContainText('17:00〜19:00')
+  await expect(days.nth(3)).toContainText('ほかの日の選んだ枠でまかなう')
+  // 帯にも、火曜の行に 🎯 の時間が出る（作戦の 17〜19時と、出前館のための1時間）。「稼げそうな時間」は作戦の時間と重ならない
+  await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').nth(1).locator('.wb-quest')).toHaveCount(2)
+  await expect(page.getByRole('list', { name: '稼げそうな時間' })).not.toContainText('10/6(火) 17:00')
+  // 作戦の軸でない出前館のクエストは 🎯：計画の8件（4時間×2件）で、あと2件＝1時間
   const targets = page.getByRole('list', { name: 'クエストのための時間' }).getByRole('listitem')
   await expect(targets).toHaveCount(1)
-  await expect(targets.first()).toContainText('🎯 平日クエスト 第1段階（+3,000円）まで あと4h')
-  // 月曜の夜は予定ずみ。段階4の 火曜 17〜20時 と、続く 20〜21時 を1つにまとめて 17〜21時
-  await expect(targets.first()).toContainText('10/6(火) 17:00〜21:00')
-  await expect(targets.first()).toContainText('純時給 1,550円/時')
-  // 帯にも、火曜の行に 🎯 の時間が出る
-  await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').nth(1).locator('.wb-quest')).toHaveCount(1)
-  // 「稼げそうな時間」は、🎯 の時間と重ならない
-  await expect(page.getByRole('list', { name: '稼げそうな時間' })).not.toContainText('10/6(火) 17:00')
+  await expect(targets.first()).toContainText('🎯 出前館の週 第1段階（+1,000円）まで あと1h')
 
-  // ＋で、まとめて候補枠に入れる → 計画で第1段階に届くので、🎯 の行は消える
-  await targets.first().getByRole('button', { name: '平日クエストのための時間を候補枠に入れる' }).click()
-  await expect(page.getByText('🎯 1つの候補枠を入れました')).toBeVisible()
-  await expect(page.getByRole('button', { name: /10\/6\(火\) 17:00〜21:00（✅ おすすめ）を編集/ })).toBeVisible()
-  await expect(page.getByRole('list', { name: 'クエストのための時間' })).toHaveCount(0)
+  // ＋で作戦の時間をまとめて候補枠に入れる → 作戦は選んだ枠で足りる
+  await plan.getByRole('button', { name: '作戦の時間を候補枠に入れる' }).click()
+  await expect(page.getByText('🎯 2つの候補枠を入れました')).toBeVisible()
+  await expect(page.getByRole('button', { name: /10\/6\(火\) 17:00〜19:00（✅ おすすめ）を編集/ })).toBeVisible()
+  await expect(days.nth(1)).toContainText('選んだ枠で足りる')
   await expect(page.getByRole('region', { name: '🎯 クエストから見たこの週' })).toContainText('計画（8h）どおりなら 20件（第1段階まで・+3,000円）')
 
   // ↩ 元に戻すと、入れた枠は消える
   await page.getByRole('button', { name: '↩ 元に戻す' }).click()
-  await expect(page.getByRole('list', { name: 'クエストのための時間' }).getByRole('listitem')).toHaveCount(1)
+  await expect(days.nth(1)).toContainText('17:00〜19:00')
+  await expect(page.getByRole('button', { name: /10\/6\(火\) 17:00〜19:00/ })).toHaveCount(0)
 })
-

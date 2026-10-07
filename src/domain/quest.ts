@@ -114,7 +114,7 @@ export interface QuestProgress {
 }
 
 /** 段階の額から、達成した合計と次の上乗せ額を出す（仕様 05：累積なら差分、上乗せならその額） */
-function tierGains(mode: QuestInput['rewardMode'], tiers: readonly QuestTier[]): number[] {
+export function tierGains(mode: QuestInput['rewardMode'], tiers: readonly QuestTier[]): number[] {
   return tiers.map((t, i) => (mode === 'cumulative' ? t.rewardYen - (i === 0 ? 0 : tiers[i - 1]!.rewardYen) : t.rewardYen))
 }
 

@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   SCENARIOS,
+  availabilityRanges,
+  scheduleStrategy,
   deadlineMs,
   suggestHours,
   suggestWindows,
@@ -31,7 +33,8 @@ import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot, saveSlots
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
 import { QuestWeek, questWeekItems } from './QuestWeek'
-import { WeekBoard, type QuestTarget } from './WeekBoard'
+import { WeekBoard, type QuestTarget, type StrategyPlan } from './WeekBoard'
+import { QuestStrategyCard, buildStrategy, goalIndexOf } from './QuestStrategyCard'
 import { AreaRoutePlan } from './AreaRoutePlan'
 
 /** 7日の帯に出すクエストの数の上限（毎日のクエストなどで帯が埋まらないように） */
@@ -80,6 +83,8 @@ export function Plan() {
   }), [db])
   const [anchor, setAnchor] = useState(localToday())
   const [scenario, setScenario] = useState<Scenario>('standard')
+  // 🧭 クエスト作戦で選んでいる目標（null＝本命）。帯の作戦の時間と同じものを使う
+  const [goalPick, setGoalPick] = useState<number | null>(null)
   const [editing, setEditing] = useState<SlotRecord | null>(null)
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
 
@@ -160,6 +165,9 @@ export function Plan() {
   const homeDeadline = data.settings?.homeDeadline ?? null
   const estimate = (st: string, e: string) => estimateRevenue(st, e, past, busyness).revenueYen
   const deadline = homeDeadline ? (st: string) => deadlineMs(st, homeDeadline) : null
+  // 働ける時間（設定）。この週の中の区間。未設定なら制限なし
+  const availability = data.settings?.availability ?? null
+  const allowed = availability ? availabilityRanges(availability, Date.parse(weekStartIso), Date.parse(weekEndIso)) : null
   // クエスト：計画で届かない次の段階まで、あと何時間か（逆算）と、その時間をどこで働くか
   const questInput = {
     now: nowIso,
@@ -174,9 +182,39 @@ export function Plan() {
   }
   const questTargets: QuestTarget[] = []
   const taken: { startsAt: string; endsAt: string }[] = [...inWeek, ...done]
+  // 🧭 クエスト作戦：選んだ目標の日ごとの時間を、働ける時間の中の実際の時間に置く（帯に出す）
+  const strategy = buildStrategy(questInput, allowed)
+  const strategyPlan: StrategyPlan | null = (() => {
+    if (!strategy) return null
+    const goal = strategy.strategy.goals[goalIndexOf(strategy.strategy, goalPick)]!
+    const sched = scheduleStrategy({
+      now: nowIso,
+      goal,
+      peaks: strategy.strategy.peaks,
+      allowed,
+      busy: taken,
+      planned: questInput.chosenSlots,
+      busyness,
+      estimate,
+      deadline,
+      ordersPerHour: strategy.rate.rate,
+    })
+    taken.push(...sched.windows)
+    return {
+      label: strategy.main.q.label,
+      target: goal.target,
+      goalName: goalIndexOf(strategy.strategy, goalPick) === strategy.strategy.goals.length - 1 ? '本命' : goalIndexOf(strategy.strategy, goalPick) === 0 ? '最低' : `第${goal.tier}段階`,
+      days: sched.days,
+      windows: sched.windows,
+      hours: sched.hours,
+      shortHours: sched.shortHours,
+    }
+  })()
   // 先に終わる回から（§5.8）
   const questItems = [...questWeekItems(questInput).items].sort((a, b) => a.occ.endsAt.localeCompare(b.occ.endsAt))
   for (const { q, occ, plan: qp } of questItems) {
+    // 作戦で扱うクエスト（日跨ぎと、そのピーク）は作戦の時間に入っているので重ねない
+    if (strategy?.keys.has(`${q.id}-${occ.index}`)) continue
     const goal = qp.tiers.find((t) => !t.reachedByPlan && t.possible)
     if (!goal || goal.extraHours <= 0 || questTargets.length >= MAX_QUEST_TARGETS) continue
     const found = busyness
@@ -185,6 +223,7 @@ export function Plan() {
           from: occ.startsAt > weekStartIso ? occ.startsAt : weekStartIso,
           to: occ.endsAt < weekEndIso ? occ.endsAt : weekEndIso,
           busyness,
+          allowed,
           busy: taken,
           estimate,
           deadline,
@@ -205,7 +244,7 @@ export function Plan() {
     })
   }
   const suggestions = busyness
-    ? suggestWindows({ now: nowIso, from: weekStartIso, to: weekEndIso, busyness, busy: taken, estimate, deadline })
+    ? suggestWindows({ now: nowIso, from: weekStartIso, to: weekEndIso, busyness, allowed, busy: taken, estimate, deadline })
     : []
   /** おすすめの時間から、見込みを入れた候補枠の入力を開く */
   const fromSuggestion = (w: { startsAt: string; endsAt: string }): SlotRecord => {
@@ -260,6 +299,8 @@ export function Plan() {
         onEdit={(id) => setEditing(inWeek.find((s) => s.id === id) ?? null)}
         onAddSuggestion={(w) => setEditing(fromSuggestion(w))}
         questTargets={questTargets}
+        strategyPlan={strategyPlan}
+        allowed={allowed}
         onAddQuestWindows={async (windows) => {
           const slots = windows.map(fromSuggestion)
           try {
@@ -275,6 +316,7 @@ export function Plan() {
         }}
       />
 
+      {strategy && <QuestStrategyCard data={strategy} picked={goalPick} onPick={setGoalPick} />}
       <QuestWeek {...questInput} onAddSlot={() => setEditing(newSlot())} />
 
       <details className="more">

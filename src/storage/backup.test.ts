@@ -260,4 +260,21 @@ describe('データの版の移行（版4）とエリアの検証', () => {
     b.datasets.areas = [{ ...area, moveMinutes: 2.5 }]
     expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
   })
+
+  it('版10（働ける時間がない頃）のバックアップもそのまま復元でき、形の壊れた働ける時間は復元しない', async () => {
+    const b = await createBackup(db, 'real')
+    const settings = b.datasets.settings[0]!
+    expect(parseBackup(JSON.stringify({ ...b, schema_version: 10 })).ok).toBe(true)
+    const week = Array.from({ length: 7 }, (_, d) => (d === 0 || d === 6 ? [{ start: '10:00', end: '22:00' }] : [{ start: '19:00', end: '23:00' }]))
+    b.datasets.settings = [{ ...settings, availability: week }]
+    const ok = parseBackup(JSON.stringify(b))
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      await restoreBackup(db, ok.backup)
+      expect((await db.settings.get('settings'))?.availability).toEqual(week)
+    }
+    b.datasets.settings = [{ ...settings, availability: [[{ start: '25:00', end: '22:00' }]] }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
 })
+

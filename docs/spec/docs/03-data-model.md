@@ -31,6 +31,7 @@ IDはUUID、金額は整数円、割合は0〜10000のbasis points、日時はIS
 - 実績集計はcompletedのみ。active/draftはホーム上の暫定欄だけに出す。
 - 派生指標は原則保存しない。保存する場合はcalculation_versionと入力hashで無効化。
 - インデックス: Session(returned_at), Delivery(session_id), Expense(allocation_month), Rental(session_id), Asset(in_service_month), StationSnapshot(station_id,observed_at)。
+- 設定の働ける時間（版11）: settings.availability＝曜日（0＝日〜6＝土）ごとの時間帯 {start, end}（HH:mm・1日3つまで）の配列。null／未定義は制限なし。版10までのバックアップは制限なしとして復元する。
 - バックアップ形式: {schema_version, exported_at, app_version, datasets:{settings:[],sessions:[],...}}。復元は全体置換のみをMVPとし、マージを実装しない。
 
 ## CSV v1（独自形式）

@@ -27,6 +27,8 @@
 | `src/domain/quest.ts` | 選択制クエストの期間、クエストの進み具合、休憩前の返却で節約できる額 |
 | `src/domain/areaRoute.ts` | 時間帯ごとのエリア計画（正時で区切り、移動の分と1回200円を引いて、どの時間にどのエリアにいるかを選ぶ） |
 | `src/domain/weekBoard.ts` | 計画の「💡 空いている、稼げそうな時間」（予定のない3時間の枠を、見込みの大きい順に1日1つ・最大3つ）と、クエストのための時間（必要な時間を見込みの大きい枠で埋める `suggestHours`） |
+| `src/domain/questStrategy.ts` | クエスト作戦表（日跨ぎ＋ピーク：段階ごとに残りの日の件数・時間・報酬・1件あたりの上乗せ）と、作戦の時間を働ける時間の中の実際の時間に置く `scheduleStrategy` |
+| `src/domain/availability.ts` | 働ける時間（曜日ごとの時間帯・プリセット・週の区間への展開・検証） |
 | `src/domain/questPlan.ts` | クエストを軸にした週の組み立て（1時間あたりの件数、計画で届く段階、次の段階まで足す時間とボーナス込みの純時給） |
 | `src/domain/continuation.ts` | 続けるか帰るか：追加の利益・増えるレンタル代・追加の時給と GO/WAIT/STOP の判定 |
 | `src/domain/planning.ts` | 計画：売上の見込み（本人の実績／参考資料の推計）、候補枠の評価、週の最適な組み合わせ、装備の回収の目安 |
@@ -51,6 +53,8 @@
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集・📷 スクショから読み取り |
 | `src/features/ocr.ts` | 端末の中の文字認識（tesseract.js・日本語）。必要なファイルは `ocr/` から使う時だけ読み込む |
 | `src/features/AreaRoutePlan.tsx` | 計画の「🧭 時間帯ごとのエリア計画」：候補枠を選び、エリアの順番と、ずっと主なエリアにいる場合との差 |
+| `src/features/AvailabilitySettings.tsx` | 設定 → 基本の「🕒 働ける時間」：プリセット・曜日ごとの時間帯の編集 |
+| `src/features/QuestStrategyCard.tsx` | 計画の「🧭 クエスト作戦」：最低・本命の切り替え、日ごとの件数（ピーク・ほか）と時間、ピークの注意 |
 | `src/features/QuestWeek.tsx` | 計画の「🎯 クエストから見たこの週」：届く段階・足す時間・純時給 |
 | `src/features/CashChange.tsx` | ホームの「💴 お釣り」 |
 | `src/features/OfferJudge.tsx` | オファー判定（`#offer`。設定でオンの時だけ。手入力の報酬・分・km・届け先の地名で判定。前のショートカットの text=・cfg= も読めるが案内はしない）、判定の基準、持ち帰り／取り込み、地名の評価の一覧 |
@@ -85,7 +89,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
+- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない。版11で働ける時間 `availability` を追加、未定義は制限なし）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`

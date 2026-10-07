@@ -37,7 +37,7 @@ function monthDay(nowMs: number, month: number, day: number, hour: number, minut
   return new Date(best).toISOString()
 }
 
-/** 「水曜日 午後4時30分」を、今から見て次のその曜日・時刻（今日のまだ来ていない時刻を含む）の日本時間にする */
+/** 「水曜日 午後4時30分」を、基準の時刻から見て次のその曜日・時刻（同じ日のまだ来ていない時刻を含む）の日本時間にする */
 function nextWeekdayTime(nowMs: number, weekday: number, hour: number, minute: number): string {
   const jstNow = new Date(nowMs + JST)
   const today = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate(), hour, minute) - JST
@@ -66,13 +66,14 @@ export function parseQuestText(text: string, nowIso: string): QuestReading {
     endsAt = monthDay(nowMs, Number(m), Number(d), Number(h), Number(mi))
   }
   // 開始・終了：「クエストの開始は水曜日午後4時30分です」（期間が出ていない画面）
-  const at = (word: string) => {
+  const at = (word: string, baseMs: number) => {
     const r = joined.match(new RegExp(`${word}は([${WEEKDAYS}])曜日?(午前|午後)?(\\d{1,2})時(\\d{1,2})分`))
     if (!r) return null
-    return nextWeekdayTime(nowMs, WEEKDAYS.indexOf(r[1]!), to24(r[2], Number(r[3])), Number(r[4]))
+    return nextWeekdayTime(baseMs, WEEKDAYS.indexOf(r[1]!), to24(r[2], Number(r[3])), Number(r[4]))
   }
-  startsAt ??= at('開始')
-  endsAt ??= at('終了')
+  startsAt ??= at('開始', nowMs)
+  // 終了は、開始より後の最初のその曜日・時刻（開始が来週になったら、終了も来週）
+  endsAt ??= at('終了', startsAt ? Date.parse(startsAt) : nowMs)
 
   // 段階：「40回の乗車 ¥3,770」「10回の乗車 +¥1,170」。件数は段階ごとに足していく（1回目の段階も含めて）
   const tiers: QuestTier[] = []

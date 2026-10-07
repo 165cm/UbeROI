@@ -32,3 +32,22 @@ test('4つのメニューから未精算を再開し、明暗・縦横・拡大�
   await page.getByRole('button', { name: 'すべて', exact: true }).click()
   await expect(page.locator('.record-item')).toContainText('7,180円')
 })
+
+test('稼働中の主な操作は52px以上。昼下がりは休憩の比較が折りたたみの外で自動で開く', async ({ page }) => {
+  // 昼下がり（注文が少なめの時間）
+  await page.clock.install({ time: new Date('2026-10-07T14:00:00+09:00') })
+  await page.goto('#home')
+  const depart = page.getByRole('button', { name: '🏠 自宅を出発' })
+  expect((await depart.boundingBox())!.height).toBeGreaterThanOrEqual(52)
+  await depart.click()
+  const start = page.getByRole('button', { name: '🚲 レンタル開始' })
+  expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(52)
+  await start.click()
+  const back = page.getByRole('button', { name: '🅿️ 返却した' })
+  await expect(back).toBeVisible()
+  expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(52)
+  // 料金の上限・乗る長さごとの料金は畳んだまま、休憩の比較は開いて見える
+  await expect(page.locator('details.rental-details')).not.toHaveAttribute('open', '')
+  await expect(page.getByText(/☕ 休憩するなら/)).toBeVisible()
+  await expect(page.getByText(/☕ 休憩するなら/).locator('xpath=..')).toHaveAttribute('open', '')
+})

@@ -1639,7 +1639,8 @@ h2#page-title { font-size: 1.375rem; font-weight: 750; }
 .stats dd { font-size: 1.125rem; }
 .stats .big { font-size: 2rem; letter-spacing: -.03em; line-height: 1.25; overflow-wrap: anywhere; }
 .stats .elapsed { font-size: 2.5rem; }
-button.primary { min-height: 52px; font-weight: 750; }
+/* 主な操作（出発・レンタル開始・返却・精算・保存）は52px以上 */
+button.primary, button.main-action { min-height: 52px; font-weight: 750; }
 button.icon { min-width: 44px; width: 44px; min-height: 44px; }
 input, select, textarea { min-width: 0; }
 .field label, .field > span { font-size: .875rem; }

@@ -1,6 +1,18 @@
 // 計画の一番上：この週の稼働量を決めるための材料をひと目で出す。
 // ① 稼働の量（実績・これからの予定・週の上限）、② 7日の帯（混み具合の色の上に、予定と実績）、③ 空いている稼げそうな時間
-import { busyLevelAt, type BusynessTable, type SuggestedWindow } from '../domain'
+import {
+  PLAN_WEATHERS,
+  PLAN_WEATHER_ICONS,
+  PLAN_WEATHER_LABELS,
+  busyLevelAt,
+  dayWeather,
+  weatherAt,
+  type BusynessTable,
+  type PlanWeather,
+  type SuggestedWindow,
+  type WeatherFactors,
+} from '../domain'
+import type { ForecastState } from './useForecast'
 import { CardTitle } from '../components/fields'
 import { formatYen } from '../format'
 
@@ -69,6 +81,10 @@ export function WeekBoard({
   onAddQuestWindows,
   strategyPlan,
   allowed,
+  forecast,
+  weatherOverrides,
+  weatherFactors,
+  onCycleWeather,
 }: {
   now: string
   /** 週の月曜（YYYY-MM-DD・端末の日付） */
@@ -89,6 +105,12 @@ export function WeekBoard({
   strategyPlan: StrategyPlan | null
   /** 働ける時間（設定）。null は制限なし */
   allowed: readonly (readonly [number, number])[] | null
+  forecast: ForecastState
+  /** 帯で手で直した天気（日付 → 天気） */
+  weatherOverrides: Readonly<Record<string, PlanWeather>>
+  weatherFactors: WeatherFactors
+  /** 日の天気を手で直す（null は予報に戻す） */
+  onCycleWeather: (date: string, next: PlanWeather | null) => void
 }) {
   const nowMs = Date.parse(now)
   const weekStart = new Date(`${weekFrom}T${pad(DAY_START_HOUR)}:00`).getTime()
@@ -113,6 +135,27 @@ export function WeekBoard({
     }
     if (t < end) out.push([t, end])
     return out
+  }
+  const hourly = 'forecast' in forecast ? forecast.forecast : null
+  /** 日の天気：手で直した天気か、予報（働ける時間の中、なければ 8〜24時の時間）の代表 */
+  const dayCond = (date: string, start: number): { cond: PlanWeather | null; manual: boolean } => {
+    const manual = weatherOverrides[date]
+    if (manual) return { cond: manual, manual: true }
+    if (!hourly) return { cond: null, manual: false }
+    const hours: PlanWeather[] = []
+    for (let h = 0; h < 24; h++) {
+      const t = start + h * HOUR
+      const inAllowed = allowed ? allowed.some(([a, b]) => a <= t && t < b) : h >= 4 && h < 20
+      const w = hourly.get(t)
+      if (inAllowed && w) hours.push(w)
+    }
+    return { cond: dayWeather(hours), manual: false }
+  }
+  const nextWeather = (cur: PlanWeather | null, manual: boolean): PlanWeather | null => {
+    // 予報 → 晴れ → くもり → 雨 → 荒天 → 予報に戻す
+    if (!manual) return 'clear'
+    const i = PLAN_WEATHERS.indexOf(cur!)
+    return i === PLAN_WEATHERS.length - 1 ? null : PLAN_WEATHERS[i + 1]!
   }
   const dayLabel = (iso: string) => {
     const d = new Date(Date.parse(iso))
@@ -211,6 +254,21 @@ export function WeekBoard({
                     {d.label}
                     {today && <span className="visually-hidden">（今日）</span>}
                   </span>
+                  {(() => {
+                    const { cond, manual } = dayCond(d.date, d.start)
+                    const text = cond ? `${PLAN_WEATHER_LABELS[cond]}（${manual ? '手で直した' : '予報'}）` : '未入力'
+                    return (
+                      <button
+                        type="button"
+                        className={`wb-weather${manual ? ' manual' : ''}`}
+                        aria-label={`${d.label}日の天気：${text}。押すと変える`}
+                        disabled={past}
+                        onClick={() => onCycleWeather(d.date, nextWeather(cond, manual))}
+                      >
+                        {cond ? PLAN_WEATHER_ICONS[cond] : '·'}
+                      </button>
+                    )
+                  })()}
                   <span className="wb-track">
                     {busyness && (
                       <span className="wb-heat" aria-hidden="true">
@@ -220,6 +278,12 @@ export function WeekBoard({
                         })}
                       </span>
                     )}
+                    {Array.from({ length: 24 }, (_, h) => {
+                      const t = d.start + h * HOUR
+                      const w = weatherAt(t, hourly, weatherOverrides)
+                      if (w !== 'rain' && w !== 'storm') return null
+                      return <span key={h} className={w === 'storm' ? 'wb-storm' : 'wb-rain'} aria-hidden="true" style={{ left: `${(h / 24) * 100}%`, width: `${100 / 24}%` }} />
+                    })}
                     {offSpans(d.start, d.end).map(([a, b]) => (
                       <span key={a} className="wb-off" aria-hidden="true" style={pos(a, b)} />
                     ))}
@@ -276,12 +340,24 @@ export function WeekBoard({
               <span className="key off" />働けない
             </>
           )}
+          {' '}
+          <span className="key rain" />雨 <span className="key storm" />荒天
           {busyness && (
             <>
               {' '}
               <span className="key" style={{ background: 'var(--busy-4)' }} />混む <span className="key" style={{ background: 'var(--busy-1)' }} />空き
             </>
           )}
+        </p>
+        <p className="hint weather-note">
+          {forecast.status === 'none'
+            ? '🌦️ 設定 → エリアで主なエリアに地図の場所を入れると、天気予報を自動で入れます（天気は日ごとの ·／☀️ を押して手でも入れられます）'
+            : forecast.status === 'loading'
+              ? '🌦️ 天気予報を取得中…'
+              : forecast.status === 'error' && !forecast.forecast
+                ? '🌦️ 天気予報を取得できませんでした。日ごとの天気を押して手で入れられます'
+                : `🌦️ 天気：Open-Meteo（気象庁）${forecast.fetchedAt ? `・${hm(Date.parse(forecast.fetchedAt))}取得` : ''}${forecast.status === 'error' ? '（前に取得した予報）' : ''}`}
+          ・雨の日 件数×{weatherFactors.rainOrders}・1件×{weatherFactors.rainPerOrder}（{weatherFactors.source === 'personal' ? '自分の記録' : '目安'}）
         </p>
         {strategyPlan && (
           <div className="stack strategy-plan" role="group" aria-label="クエスト作戦の時間">

@@ -7,6 +7,7 @@ import {
   scheduleStrategy,
   deadlineMs,
   suggestHours,
+  weatherFactors,
   suggestWindows,
   SCENARIO_FACTORS,
   SCENARIO_LABELS,
@@ -29,13 +30,14 @@ import { CardTitle, IntInput, Notice, Problems, TextInput, Tip, errorMessages, l
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { EQUIPMENT_PRESETS } from '../storage/presets'
-import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSlot, saveSlots } from '../storage/repo'
+import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSettings, saveSlot, saveSlots } from '../storage/repo'
 import type { SlotRecord, TariffRecord } from '../storage/schema'
-import { expandRecurring, pastSessionsFor } from '../storage/toDomain'
+import { expandRecurring, pastSessionsFor, weatherSessionsFor } from '../storage/toDomain'
 import { QuestWeek, questWeekItems } from './QuestWeek'
 import { WeekBoard, type QuestTarget, type StrategyPlan } from './WeekBoard'
 import { QuestStrategyCard, buildStrategy, goalIndexOf } from './QuestStrategyCard'
 import { AreaRoutePlan } from './AreaRoutePlan'
+import { useForecast } from './useForecast'
 
 /** 7日の帯に出すクエストの数の上限（毎日のクエストなどで帯が埋まらないように） */
 const MAX_QUEST_TARGETS = 3
@@ -127,6 +129,9 @@ export function Plan() {
     )
     return { past, inWeek, inputs, plan, tariffOf, done, weekStartIso, weekEndIso, nowIso }
   }, [data, week.from, week.to, scenario])
+
+  // 天気予報：主なエリアの中心（地図の場所）があれば、計画を開いた時に取る
+  const forecastState = useForecast(data ? (primaryArea(data.areas, data.settings)?.center ?? null) : null)
 
   if (!data || !computed) return <p className="loading">読み込み中…</p>
 
@@ -301,6 +306,19 @@ export function Plan() {
         questTargets={questTargets}
         strategyPlan={strategyPlan}
         allowed={allowed}
+        forecast={forecastState}
+        weatherOverrides={data.settings?.weatherOverrides ?? {}}
+        weatherFactors={weatherFactors(weatherSessionsFor(data.sessions))}
+        onCycleWeather={async (date, next) => {
+          const cur = { ...(data.settings?.weatherOverrides ?? {}) }
+          if (next === null) delete cur[date]
+          else cur[date] = next
+          try {
+            await saveSettings(db, { weatherOverrides: cur })
+          } catch (e) {
+            setNotice({ message: `⚠️ 天気を保存できませんでした：${errorMessages(e).join('・')}` })
+          }
+        }}
         onAddQuestWindows={async (windows) => {
           const slots = windows.map(fromSuggestion)
           try {

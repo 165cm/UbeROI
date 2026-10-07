@@ -1,15 +1,15 @@
 // 端末に保存するデータの形（docs/spec/docs/03-data-model.md を MVP 向けに簡略化）
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
-import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, QuestRepeat, Tariff, WeeklyAvailability } from '../domain'
+import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, QuestRepeat, PlanWeather, Tariff, WeeklyAvailability } from '../domain'
 
 /**
  * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
  * 5：エリアの混み具合（areas）と、設定の主なエリア（primaryAreaId）を追加。
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
- * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。
+ * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 11
+export const SCHEMA_VERSION = 12
 
 interface Stamped {
   createdAt: string
@@ -38,6 +38,8 @@ export interface SettingsRecord extends Stamped {
   offerJudgeEnabled?: boolean
   /** 働ける時間（曜日ごとの時間帯。版11で追加。null／未定義は制限なし） */
   availability?: WeeklyAvailability | null
+  /** 計画の帯で手で直した天気（日付 YYYY-MM-DD・4時区切り → 天気。版12で追加。未定義は予報のまま） */
+  weatherOverrides?: Record<string, PlanWeather>
 }
 
 export interface TariffRecord extends Stamped {

@@ -28,6 +28,9 @@
 | `src/domain/areaRoute.ts` | 時間帯ごとのエリア計画（正時で区切り、移動の分と1回200円を引いて、どの時間にどのエリアにいるかを選ぶ） |
 | `src/domain/weekBoard.ts` | 計画の「💡 空いている、稼げそうな時間」（予定のない3時間の枠を、見込みの大きい順に1日1つ・最大3つ）と、クエストのための時間（必要な時間を見込みの大きい枠で埋める `suggestHours`） |
 | `src/domain/questStrategy.ts` | クエスト作戦表（日跨ぎ＋ピーク：段階ごとに残りの日の件数・時間・報酬・1件あたりの上乗せ）と、作戦の時間を働ける時間の中の実際の時間に置く `scheduleStrategy` |
+| `src/domain/weather.ts` | 天気（晴れ・くもり・雨・荒天）：予報の1時間の判定、記録の天気のまとめ、日の代表、手で直した天気、雨の倍率 |
+| `src/adapters/weather.ts` | 天気予報の取得（Open-Meteo の気象庁モデル。緯度経度を小数1桁に丸めて送る・3時間端末に覚える） |
+| `src/features/useForecast.ts` | 計画を開いた時に主なエリアの天気予報を取る |
 | `src/domain/availability.ts` | 働ける時間（曜日ごとの時間帯・プリセット・週の区間への展開・検証） |
 | `src/domain/questPlan.ts` | クエストを軸にした週の組み立て（1時間あたりの件数、計画で届く段階、次の段階まで足す時間とボーナス込みの純時給） |
 | `src/domain/continuation.ts` | 続けるか帰るか：追加の利益・増えるレンタル代・追加の時給と GO/WAIT/STOP の判定 |
@@ -77,7 +80,7 @@
 | `src/storage/context.tsx` | 画面からデータベースを使う入口 |
 | `src/storage/storage.test.ts` `backup.test.ts` `csvImport.test.ts` | 保存・検証・装備と実績の分離、バックアップと復元、CSVの取り込み（A19）のテスト |
 | `e2e/` `playwright.config.ts` | 通しのテスト（Playwright）：主な流れ、データを守る場面、使いやすさ（A23） |
-| `src/adapters/` | （予定・MVP後）シェアサイクルの空き情報・天気・AI |
+| `src/adapters/` | 外部サービスの入口（天気予報）。候補：シェアサイクルの空き情報・AI |
 | `src/pwa.ts` | Service Worker の登録、新しい版の知らせ、オフライン判定、ホーム画面に追加、消えにくい保存の依頼 |
 | `src/features/InstallHelp.tsx` | 「アプリとして使う」の案内（設定 → データ） |
 | `sw/sw.template.js` | Service Worker のひな形。ビルド時に版と一覧を埋め込んで `dist/sw.js` になる。文字認識のファイル（`ocr/`）は最初の一覧に入れず、使った時に `deli-kan-ocr-v1` に保存する（版が変わっても消さない） |
@@ -89,7 +92,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない。版11で働ける時間 `availability` を追加、未定義は制限なし）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
+- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない。版11で働ける時間 `availability`、版12で天気の手直し `weatherOverrides` を追加、未定義は制限なし・予報のまま）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`
@@ -101,6 +104,10 @@
   - 送るのは、見ている辺りの地図の画像の位置（ズームと区画）だけ。記録・設定・現在地は送らない（現在地＝位置情報は使わない。現在地へ地図を動かすと、その辺りの地図の画像を取りに行き、だいたいの現在地が伝わるため）
   - 表示に「© OpenStreetMap contributors」を出す。Service Worker は外のサイトの画像をキャッシュしない（電波がない時は地図の絵が出ない）
   - 地図の部品は Leaflet（`leaflet`）
+- **Open-Meteo の天気予報**（`https://api.open-meteo.com/v1/jma`、2026-10-07 ユーザーが了承）
+  - 使うのは、計画を開いた時だけ（主なエリアに地図の場所がある時）。3時間は端末（localStorage）に覚えて取り直さない
+  - 送るのは、主なエリアの中心を小数1桁（約10km）に丸めた緯度・経度だけ。記録・設定・現在地は送らない
+  - 表示に「天気：Open-Meteo（気象庁）」を出す。Service Worker は外のサイトの応答をキャッシュしない（電波がない時は前に覚えた予報か手入力）
 - **スクショの文字認識**は外部サービスを使わない：tesseract.js（Apache-2.0）と日本語データ（`@tesseract.js-data/jpn` の best_int、約2MB）を、このアプリと同じ場所の `ocr/` から読み込み、端末の中で動かす。画像も文字も送らない
 - 環境変数・APIキーはなし
 - 候補：シェアサイクルの公開データ（GBFS。例：HELLO CYCLING）、天気、AIの説明（サーバー経由のみ）

@@ -35,10 +35,10 @@ test('装備の品目は畳まれていて、新しく足した品目は名前�
   await expect(page.getByLabel('価格（税込・1個）', { exact: true }).last()).toBeVisible()
 })
 
-test('空の記録で「天気・エリア・メモ」を開いて入力しても、畳まれない', async ({ page }) => {
+test('空の記録で「エリア・メモ」を開いて入力しても、畳まれない', async ({ page }) => {
   await page.goto('#records')
   await page.getByRole('button', { name: /過去の稼働をまとめて入力/ }).click()
-  await page.getByText('🏷️ 天気・エリア・メモ').click()
+  await page.getByText('🏷️ エリア・メモ').click()
   const area = page.getByLabel('エリア（任意）', { exact: true })
   await area.pressSequentially('駅前')
   await page.getByLabel('メモ（任意）', { exact: true }).pressSequentially('雨上がり')

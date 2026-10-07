@@ -6,6 +6,7 @@ import {
   calculateSession,
   localDate,
   monthRange,
+  planWeatherOfRecord,
   type AssetInput,
   type CashEvent,
   type MonthlyExpenseInput,
@@ -13,6 +14,7 @@ import {
   type PeriodResult,
   type RecoveryResult,
   type SessionInput,
+  type WeatherSession,
 } from '../domain'
 import type { AssetRecord, RecurringExpenseRecord, SessionRecord } from './schema'
 
@@ -109,6 +111,21 @@ export function cashEventsFor(data: DataSnapshot, asOf: string): CashEvent[] {
 }
 
 /** 確定した記録の時間と売上（計画や「続けるか」の見込みに使う）。読めない記録は除く */
+/** 天気の倍率（§5.11）に使う、確定記録の天気・時間・件数・売上 */
+export function weatherSessionsFor(sessions: readonly SessionRecord[]): WeatherSession[] {
+  const out: WeatherSession[] = []
+  for (const s of sessions) {
+    if (s.status !== 'completed') continue
+    try {
+      const r = calculateSession(sessionToInput(s))
+      if (r.valid && r.hours) out.push({ weather: planWeatherOfRecord(s.weather), hours: r.hours, completedCount: s.completedCount, revenueYen: r.revenueYen })
+    } catch {
+      // 読めない記録は使わない
+    }
+  }
+  return out
+}
+
 export function pastSessionsFor(sessions: readonly SessionRecord[]): PastSession[] {
   const past: PastSession[] = []
   for (const s of sessions) {

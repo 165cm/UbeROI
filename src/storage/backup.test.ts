@@ -276,5 +276,22 @@ describe('データの版の移行（版4）とエリアの検証', () => {
     b.datasets.settings = [{ ...settings, availability: [[{ start: '25:00', end: '22:00' }]] }]
     expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
   })
+
+  it('版11（天気の手直しがない頃）のバックアップもそのまま復元でき、形の壊れた天気の手直しは復元しない', async () => {
+    const b = await createBackup(db, 'real')
+    const settings = b.datasets.settings[0]!
+    expect(parseBackup(JSON.stringify({ ...b, schema_version: 11 })).ok).toBe(true)
+    b.datasets.settings = [{ ...settings, weatherOverrides: { '2026-10-10': 'rain' } }]
+    const ok = parseBackup(JSON.stringify(b))
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      await restoreBackup(db, ok.backup)
+      expect((await db.settings.get('settings'))?.weatherOverrides).toEqual({ '2026-10-10': 'rain' })
+    }
+    b.datasets.settings = [{ ...settings, weatherOverrides: { '10/10': 'rain' } as never }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+    b.datasets.settings = [{ ...settings, weatherOverrides: { '2026-10-10': 'typhoon' } as never }]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
 })
 

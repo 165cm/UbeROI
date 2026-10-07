@@ -49,6 +49,7 @@ test('エリアの場所を地図で決めると、ホームの地図に混み�
 
   // 地図を開くまでは地図の画像を読み込まない
   await page.goto('#home')
+  await page.getByText('📋 判断のたすけ').click()
   const before = tiles
   await expect(page.getByRole('region', { name: 'この先4時間の混み具合' })).toBeVisible()
   expect(tiles).toBe(before)

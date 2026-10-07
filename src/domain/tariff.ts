@@ -200,3 +200,14 @@ export function calculateRental(input: RentalInput, asOf?: string): RentalResult
     reason: elapsedSeconds === null ? '終了時刻がありません' : reason,
   }
 }
+
+/**
+ * 次の課金で上がる額（表示用）。次に上がる時刻の直後の料金 − 今の料金。
+ * 計算は feeFor のまま（料金の式は変えない）。出せない時は null
+ */
+export function nextChargeYen(t: Tariff, startAt: string, nextIncreaseAt: string | null, currentYen: number | null): number | null {
+  if (!nextIncreaseAt || currentYen === null) return null
+  const seconds = (parseInstant(nextIncreaseAt) - parseInstant(startAt)) / 1000 + 1
+  const after = feeFor(t, seconds)
+  return after === null ? null : Math.max(0, after - currentYen)
+}

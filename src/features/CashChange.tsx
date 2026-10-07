@@ -10,13 +10,13 @@ function breakdownText(breakdown: { yen: number; count: number }[]): string {
   return breakdown.map((b) => `${yenLabel(b.yen)}×${b.count}`).join('・')
 }
 
-export function CashChange() {
+export function CashChange({ open = false }: { open?: boolean }) {
   const [totalYen, setTotalYen] = useState<number | null>(null)
   const [receivedYen, setReceivedYen] = useState<number | null>(null)
   const result = totalYen !== null && receivedYen !== null ? calculateChange(totalYen, receivedYen) : null
 
   return (
-    <details className="card fold">
+    <details className="card fold" open={open || undefined}>
       <summary>
         <strong>💴 お釣り</strong>
         <span className="hint">{totalYen === null ? '現金払いの時に' : `支払い ${formatYen(totalYen)}`}</span>

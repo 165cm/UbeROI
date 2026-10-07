@@ -42,6 +42,7 @@ test('最初はオフ。オンにすると、手で入れた報酬・分・km �
   await enableOffer(page, { target: '1500' })
   await addArea(page)
   await page.goto('#home')
+  await page.getByText('📋 判断のたすけ').click()
   await page.getByRole('link', { name: '🧾 オファー判定' }).click()
   await expect(page.getByText(/スクリーンショットや画面の読み取りは使わないでください/)).toBeVisible()
   await enter(page, '1200', '24', '3.7', '高円寺')

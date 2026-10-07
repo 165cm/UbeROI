@@ -1,4 +1,4 @@
-// 稼働中の「🎯 あと何件？」（🏁 終了までの見通しの中）：今の件数から、クエストの次の段階・リーダーボードの順位まで
+// 稼働中のホームの「クエスト」カードと「🎯 あと何件？」：今の件数から、クエストの次の段階・リーダーボードの順位まで
 // あと何件・何分か、終了予定までに届くか（延ばせば届くか）。計算は src/domain/questPush.ts（§5.14）
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -6,6 +6,7 @@ import { leaderboardOutlook, ordersPerHour, pushOrdersPerHour, questOccurrencesN
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { weatherSessionsFor } from '../storage/toDomain'
+import { CashChange } from './CashChange'
 
 const STORE_KEY = 'deli-kan:quest-push'
 interface Stored {
@@ -40,6 +41,7 @@ function duration(minutes: number): string {
   return h > 0 ? (m > 0 ? `${h}時間${m}分` : `${h}時間`) : `${m}分`
 }
 
+/** 稼働中のホームの「クエスト」カード：上に先に終わるクエストの件数と次の段階、押すと「あと何件？」の ＋／− と目標・お釣り */
 export function QuestPush({
   now,
   sessionId,
@@ -63,6 +65,7 @@ export function QuestPush({
 }) {
   const { db } = useData()
   const data = useLiveQuery(async () => ({ quests: await db.quests.toArray(), sessions: await db.sessions.toArray() }), [db])
+  const [open, setOpen] = useState<'count' | 'cash' | null>(null)
   const [stored, setStored] = useState<Stored>(() => load(sessionId, acceptedOffers) ?? { sessionId, adjust: 0 })
   // この稼働の件数＝受けたオファーの数＋直した分（0より少なくしない）
   const added = Math.max(0, acceptedOffers + stored.adjust)
@@ -75,82 +78,127 @@ export function QuestPush({
     .map((q) => ({ q, occ: questOccurrencesNow(q, now).current }))
     .filter(({ occ }) => Date.parse(occ.startsAt) <= nowMs && nowMs < Date.parse(occ.endsAt))
     .sort((a, b) => a.occ.endsAt.localeCompare(b.occ.endsAt))
-  if (items.length === 0) return null
-
   const rate = ordersPerHour(weatherSessionsFor(data.sessions))
   const sessionMinutes = Math.max(0, (nowMs - Date.parse(departedAt)) / 60_000)
   const pace = pushOrdersPerHour(rate.rate, sessionMinutes, added)
   const step = (d: number) => setStored({ ...stored, adjust: Math.max(-acceptedOffers, added + d - acceptedOffers) })
 
+  const rows = items.map(({ q, occ }) => {
+    const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
+    const p = questProgress(
+      { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
+      data.sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
+      now,
+    )
+    const count = p.count + added
+    const board = q.leaderboard ? leaderboardOutlook({ ...q.leaderboard, startsAt: occ.startsAt, endsAt: occ.endsAt, myCountNow: count }) : null
+    const r = questPushGoals({
+      now,
+      endAt,
+      lastAt,
+      questEndsAt: occ.endsAt,
+      count,
+      rewardMode: q.rewardMode,
+      tiers: q.tiers,
+      board,
+      baseOrdersPerHour: rate.rate,
+      sessionMinutes,
+      sessionCount: added,
+      revenuePerHourYen,
+    })
+    return { q, occ, count, board, r, last: Math.max(...q.tiers.map((t) => t.count)) }
+  })
+  // 上に大きく出すのは、先に終わるクエスト（日跨ぎとピークが重なる時は、先に終わるピーク）
+  const head = rows[0]
+  const next = head?.r.goals.find((g) => g.gainYen > 0) ?? head?.r.goals[0]
+
   return (
-    <div className="stack quest-push" role="group" aria-label="あと何件？">
-      <p className="line">
-        <strong className="grow">🎯 あと何件？</strong>
-        <span className="hint">この稼働 {added}件</span>
-        <button type="button" className="icon" aria-label="この稼働の件数を1件減らす" disabled={added === 0} onClick={() => step(-1)}>
-          −
-        </button>
-        <button type="button" className="icon" aria-label="この稼働の件数を1件増やす" onClick={() => step(1)}>
-          ＋
-        </button>
-      </p>
-      {items.map(({ q, occ }) => {
-        const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
-        const p = questProgress(
-          { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
-          data.sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
-          now,
-        )
-        const count = p.count + added
-        const board = q.leaderboard ? leaderboardOutlook({ ...q.leaderboard, startsAt: occ.startsAt, endsAt: occ.endsAt, myCountNow: count }) : null
-        const r = questPushGoals({
-          now,
-          endAt,
-          lastAt,
-          questEndsAt: occ.endsAt,
-          count,
-          rewardMode: q.rewardMode,
-          tiers: q.tiers,
-          board,
-          baseOrdersPerHour: rate.rate,
-          sessionMinutes,
-          sessionCount: added,
-          revenuePerHourYen,
-        })
-        const last = Math.max(...q.tiers.map((t) => t.count))
-        return (
-          <div key={`${q.id}-${occ.index}`} className="subcard stack">
-            <p className="line">
-              <span className="grow">
-                {q.label} <strong className="num">{count}/{last}件</strong>
-                {board?.myRank != null && <span className="hint">・🏆{board.myRank}位（{clock(Date.parse(board.at))}時点）</span>}
-              </span>
+    <section className="card stack quest-today" aria-labelledby="quest-today-title">
+      <h3 id="quest-today-title">クエスト</h3>
+      {head ? (
+        <>
+          <div className="line">
+            <p className="quest-count grow">
+              <strong className="num">{head.count}</strong>
+              <span> / {head.last}件</span>
+              <span className="visually-hidden">（{head.q.label}）</span>
             </p>
-            {r.goals.length === 0 ? (
-              <p className="hint">全段階を達成しました</p>
-            ) : (
-              <ul className="list" aria-label={`${q.label}の目標`}>
-                {r.goals.map((g) => (
-                  <li key={g.target} className="line">
-                    <span className="grow">
-                      {g.labels.join('・')}：あと<strong>{g.more}件</strong>・{g.minutes === null ? '時間は算出不可' : `約${duration(g.minutes)}`}
-                      {g.gainYen > 0 && `・+${formatYen(g.gainYen)}`}
-                      {g.hourlyYen !== null && <span className="hint">（{formatYen(g.hourlyYen)}/時）</span>}
-                    </span>
-                    <span className="tag">
-                      {g.reach === 'fits' ? `✅ ${clock(Date.parse(endAt))}までに届く` : g.reach === 'extend' ? `⚠️ ${duration(g.extendMinutes)}延ばすと届く` : '❌ 届かない見込み'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {head.r.goals.some((g) => g.gainYen > 0) && <span className="pill estimate-pill">達成時の見込み</span>}
           </div>
-        )
-      })}
-      <p className="hint">
-        1時間 約{pace.rate}件で見込み（{rate.source === 'personal' ? '自分の記録' : '目安'}
-        {pace.usesPace ? '・今日のペースを半分反映' : ''}）。届く時刻・延ばす分は、終了予定と帰宅締切（家までの分を引く）で見ます
-      </p>
-    </div>
+          <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={head.last} aria-valuenow={Math.min(head.count, head.last)} aria-label={`${head.q.label}の件数`}>
+            <span style={{ width: `${Math.min(100, (head.count / Math.max(1, head.last)) * 100)}%` }} />
+          </div>
+          <p>
+            {next ? (
+              <>
+                あと{next.more}件で{next.gainYen > 0 && <strong className="gain"> +{formatYen(next.gainYen)}</strong>}
+                <span className="hint">（{head.q.label}）</span>
+              </>
+            ) : (
+              <>全段階を達成しました<span className="hint">（{head.q.label}）</span></>
+            )}
+          </p>
+        </>
+      ) : (
+        <p className="hint">今のクエストはありません（稼働していない時に「🎯 クエスト」の＋で追加）</p>
+      )}
+      <div className="row quest-actions">
+        {head && (
+          <button type="button" className="chevron" aria-expanded={open === 'count'} onClick={() => setOpen(open === 'count' ? null : 'count')}>
+            件数を記録
+          </button>
+        )}
+        <button type="button" className="chevron" aria-expanded={open === 'cash'} onClick={() => setOpen(open === 'cash' ? null : 'cash')}>
+          お釣り
+        </button>
+      </div>
+      {open === 'count' && head && (
+        <div className="stack quest-push" role="group" aria-label="あと何件？">
+          <p className="line">
+            <strong className="grow">🎯 あと何件？</strong>
+            <span className="hint">この稼働 {added}件</span>
+            <button type="button" className="icon" aria-label="この稼働の件数を1件減らす" disabled={added === 0} onClick={() => step(-1)}>
+              −
+            </button>
+            <button type="button" className="icon" aria-label="この稼働の件数を1件増やす" onClick={() => step(1)}>
+              ＋
+            </button>
+          </p>
+          {rows.map(({ q, occ, count, board, r, last }) => (
+            <div key={`${q.id}-${occ.index}`} className="subcard stack">
+              <p className="line">
+                <span className="grow">
+                  {q.label} <strong className="num">{count}/{last}件</strong>
+                  {board?.myRank != null && <span className="hint">・🏆{board.myRank}位（{clock(Date.parse(board.at))}時点）</span>}
+                </span>
+              </p>
+              {r.goals.length === 0 ? (
+                <p className="hint">全段階を達成しました</p>
+              ) : (
+                <ul className="list" aria-label={`${q.label}の目標`}>
+                  {r.goals.map((g) => (
+                    <li key={g.target} className="line">
+                      <span className="grow">
+                        {g.labels.join('・')}：あと<strong>{g.more}件</strong>・{g.minutes === null ? '時間は算出不可' : `約${duration(g.minutes)}`}
+                        {g.gainYen > 0 && `・+${formatYen(g.gainYen)}`}
+                        {g.hourlyYen !== null && <span className="hint">（{formatYen(g.hourlyYen)}/時）</span>}
+                      </span>
+                      <span className="tag">
+                        {g.reach === 'fits' ? `✅ ${clock(Date.parse(endAt))}までに届く` : g.reach === 'extend' ? `⚠️ ${duration(g.extendMinutes)}延ばすと届く` : '❌ 届かない見込み'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+          <p className="hint">
+            1時間 約{pace.rate}件で見込み（{rate.source === 'personal' ? '自分の記録' : '目安'}
+            {pace.usesPace ? '・今日のペースを半分反映' : ''}）。届く時刻・延ばす分は、終了予定と帰宅締切（家までの分を引く）で見ます
+          </p>
+        </div>
+      )}
+      {open === 'cash' && <CashChange open />}
+    </section>
   )
 }

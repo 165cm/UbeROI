@@ -1,11 +1,10 @@
 // 稼働中の「🏁 終了までの見通し」。終了予定の時刻を決めると、今日のペースとこの先の混み具合から、
 // 続ける／休憩して再開／今やめるの、この先の利益を比べる。止まっている時に確かめる前提で、走行中の操作は求めない
 import { useEffect, useMemo, useState } from 'react'
-import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, tieredCapInfo, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Platform, type Tariff } from '../domain'
+import { deadlineMs, endTimeMs, estimateRevenue, evaluateOutlook, tieredCapInfo, type BusynessTable, type OutlookAction, type OutlookOffer, type PastSession, type Tariff } from '../domain'
 import { CardTitle, IntInput, Tip } from '../components/fields'
 import { formatYen } from '../format'
 import { loadPrefs } from './ContinueCard'
-import { QuestPush } from './QuestPush'
 
 const ACTION_LABELS: Record<OutlookAction, string> = { continue: 'このまま続ける', break: '休憩して再開', move: 'エリアを移動', stop: '今やめて帰る' }
 const LEVEL_MARKS = ['·', '▮', '▮▮', '▮▮▮', '▮▮▮▮'] as const
@@ -50,6 +49,15 @@ function defaultEnd(nowIso: string, homeDeadline: string | null, departedAt: str
   return jstClock(Math.floor((nowMs + 2 * 3_600_000) / 3_600_000) * 3_600_000)
 }
 
+/**
+ * 終了予定（配達をやめる時刻）。この稼働で決めた時刻があればそれ、なければ帰宅締切から決める初期値。
+ * ホームの「帰宅予定」と「🎯 あと何件？」も同じ時刻を使う
+ */
+export function outlookEndAt(sessionId: string, nowIso: string, homeDeadline: string | null, departedAt: string): string {
+  const clock = load(sessionId)?.end ?? defaultEnd(nowIso, homeDeadline, departedAt, loadPrefs().minutesToHome)
+  return new Date(endTimeMs(nowIso, clock)).toISOString()
+}
+
 function formatLeft(minutes: number): string {
   const h = Math.floor(minutes / 60)
   return h > 0 ? `${h}時間${minutes % 60}分` : `${minutes}分`
@@ -67,8 +75,6 @@ export function OutlookCard({
   targetHourlyYen,
   homeDeadline,
   moveAreas,
-  platform,
-  acceptedOffers,
 }: {
   now: string
   sessionId: string
@@ -82,10 +88,6 @@ export function OutlookCard({
   homeDeadline: string | null
   /** 移動の候補にするエリア（主なエリア以外で、移動の分を登録したもの） */
   moveAreas: { name: string; minutes: number; levels: BusynessTable }[]
-  /** この稼働のサービス（🎯 あと何件？で、同じサービスのクエストを出す） */
-  platform: Platform
-  /** この稼働で「受けた」と記録したオファーの数 */
-  acceptedOffers: number
 }) {
   const prefs = loadPrefs()
   const [stored, setStored] = useState<Stored>(
@@ -218,16 +220,6 @@ export function OutlookCard({
         </ul>
       </div>
 
-      <QuestPush
-        now={minute}
-        sessionId={sessionId}
-        departedAt={departedAt}
-        platform={platform}
-        acceptedOffers={acceptedOffers}
-        endAt={new Date(endTimeMs(minute, stored.end)).toISOString()}
-        lastAt={homeDeadline ? new Date(deadlineMs(departedAt, homeDeadline) - prefs.minutesToHome * 60_000).toISOString() : null}
-        revenuePerHourYen={estimateRevenue(minute, new Date(Date.parse(minute) + 3_600_000).toISOString(), past, busyness).revenueYen}
-      />
 
       <details>
         <summary>今日の売上を手で入れる</summary>

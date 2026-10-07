@@ -20,7 +20,8 @@ test('終了予定を決めると、今日のペースとこの先の混み具�
   await expect(page.locator('.tag', { hasText: '主なエリア' })).toBeVisible()
 
   await page.goto('#home')
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
+  await page.getByText('📋 判断のたすけ').click()
   await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
 
   // 17:30 と 18:10 に受けたオファーを記録（合わせて 1,500円）
@@ -96,7 +97,8 @@ test('移動の分を入れたエリアの方が見込みが良ければ、エ�
   await expect(page.getByText(/移動30分/)).toBeVisible()
 
   await page.goto('#home')
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
+  await page.getByText('📋 判断のたすけ').click()
   // 出発が保存されてから（カードが出てから）時刻を進めて読み直す
   await expect(page.getByRole('heading', { name: /終了までの見通し/ })).toBeVisible()
   await page.clock.setFixedTime(new Date('2026-10-05T19:00:00+09:00'))

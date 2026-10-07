@@ -67,10 +67,10 @@ test('この週の実績の時間を上限から引いて、残りの時間に�
   await page.getByRole('button', { name: '💾 保存' }).click()
   // 月曜 17〜20時に3時間働いた（確定）
   await page.goto('#home')
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
   await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
   await page.clock.fastForward('03:00:00')
-  await page.getByRole('button', { name: '🏁 帰宅して精算' }).click()
+  await page.getByRole('button', { name: '帰宅して精算' }).click()
   await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('4000')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.locator('.list-item').first()).toBeVisible()

@@ -1,7 +1,7 @@
-// ホーム（S02）：今日の状態・稼働中のレンタル料金・今月の成績
+// ホーム（S02）「今日」：今日の稼働（出発からの時計・帰宅予定）・レンタル料金・クエスト・帰宅して精算。そのほかの判断のたすけは折りたたみに
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { averageLevel, breakAdvice, busyAhead, calculateRental, localDate, rentalCostByHours, tieredCapInfo, timeSlotOf, type Tariff } from '../domain'
+import { averageLevel, breakAdvice, busyAhead, calculateRental, deadlineMs, estimateRevenue, localDate, nextChargeYen, rentalCostByHours, tieredCapInfo, timeSlotOf, type Tariff } from '../domain'
 import { CardTitle, IntInput, Problems, Tip, errorMessages } from '../components/fields'
 import { formatClock, formatDuration, formatYen } from '../format'
 import { useData } from '../storage/context'
@@ -11,8 +11,27 @@ import type { AreaRecord } from '../storage/schema'
 import { BusyMap } from './AreaMap'
 import { CashChange } from './CashChange'
 import { ContinueCard } from './ContinueCard'
-import { OutlookCard } from './OutlookCard'
+import { OutlookCard, outlookEndAt } from './OutlookCard'
+import { loadPrefs } from './ContinueCard'
+import { QuestPush } from './QuestPush'
 import { QuestCard } from './QuestCard'
+
+const HELPERS_KEY = 'deli-kan:helpers-open'
+/** 「📋 判断のたすけ」を開いたままにするか（端末ごとの好み） */
+function loadHelpersOpen(): boolean {
+  try {
+    return localStorage.getItem(HELPERS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function saveHelpersOpen(open: boolean) {
+  try {
+    localStorage.setItem(HELPERS_KEY, open ? '1' : '0')
+  } catch {
+    // 覚えられなくても使える
+  }
+}
 
 function useNow(active: boolean): string {
   const [now, setNow] = useState(() => new Date().toISOString())
@@ -41,6 +60,8 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
   const now = useNow(Boolean(active))
   const [problems, setProblems] = useState<string[]>([])
   const [tariffId, setTariffId] = useState<string>('')
+  const [helpersOpen, setHelpersOpen] = useState(loadHelpersOpen)
+  useEffect(() => saveHelpersOpen(helpersOpen), [helpersOpen])
 
   if (!data) return <p className="loading">読み込み中…</p>
 
@@ -81,88 +102,136 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           ? '📝 帰宅未記録の下書きあり'
           : '⚪ 未開始'
 
+  const sessions = pastSessionsFor(data.sessions)
+  const rentalForOutlook = openRental && openRental.startAt ? { tariff: openRental.tariff, startAt: openRental.startAt } : null
+  const homeDeadline = data.settings?.homeDeadline ?? null
+  const endAt = active ? outlookEndAt(active.id, now, homeDeadline, active.departedAt) : null
+  const elapsedMinutes = active ? Math.max(0, Math.floor((Date.parse(now) - Date.parse(active.departedAt)) / 60_000)) : 0
+
+  // 案にない判断のたすけは、1つの折りたたみにまとめる（最初は閉じる）
+  const helpers = (
+    <details className="card fold helpers" open={helpersOpen || undefined} onToggle={(e) => setHelpersOpen(e.currentTarget.open)}>
+      <summary>
+        <strong>📋 判断のたすけ</strong>
+        <span className="hint">{active ? '終了までの見通し・あと少し続ける？・混み具合・今月の成績' : 'お釣り・混み具合・今月の成績'}</span>
+      </summary>
+      <div className="stack">
+        {data.settings?.offerJudgeEnabled && <a className="button-link" href="#offer">🧾 オファー判定</a>}
+        {active && (
+          <>
+            <OutlookCard
+              now={now}
+              sessionId={active.id}
+              departedAt={active.departedAt}
+              rental={rentalForOutlook}
+              past={sessions}
+              busyness={area?.levels ?? null}
+              offers={data.offers}
+              allOffers={data.offers}
+              targetHourlyYen={target}
+              homeDeadline={homeDeadline}
+              moveAreas={data.areas.filter((a) => area && a.id !== area.id && a.moveMinutes && a.moveFromAreaId === area.id).map((a) => ({ name: a.name, minutes: a.moveMinutes!, levels: a.levels }))}
+            />
+            <ContinueCard now={now} departedAt={active.departedAt} rental={rentalForOutlook} past={sessions} targetHourlyYen={target} homeDeadline={homeDeadline} busyness={area?.levels ?? null} />
+          </>
+        )}
+        {!active && <CashChange />}
+        {data.areas.length > 0 && <section className="card"><h3>エリアの傾向</h3><p className="hint">登録した時間帯の傾向です。現在の注文状況ではありません。</p><BusyAhead areas={data.areas} primaryId={area?.id ?? null} now={now} /></section>}
+        {active && <QuestCard now={now} />}
+        <section className="card" aria-labelledby="month-title">
+          <CardTitle id="month-title" tip="税引前。営業純時給＝営業純利益 ÷ 出発〜帰宅の時間。投資配賦後は、装備・車両の購入額を月ごとに配った額も引いた時給です。">
+            📅 {today.slice(5, 7).replace(/^0/, '')}月の成績
+          </CardTitle>
+          {month.rows.length === 0 && month.totals.costYen === 0 ? (
+            <p className="hint">まだ確定した記録がありません。</p>
+          ) : (
+            <dl className="stats">
+              <div><dt>営業純利益</dt><dd className="big">{formatYen(month.totals.operatingProfitYen)}</dd></div>
+              <div>
+                <dt>営業純時給</dt>
+                <dd>
+                  {month.totals.hourlyYen === null ? '算出不可' : `${formatYen(month.totals.hourlyYen)}/時`}
+                  {target !== null && month.totals.hourlyYen !== null && (month.totals.hourlyYen >= target ? ' 🎯' : '（目標未満）')}
+                </dd>
+              </div>
+              <div><dt>投資配賦後の時給</dt><dd>{month.totals.afterAllocationHourlyYen === null ? '算出不可' : `${formatYen(month.totals.afterAllocationHourlyYen)}/時`}</dd></div>
+              <div><dt>稼働</dt><dd>{month.rows.length}回・{month.totals.hours.toFixed(1)}時間</dd></div>
+            </dl>
+          )}
+          {month.excludedDrafts + month.excludedInvalid > 0 && (
+            <p className="hint">⚠️ 下書き・要確認の{month.excludedDrafts + month.excludedInvalid}件は集計外</p>
+          )}
+        </section>
+      </div>
+    </details>
+  )
+
   return (
-    <div className="stack">
+    <div className="stack home">
       <section className="card today-card" aria-labelledby="today-title">
-        <h3 id="today-title">今日の状態：{status}</h3>
+        <h3 id="today-title" className="today-title">
+          <span className="grow">今日の稼働</span>
+          {active ? <span className="pill working-pill">稼働中</span> : <span className="hint">{status}</span>}
+        </h3>
 
         {!active ? (
           <button type="button" className="primary" onClick={() => void run(() => departNow(db))}>
-            🏠 自宅を出発
+            自宅を出発
           </button>
         ) : (
-          <div className="stack">
-            <dl className="stats">
-              <div><dt>出発から</dt><dd className="big elapsed">{formatDuration((Date.parse(now) - Date.parse(active.departedAt)) / 1000)}</dd></div>
-              {data.settings?.homeDeadline && <div><dt>帰宅締切</dt><dd>{data.settings.homeDeadline}</dd></div>}
-            </dl>
-            {openRental ? (
-              <RentalStatus rental={openRental} now={now} onReturn={() => void run(() => endRental(db, active.id, openRental.id))} />
-            ) : (
-              selectedTariff && (
-                <div className="line">
-                  {data.tariffs.length > 1 && (
-                    <select className="grow" aria-label="料金" value={selectedTariff.id} onChange={(e) => setTariffId(e.target.value)}>
-                      {data.tariffs.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  <button type="button" className={data.tariffs.length > 1 ? 'main-action grow' : 'main-action'} onClick={() => void run(() => startRental(db, active.id, selectedTariff))}>
-                    🚲 レンタル開始
-                  </button>
-                </div>
-              )
-            )}
-            <button
-              type="button"
-              className="primary"
-              onClick={() =>
-                void run(async () => {
-                  await arriveHome(db, active.id)
-                  onSettle(active.id)
-                })
-              }
-            >
-              🏁 帰宅して精算
-            </button>
+          <div className="today-clock">
+            <div>
+              <span className="label">出発から</span>
+              <strong className="clock num" aria-label={`出発から${Math.floor(elapsedMinutes / 60)}時間${elapsedMinutes % 60}分`}>
+                {pad2(Math.floor(elapsedMinutes / 60))}:{pad2(elapsedMinutes % 60)}
+              </strong>
+            </div>
+            <div className="today-return">
+              <span className="label">帰宅予定</span>
+              <strong className="num">{endAt ? formatClock(endAt).slice(0, 5) : '—'}</strong>
+            </div>
           </div>
         )}
         <Problems items={problems} />
-        {data.settings?.offerJudgeEnabled && <a className="button-link" href="#offer">🧾 オファー判定</a>}
       </section>
+
+      {active && (openRental ? (
+        <RentalStatus rental={openRental} now={now} onReturn={() => void run(() => endRental(db, active.id, openRental.id))} />
+      ) : (
+        selectedTariff && (
+          <section className="card stack" aria-label="レンタル">
+            <div className="line">
+              {data.tariffs.length > 1 && (
+                <select className="grow" aria-label="料金" value={selectedTariff.id} onChange={(e) => setTariffId(e.target.value)}>
+                  {data.tariffs.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              )}
+              <button type="button" className={data.tariffs.length > 1 ? 'main-action grow' : 'main-action'} onClick={() => void run(() => startRental(db, active.id, selectedTariff))}>
+                レンタル開始
+              </button>
+            </div>
+          </section>
+        )
+      ))}
+
+      {active && endAt && (
+        <QuestPush
+          now={`${now.slice(0, 16)}:00.000Z`}
+          sessionId={active.id}
+          departedAt={active.departedAt}
+          platform={active.platform}
+          acceptedOffers={data.offers.filter((o) => o.outcome === 'accepted' && o.at >= active.departedAt).length}
+          endAt={endAt}
+          lastAt={homeDeadline ? new Date(deadlineMs(active.departedAt, homeDeadline) - loadPrefs().minutesToHome * 60_000).toISOString() : null}
+          revenuePerHourYen={estimateRevenue(now, new Date(Date.parse(now) + 3_600_000).toISOString(), sessions, area?.levels ?? null).revenueYen}
+        />
+      )}
 
       {!active && awaitingSettle > 0 && <section className="card notice-card"><h3>精算待ちが{awaitingSettle}件あります</h3><p>売上と経費を確認すると、実質時給が分かります。</p><a className="button-link" href="#records">未精算の記録を確認</a></section>}
       {!active && data.settings?.weeklyBudgetMinutes == null && <section className="card"><h3>自分に合う働き方を設定</h3><p>働ける時間と料金を決めて、今週の計画を作れます。</p><a className="button-link" href="#plan">働ける条件を設定する</a></section>}
-      <CashChange />
-      <QuestCard now={now} />
-      {data.areas.length > 0 && <section className="card"><h3>エリアの傾向</h3><p className="hint">登録した時間帯の傾向です。現在の注文状況ではありません。</p><BusyAhead areas={data.areas} primaryId={area?.id ?? null} now={now} /></section>}
-      {active && <section className="stack" aria-labelledby="next-action-title"><h3 id="next-action-title">このあとどうする？</h3>
-        <OutlookCard
-          now={now}
-          sessionId={active.id}
-          departedAt={active.departedAt}
-          rental={openRental && openRental.startAt ? { tariff: openRental.tariff, startAt: openRental.startAt } : null}
-          past={pastSessionsFor(data.sessions)}
-          busyness={area?.levels ?? null}
-          offers={data.offers}
-          allOffers={data.offers}
-          targetHourlyYen={target}
-          homeDeadline={data.settings?.homeDeadline ?? null}
-          moveAreas={data.areas.filter((a) => area && a.id !== area.id && a.moveMinutes && a.moveFromAreaId === area.id).map((a) => ({ name: a.name, minutes: a.moveMinutes!, levels: a.levels }))}
-          platform={active.platform}
-          acceptedOffers={data.offers.filter((o) => o.outcome === 'accepted' && o.at >= active.departedAt).length}
-        />
-        <ContinueCard
-          now={now}
-          departedAt={active.departedAt}
-          rental={openRental && openRental.startAt ? { tariff: openRental.tariff, startAt: openRental.startAt } : null}
-          past={pastSessionsFor(data.sessions)}
-          targetHourlyYen={target}
-          homeDeadline={data.settings?.homeDeadline ?? null}
-          busyness={area?.levels ?? null}
-        />
-      </section>}
+      {!active && <QuestCard now={now} />}
 
       {needsBackup && (
         <section className="card notice-card line" role="status">
@@ -177,68 +246,66 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         </section>
       )}
 
-      <section className="card" aria-labelledby="month-title">
-        <CardTitle id="month-title" tip="税引前。営業純時給＝営業純利益 ÷ 出発〜帰宅の時間。投資配賦後は、装備・車両の購入額を月ごとに配った額も引いた時給です。">
-          📅 {today.slice(5, 7).replace(/^0/, '')}月の成績
-        </CardTitle>
-        {month.rows.length === 0 && month.totals.costYen === 0 ? (
-          <p className="hint">まだ確定した記録がありません。</p>
-        ) : (
-          <dl className="stats">
-            <div><dt>営業純利益</dt><dd className="big">{formatYen(month.totals.operatingProfitYen)}</dd></div>
-            <div>
-              <dt>営業純時給</dt>
-              <dd>
-                {month.totals.hourlyYen === null ? '算出不可' : `${formatYen(month.totals.hourlyYen)}/時`}
-                {target !== null && month.totals.hourlyYen !== null && (month.totals.hourlyYen >= target ? ' 🎯' : '（目標未満）')}
-              </dd>
-            </div>
-            <div><dt>投資配賦後の時給</dt><dd>{month.totals.afterAllocationHourlyYen === null ? '算出不可' : `${formatYen(month.totals.afterAllocationHourlyYen)}/時`}</dd></div>
-            <div><dt>稼働</dt><dd>{month.rows.length}回・{month.totals.hours.toFixed(1)}時間</dd></div>
-          </dl>
-        )}
-        {month.excludedDrafts + month.excludedInvalid > 0 && (
-          <p className="hint">⚠️ 下書き・要確認の{month.excludedDrafts + month.excludedInvalid}件は集計外</p>
-        )}
-      </section>
+      {helpers}
+
+      {active && (
+        <div className="settle-bar">
+          <button
+            type="button"
+            className="primary"
+            onClick={() =>
+              void run(async () => {
+                await arriveHome(db, active.id)
+                onSettle(active.id)
+              })
+            }
+          >
+            帰宅して精算
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
 function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<typeof calculateRental>[0]['tariff']; tariffName: string; startAt: string | null }; now: string; onReturn: () => void }) {
   const r = calculateRental({ tariff: rental.tariff, startAt: rental.startAt }, now)
+  const step = rental.startAt ? nextChargeYen(rental.tariff, rental.startAt, r.nextIncreaseAt, r.amountYen) : null
+  const left = r.nextIncreaseAt ? Math.max(0, Math.floor((Date.parse(r.nextIncreaseAt) - Date.parse(now)) / 1000)) : null
   return (
-    <div className="subcard stack rental-status">
+    <section className="card stack rental-status" aria-labelledby="rental-title">
       <div className="line">
-        <span className="grow hint">🚲 {rental.tariffName}</span>
-        <Tip label="レンタル料金">料金設定からの見積です。返却した時は、シェアサイクルのアプリに出る請求額が正しい額です。</Tip>
+        <h3 id="rental-title" className="grow">レンタル料金<span className="hint">（見積）</span></h3>
+        <Tip label="レンタル料金">{rental.tariffName}。料金設定からの見積です。返却した時は、シェアサイクルのアプリに出る請求額が正しい額です。</Tip>
       </div>
-      <dl className="stats">
-        <div><dt>レンタル経過</dt><dd>{formatDuration(r.elapsedSeconds ?? 0)}</dd></div>
-        <div><dt>見積料金</dt><dd className="big">{formatYen(r.amountYen)}</dd></div>
-        <div className="wide next-charge">
-          <dt>次の課金</dt>
-          <dd>
-            {r.nextIncreaseAt
-              ? `${formatClock(r.nextIncreaseAt)}（あと${formatDuration((Date.parse(r.nextIncreaseAt) - Date.parse(now)) / 1000)}）`
-              : r.capped
-                ? '上限に到達：上限の時間内は追加課金なし'
-                : rental.tariff.kind === 'none'
-                  ? '貸出ごとの料金なし'
-                  : '見積の対象外（実請求額を確認）'}
-          </dd>
-        </div>
-      </dl>
+      <p className="rental-amount num">{r.amountYen === null ? '見積の対象外' : formatYen(r.amountYen)}</p>
+      <p className="next-charge line">
+        {left !== null ? (
+          <>
+            <span className="grow">
+              ⏱ 次の課金まで <strong className="num">{pad2(Math.floor(left / 60))}:{pad2(left % 60)}</strong>
+              <span className="visually-hidden">（{formatClock(r.nextIncreaseAt!)}）</span>
+            </span>
+            {step !== null && step > 0 && <span>次回 <strong className="num">+{formatYen(step)}</strong></span>}
+          </>
+        ) : (
+          <span className="grow">
+            {r.capped ? '上限に到達：上限の時間内は追加課金なし' : rental.tariff.kind === 'none' ? '貸出ごとの料金なし' : '見積の対象外（実請求額を確認）'}
+          </span>
+        )}
+      </p>
+      <button type="button" className="main-action outline" onClick={onReturn}>
+        ↩ 返却を記録
+      </button>
       <details className="rental-details"><summary>料金の上限・乗る長さごとの料金</summary>
       {rental.startAt && rental.tariff.kind === 'tiered' && <CapLine tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       {rental.tariff.kind !== 'none' && <CostByLength tariff={rental.tariff} />}
       </details>
       {/* 休憩の比較は折りたたみの外に置く（昼下がりは自動で開く） */}
       {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
-      <button type="button" className="main-action" onClick={onReturn}>
-        🅿️ 返却した
-      </button>
-    </div>
+    </section>
   )
 }
 

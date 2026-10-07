@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Icon } from './components/Icon'
 import { DataProvider, useData } from './storage/context'
 import { Analytics } from './features/Analytics'
 import { Home } from './features/Home'
@@ -9,10 +10,10 @@ import { Settings } from './features/Settings'
 import { applyUpdate, useOnline, usePwa } from './pwa'
 
 const TABS = [
-  { id: 'home', label: '今日', icon: '🏠' },
-  { id: 'plan', label: '計画', icon: '🗓️' },
-  { id: 'records', label: '記録', icon: '📝' },
-  { id: 'analytics', label: '分析', icon: '📊' },
+  { id: 'home', label: '今日' },
+  { id: 'plan', label: '計画' },
+  { id: 'records', label: '記録' },
+  { id: 'analytics', label: '分析' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id'] | 'offer' | 'settings'
@@ -57,7 +58,7 @@ function Shell() {
     <div className="app">
       <header className="app-header">
         <h1>デリ勘</h1>
-        <a className="settings-link" href="#settings" aria-label="設定" aria-current={tab === 'settings' ? 'page' : undefined}>⚙️ 設定</a>
+        <a className="settings-link" href="#settings" aria-label="設定" aria-current={tab === 'settings' ? 'page' : undefined}><Icon name="settings" />設定</a>
         {!online && (
           <span className="tag" role="status" title="電波がなくても記録できます（端末に保存されます）">
             📴 オフライン・記録できます
@@ -97,7 +98,7 @@ function Shell() {
       <nav className="tabbar" aria-label="メニュー">
         {TABS.map((t) => (
           <a key={t.id} href={`#${t.id}`} aria-current={t.id === active?.id ? 'page' : undefined} onClick={() => t.id !== 'records' && setEditId(null)}>
-            <span aria-hidden="true">{t.icon}</span>
+            <Icon name={t.id} />
             {t.label}
           </a>
         ))}

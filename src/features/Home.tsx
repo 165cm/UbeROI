@@ -108,7 +108,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
                       ))}
                     </select>
                   )}
-                  <button type="button" className={data.tariffs.length > 1 ? 'grow' : undefined} onClick={() => void run(() => startRental(db, active.id, selectedTariff))}>
+                  <button type="button" className={data.tariffs.length > 1 ? 'main-action grow' : 'main-action'} onClick={() => void run(() => startRental(db, active.id, selectedTariff))}>
                     🚲 レンタル開始
                   </button>
                 </div>
@@ -229,10 +229,13 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
           </dd>
         </div>
       </dl>
+      <details className="rental-details"><summary>料金の上限・乗る長さごとの料金</summary>
       {rental.startAt && rental.tariff.kind === 'tiered' && <CapLine tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       {rental.tariff.kind !== 'none' && <CostByLength tariff={rental.tariff} />}
+      </details>
+      {/* 休憩の比較は折りたたみの外に置く（昼下がりは自動で開く） */}
       {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
-      <button type="button" onClick={onReturn}>
+      <button type="button" className="main-action" onClick={onReturn}>
         🅿️ 返却した
       </button>
     </div>

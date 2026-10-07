@@ -6,6 +6,7 @@ test('レンタル中は上限までの残りと、上限の後は追加 0円に
   await page.goto('#home')
   await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
   await page.getByRole('button', { name: '🚲 レンタル開始' }).click()
+  await page.getByText('料金の上限・乗る長さごとの料金', { exact: true }).click()
   await expect(page.getByText(/上限 2,500円 まで あと/)).toBeVisible()
   // 14:00 に借りると、18:00（240分1秒）に上限に達し、翌2:00（12時間）までは増えない
   await expect(page.getByText(/（18:00）。そこから 02:00 までは追加 0円/)).toBeVisible()
@@ -20,6 +21,7 @@ test('レンタル中は上限までの残りと、上限の後は追加 0円に
   // 18:30 には上限に到達している
   await page.clock.setFixedTime(new Date('2026-10-05T18:30:00+09:00'))
   await page.reload()
+  await page.getByText('料金の上限・乗る長さごとの料金', { exact: true }).click()
   await expect(page.getByText(/上限 2,500円 に到達。02:00 まで追加 0円/)).toBeVisible()
 
   // 終了までの見通しにも出る。上限で乗れる時間（翌2:00）を過ぎる終了予定なら、その先は見積の対象外と伝える

@@ -1,15 +1,15 @@
 :root {
-  --bg: #f6f7f5;
+  --bg: #f4f6f3;
   --surface: #ffffff;
-  --text: #1c1f1d;
-  --text-muted: #5b625e;
+  --text: #15231c;
+  --text-muted: #526159;
   --border: #d9ddd9;
-  --accent: #0f766e;
+  --accent: #166b45;
   --accent-text: #ffffff;
   --danger: #b42318;
   --warn: #b54708;
   /* グラフの色（検証済み：明るさ帯・彩度・背景とのコントラスト） */
-  --chart: #0d9488;
+  --chart: #166b45;
   --chart-muted: #b9c0bc;
   /* 混み具合の段階の色（4 混む＝緑 → 1 空き＝赤）。数字も必ず一緒に出す（色だけに頼らない） */
   --busy-4: #2f9e44;
@@ -19,24 +19,27 @@
   --grid: #e6e9e6;
   /* クエストのために足す時間（混み具合の色と見分けるため紫） */
   --quest: #7c3aed;
-  --radius: 12px;
+  --radius: 16px;
+  --estimate: #3869b1;
+  --estimate-bg: #edf3fc;
+  --attention-bg: #fff4dc;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  line-height: 1.45;
+  line-height: 1.6;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #121514;
-    --surface: #1c201e;
-    --text: #e8ece9;
-    --text-muted: #a3aba6;
+    --bg: #101815;
+    --surface: #1c2822;
+    --text: #f2f6f3;
+    --text-muted: #b7c6bd;
     --border: #343a37;
-    --accent: #2dd4bf;
-    --accent-text: #08201d;
+    --accent: #64d9a0;
+    --accent-text: #102218;
     --danger: #f97066;
-    --warn: #fdb022;
-    --chart: #1aa89a;
+    --warn: #f4b544;
+    --chart: #64d9a0;
     --chart-muted: #4a524e;
     --busy-4: #37b24d;
     --busy-3: #a3cf45;
@@ -44,6 +47,9 @@
     --busy-1: #ef6a57;
     --grid: #2a2f2c;
     --quest: #b197fc;
+    --estimate: #a9c9ff;
+    --estimate-bg: #1d2c40;
+    --attention-bg: #332a18;
   }
 }
 
@@ -1433,7 +1439,7 @@ select.inline-select {
   font-weight: 700;
   line-height: 16px;
   text-align: center;
-  color: #1c1f1d;
+  color: #15231c;
 }
 
 /* 計画：くわしく見る（比べ方・一覧・エリアの順番・装備）は畳んでおく */
@@ -1614,3 +1620,61 @@ details.more[open] > summary {
 .wb-readable { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .875rem; padding: 4px 0 8px; color: var(--text); }
 .wb-day { border-bottom: 1px solid var(--border); }
 .wb-day > .wb-add { grid-column: 5; grid-row: 1; }
+
+/* 配達員向けの表示体系：昼夜とも、同じ場所で同じ情報を読める */
+.app { max-width: 680px; }
+.app-header { padding: 12px 16px 8px; gap: 12px; flex-wrap: wrap; }
+.app-header h1 { font-size: 1.6rem; font-weight: 850; letter-spacing: -.06em; }
+.settings-link { gap: 6px; color: var(--text-muted); font-size: .875rem; }
+.ui-icon { width: 24px; height: 24px; flex-shrink: 0; }
+.app-main { padding: 0 16px calc(88px + env(safe-area-inset-bottom)); gap: 16px; }
+h2#page-title { font-size: 1.375rem; font-weight: 750; }
+.stack { gap: 14px; }
+.card { padding: 18px 16px; }
+.card h3 { font-size: 1rem; margin-bottom: 8px; }
+.card-title h3 { margin: 0; }
+.hint, .card.muted p { font-size: .875rem; line-height: 1.55; }
+.stats { gap: 12px 16px; }
+.stats dt { font-size: .875rem; }
+.stats dd { font-size: 1.125rem; }
+.stats .big { font-size: 2rem; letter-spacing: -.03em; line-height: 1.25; overflow-wrap: anywhere; }
+.stats .elapsed { font-size: 2.5rem; }
+/* 主な操作（出発・レンタル開始・返却・精算・保存）は52px以上 */
+button.primary, button.main-action { min-height: 52px; font-weight: 750; }
+button.icon { min-width: 44px; width: 44px; min-height: 44px; }
+input, select, textarea { min-width: 0; }
+.field label, .field > span { font-size: .875rem; }
+.field input, .field select { min-height: 48px; }
+.tip-button { width: 36px; min-height: 36px; height: 36px; flex-shrink: 0; }
+.today-card { border-top: 4px solid var(--accent); }
+.rental-status { border-style: solid; padding: 14px; }
+.next-charge { background: var(--attention-bg); padding: 10px 12px; border-radius: 10px; }
+.next-charge dt { color: var(--text); }
+.next-charge dd { color: var(--warn); font-weight: 700; }
+.week-options { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 10px; }
+.week-options > button.week-option { font-size: 1rem; gap: 8px; padding: 16px; }
+.week-options > button.week-option[aria-checked='true'] { color: var(--text); border-color: var(--estimate); background: var(--estimate-bg); }
+.week-option strong { font-size: 1.125rem; }
+.strategy-plan .list > li { padding: 12px 0; }
+.outlook-options .picked { border-left: 4px solid var(--accent); padding: 12px; background: var(--bg); border-radius: 10px; }
+.settlement-result { padding: 18px; }
+.settlement-actions { bottom: calc(76px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 18px #0000000d; }
+.empty-state { border-left: 4px solid var(--accent); }
+.tabbar { left: 50%; transform: translateX(-50%); width: 100%; max-width: 680px; right: auto; }
+.tabbar a { min-height: 68px; gap: 5px; font-size: .8125rem; position: relative; }
+.tabbar a[aria-current='page']::after { content: ''; position: absolute; bottom: 4px; width: 24px; height: 3px; border-radius: 2px; background: var(--accent); }
+.wb-readable { line-height: 1.5; }
+button, a, summary { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 359px) {
+  .app-main { padding-inline: 12px; }
+  .card { padding: 14px 12px; }
+  .stats .big { font-size: 1.75rem; }
+  .stats .elapsed { font-size: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}
+
+.settlement-summary { grid-column: 1 / -1; margin: 0 0 6px; font-size: .875rem; }
+.rental-details > summary { font-size: .875rem; }

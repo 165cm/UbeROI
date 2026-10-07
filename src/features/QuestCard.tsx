@@ -38,7 +38,7 @@ export function QuestCard({ now }: { now: string }) {
   // 編集するクエストと、件数の調整を入れる回（くり返すクエストは回ごとに調整を持つ）
   const [editing, setEditing] = useState<{ quest: QuestRecord; index: number } | null>(null)
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
-  // リーダーボードを入れているクエスト
+  // リーダーボードを入れているクエストの回（くり返すクエストは前の回と今の回が並ぶので、回まで区別する）
   const [boardFor, setBoardFor] = useState<string | null>(null)
   if (!data) return null
 
@@ -93,6 +93,7 @@ export function QuestCard({ now }: { now: string }) {
             )
             const target = p.next ? p.count + p.next.remaining : q.tiers[q.tiers.length - 1]?.count ?? p.count
             const upcoming = nowMs < Date.parse(occ.startsAt)
+            const boardKey = `${q.id}-${occ.index}`
             return (
               <div key={`${q.id}-${occ.index}`} className="subcard">
                 <div className="line">
@@ -101,7 +102,7 @@ export function QuestCard({ now }: { now: string }) {
                     {repeat !== 'none' && <span className="hint"> 🔁 {QUEST_REPEAT_LABELS[repeat]}</span>}
                   </strong>
                   <span className="tag">{p.ended ? '⌛ 終了' : upcoming ? '🕒 これから' : PLATFORM_LABELS[q.platform]}</span>
-                  <button type="button" className="icon" aria-label={`${q.label}のリーダーボードを入れる`} aria-expanded={boardFor === q.id} onClick={() => setBoardFor(boardFor === q.id ? null : q.id)}>🏆</button>
+                  <button type="button" className="icon" aria-label={`${q.label}のリーダーボードを入れる`} aria-expanded={boardFor === boardKey} onClick={() => setBoardFor(boardFor === boardKey ? null : boardKey)}>🏆</button>
                   <button type="button" className="icon" aria-label={`${q.label}を編集・件数の調整`} onClick={() => setEditing({ quest: q, index: occ.index })}>✏️</button>
                   <button
                     type="button"
@@ -128,7 +129,7 @@ export function QuestCard({ now }: { now: string }) {
                 </p>
                 {p.unknownCountSessions > 0 && <p className="hint">⚠️ 件数未入力の記録{p.unknownCountSessions}件は数えていません</p>}
                 {q.leaderboard && <LeaderboardSummary board={q.leaderboard} occ={occ} countNow={p.count} />}
-                {boardFor === q.id && (
+                {boardFor === boardKey && (
                   <LeaderboardForm
                     quest={q}
                     onCancel={() => setBoardFor(null)}

@@ -43,6 +43,10 @@ describe('リーダーボードの画面の読み取り', () => {
       { rank: 9, count: 23 },
     ])
     expect(parseLeaderboardText('あなた：9位 23件').me).toEqual({ rank: 9, count: 23 })
+    // 名前の一部の「You」（Young など）は自分にしない。英語の表示の「You」だけの語は自分
+    const en = parseLeaderboardText('3位 Young 31件\n4位 Yousef 27件\n9位 You 23件')
+    expect(en.me).toEqual({ rank: 9, count: 23 })
+    expect(parseLeaderboardText('3位 Young 31件').me).toBeNull()
     expect(parseLeaderboardText('クエストの進捗\n40回の乗車 ¥3,770').missing).toEqual(['rows', 'me'])
   })
 })

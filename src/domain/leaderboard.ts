@@ -36,12 +36,14 @@ export interface LeaderboardReading {
   missing: ('rows' | 'me')[]
 }
 
-const ME = /あなた|自分|You/i
+/** 自分の行の目印：「あなた」「自分」、英語の表示の「You」（名前の一部の Young などは自分にしない。区切りに挟まれた語だけ） */
+const isMeLine = (raw: string, line: string) => /あなた|自分/.test(line) || /(?:^|[|(:])[yＹ]ou(?=[|):]|$)/i.test(raw)
 
 /** 文字認識の結果から、順位と件数・自分の行・賞金を読む。名前などほかの文字は捨てる */
 export function parseLeaderboardText(text: string): LeaderboardReading {
   // 空白は「|」にして残す（名前の最後の数字と件数がくっつかないように）
-  const spaced = normalizeOcrText(text.replace(/[ \t　]+/g, '|')).split('\n')
+  // 英字が続く Y（You・Yamada など）は、¥ の読み違いとして直さないように全角の Ｙ にしておく
+  const spaced = normalizeOcrText(text.replace(/[ \t　]+/g, '|').replace(/Y(?=[a-z])/g, 'Ｙ')).split('\n')
   const rows = new Map<number, number>()
   const prizes: LeaderboardPrize[] = []
   let me: LeaderboardRow | null = null
@@ -62,7 +64,7 @@ export function parseLeaderboardText(text: string): LeaderboardReading {
     // 順位の後の「位」か、件数の後の「件・回」のどちらかが要る。件数は行の最後の数（名前の中の数字を拾わないように、後ろから探す）
     const r = raw.match(/^(\D{0,12}?)(\d{1,3})\|?(位|\.|\))?/)
     const tail = raw.match(/(?<=^|\D)(\d{1,4})\|?(件|回)?\D*$/)
-    const isMe = ME.test(line)
+    const isMe = isMeLine(raw, line)
     if (r && tail && (r[3] === '位' || tail[2])) {
       const rankEnd = r[0].length
       const rank = Number(r[2])

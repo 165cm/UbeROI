@@ -152,6 +152,30 @@ export function OutlookCard({
         <strong className="num">あと{formatLeft(result.minutesLeft)}</strong>
       </div>
 
+      <p className="hint">ここから増える利益の見込みです。確定した売上には入りません。</p>
+      <ul className="list outlook-options" aria-label="行動ごとのこの先の利益">
+        {result.options.map((o) => {
+          const picked = o.action === result.recommended
+          return (
+            <li key={o.action} className={`line${picked ? ' picked' : ''}`}>
+              <span className="grow">
+                {picked ? '▶ ' : ''}
+                {o.action === 'break' ? `${o.breakMinutes}分休憩して再開` : o.action === 'move' ? `${o.areaName}へ移動（${o.moveMinutes}分）` : ACTION_LABELS[o.action]}
+                {picked && <span className="tag">おすすめ</span>}
+              </span>
+              <span className="num">
+                {o.profitYen === null ? '算出不可' : `${o.profitYen > 0 ? '+' : ''}${formatYen(o.profitYen)}`}
+                {o.hourlyYen !== null && (
+                  <>
+                    <br />
+                    <span className="hint">{formatYen(o.hourlyYen)}/時</span>
+                  </>
+                )}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
       <dl className="stats">
         <div>
           <dt>今日のここまで</dt>
@@ -185,29 +209,6 @@ export function OutlookCard({
         </p>
       )}
 
-      <ul className="list outlook-options" aria-label="行動ごとのこの先の利益">
-        {result.options.map((o) => {
-          const picked = o.action === result.recommended
-          return (
-            <li key={o.action} className={`line${picked ? ' picked' : ''}`}>
-              <span className="grow">
-                {picked ? '▶ ' : ''}
-                {o.action === 'break' ? `${o.breakMinutes}分休憩して再開` : o.action === 'move' ? `${o.areaName}へ移動（${o.moveMinutes}分）` : ACTION_LABELS[o.action]}
-                {picked && <span className="tag">おすすめ</span>}
-              </span>
-              <span className="num">
-                {o.profitYen === null ? '算出不可' : `${o.profitYen > 0 ? '+' : ''}${formatYen(o.profitYen)}`}
-                {o.hourlyYen !== null && (
-                  <>
-                    <br />
-                    <span className="hint">{formatYen(o.hourlyYen)}/時</span>
-                  </>
-                )}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
       <div role="status">
         <ul className="reasons">
           {result.reasons.map((r) => (

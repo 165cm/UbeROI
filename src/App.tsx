@@ -9,19 +9,18 @@ import { Settings } from './features/Settings'
 import { applyUpdate, useOnline, usePwa } from './pwa'
 
 const TABS = [
-  { id: 'home', label: 'ホーム', icon: '🏠' },
+  { id: 'home', label: '今日', icon: '🏠' },
+  { id: 'plan', label: '計画', icon: '🗓️' },
   { id: 'records', label: '記録', icon: '📝' },
   { id: 'analytics', label: '分析', icon: '📊' },
-  { id: 'plan', label: '計画', icon: '🗓️' },
-  { id: 'settings', label: '設定', icon: '⚙️' },
 ] as const
 
-type TabId = (typeof TABS)[number]['id'] | 'offer'
+type TabId = (typeof TABS)[number]['id'] | 'offer' | 'settings'
 
 /** 「#offer?text=…」のように、画面の名前の後ろに値が付くことがある（ショートカットから開く時） */
 function currentTab(): TabId {
   const hash = window.location.hash.replace('#', '').split('?')[0]!
-  if (hash === 'offer') return 'offer'
+  if (hash === 'offer' || hash === 'settings') return hash
   return TABS.some((t) => t.id === hash) ? (hash as TabId) : 'home'
 }
 
@@ -52,12 +51,13 @@ function Shell() {
   }, [])
 
   // オファー判定はホームから開く画面なので、下のメニューではホームを選んだ状態にする
-  const active = TABS.find((t) => t.id === (tab === 'offer' ? 'home' : tab))!
+  const active = TABS.find((t) => t.id === (tab === 'offer' ? 'home' : tab))
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>デリ勘</h1>
+        <a className="settings-link" href="#settings" aria-label="設定" aria-current={tab === 'settings' ? 'page' : undefined}>⚙️ 設定</a>
         {!online && (
           <span className="tag" role="status" title="電波がなくても記録できます（端末に保存されます）">
             📴 オフライン・記録できます
@@ -78,8 +78,8 @@ function Shell() {
         </p>
       )}
       <main className="app-main" aria-labelledby="page-title">
-        {/* 画面の名前は下のメニューで分かるので、見た目では出さず読み上げ用に残す */}
-        <h2 id="page-title" className="visually-hidden">{tab === 'offer' ? 'オファー判定' : active.label}</h2>
+        {/* メニューに加え、画面の見出しでも現在地を示す */}
+        <h2 id="page-title">{tab === 'offer' ? 'オファー判定' : tab === 'settings' ? '設定' : active?.label}</h2>
         {tab === 'home' && (
           <Home
             onSettle={(id) => {
@@ -96,7 +96,7 @@ function Shell() {
       </main>
       <nav className="tabbar" aria-label="メニュー">
         {TABS.map((t) => (
-          <a key={t.id} href={`#${t.id}`} aria-current={t.id === active.id ? 'page' : undefined} onClick={() => t.id !== 'records' && setEditId(null)}>
+          <a key={t.id} href={`#${t.id}`} aria-current={t.id === active?.id ? 'page' : undefined} onClick={() => t.id !== 'records' && setEditId(null)}>
             <span aria-hidden="true">{t.icon}</span>
             {t.label}
           </a>

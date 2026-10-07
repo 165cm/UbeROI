@@ -83,9 +83,9 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
 
   return (
     <div className="stack">
-      <section className="card" aria-labelledby="today-title">
+      <section className="card today-card" aria-labelledby="today-title">
         <h3 id="today-title">今日の状態：{status}</h3>
-        <BusyAhead areas={data.areas} primaryId={area?.id ?? null} now={now} />
+
         {!active ? (
           <button type="button" className="primary" onClick={() => void run(() => departNow(db))}>
             🏠 自宅を出発
@@ -93,7 +93,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         ) : (
           <div className="stack">
             <dl className="stats">
-              <div><dt>出発から</dt><dd>{formatDuration((Date.parse(now) - Date.parse(active.departedAt)) / 1000)}</dd></div>
+              <div><dt>出発から</dt><dd className="big elapsed">{formatDuration((Date.parse(now) - Date.parse(active.departedAt)) / 1000)}</dd></div>
               {data.settings?.homeDeadline && <div><dt>帰宅締切</dt><dd>{data.settings.homeDeadline}</dd></div>}
             </dl>
             {openRental ? (
@@ -132,7 +132,12 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         {data.settings?.offerJudgeEnabled && <a className="button-link" href="#offer">🧾 オファー判定</a>}
       </section>
 
-      {active && (
+      {!active && awaitingSettle > 0 && <section className="card notice-card"><h3>精算待ちが{awaitingSettle}件あります</h3><p>売上と経費を確認すると、実質時給が分かります。</p><a className="button-link" href="#records">未精算の記録を確認</a></section>}
+      {!active && data.settings?.weeklyBudgetMinutes == null && <section className="card"><h3>自分に合う働き方を設定</h3><p>働ける時間と料金を決めて、今週の計画を作れます。</p><a className="button-link" href="#plan">働ける条件を設定する</a></section>}
+      <CashChange />
+      <QuestCard now={now} />
+      {data.areas.length > 0 && <section className="card"><h3>エリアの傾向</h3><p className="hint">登録した時間帯の傾向です。現在の注文状況ではありません。</p><BusyAhead areas={data.areas} primaryId={area?.id ?? null} now={now} /></section>}
+      {active && <section className="stack" aria-labelledby="next-action-title"><h3 id="next-action-title">このあとどうする？</h3>
         <OutlookCard
           now={now}
           sessionId={active.id}
@@ -148,9 +153,6 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           platform={active.platform}
           acceptedOffers={data.offers.filter((o) => o.outcome === 'accepted' && o.at >= active.departedAt).length}
         />
-      )}
-
-      {active && (
         <ContinueCard
           now={now}
           departedAt={active.departedAt}
@@ -160,11 +162,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           homeDeadline={data.settings?.homeDeadline ?? null}
           busyness={area?.levels ?? null}
         />
-      )}
-
-      <CashChange />
-
-      <QuestCard now={now} />
+      </section>}
 
       {needsBackup && (
         <section className="card notice-card line" role="status">
@@ -210,7 +208,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
 function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<typeof calculateRental>[0]['tariff']; tariffName: string; startAt: string | null }; now: string; onReturn: () => void }) {
   const r = calculateRental({ tariff: rental.tariff, startAt: rental.startAt }, now)
   return (
-    <div className="subcard stack">
+    <div className="subcard stack rental-status">
       <div className="line">
         <span className="grow hint">🚲 {rental.tariffName}</span>
         <Tip label="レンタル料金">料金設定からの見積です。返却した時は、シェアサイクルのアプリに出る請求額が正しい額です。</Tip>
@@ -218,7 +216,7 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
       <dl className="stats">
         <div><dt>レンタル経過</dt><dd>{formatDuration(r.elapsedSeconds ?? 0)}</dd></div>
         <div><dt>見積料金</dt><dd className="big">{formatYen(r.amountYen)}</dd></div>
-        <div className="wide">
+        <div className="wide next-charge">
           <dt>次の課金</dt>
           <dd>
             {r.nextIncreaseAt

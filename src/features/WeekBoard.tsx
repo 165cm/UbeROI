@@ -324,6 +324,11 @@ export function WeekBoard({
                     {today && <span className="wb-now" aria-hidden="true" style={{ left: `${((nowMs - d.start) / DAY) * 100}%` }} />}
                   </span>
                   <span className="wb-hours num">{hours > 0 ? fmtH(hours) : ''}</span>
+                  <span className="wb-readable">
+                    {daySlots.filter((s) => s.chosen).map((s) => <span key={s.id}>登録済み {hm(Date.parse(s.startsAt))}〜{hm(Date.parse(s.endsAt))}</span>)}
+                    {planShifts.filter((s) => Date.parse(s.startsAt) < d.end && Date.parse(s.endsAt) > d.start).map((s) => <span key={s.startsAt}>提案 {hm(Date.parse(s.startsAt))}〜{hm(Date.parse(s.endsAt))}</span>)}
+                    {!daySlots.some((s) => s.chosen) && !planShifts.some((s) => Date.parse(s.startsAt) < d.end && Date.parse(s.endsAt) > d.start) && <span>{past ? '終了した日' : '予定なし'}</span>}
+                  </span>
                   {past ? (
                     <span className="wb-add" />
                   ) : (

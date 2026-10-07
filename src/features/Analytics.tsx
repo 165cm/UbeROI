@@ -158,6 +158,7 @@ export function Analytics() {
         <p className="problems" role="alert">開始日と終了日を選び、開始日は終了日以前にしてください。</p>
       ) : (
         <>
+          {result.rows.length === 0 && <section className="card empty-state"><h3>この期間の確定した記録はありません</h3><p>稼働を記録して精算すると、実質時給と利益を振り返れます。</p><a className="button-link" href="#records">記録・未精算を確認する</a><p className="hint">固定費や装備費がある場合は、稼働がなくても下に表示します。</p></section>}
           <section className="card" aria-labelledby="kpi-title">
             <CardTitle
               id="kpi-title"
@@ -239,6 +240,7 @@ export function Analytics() {
             )}
           </section>
 
+          <details className="more"><summary>装備の購入・年間の所得・詳しい比較</summary><div className="stack">
           <section className="card stack" aria-labelledby="buy-title">
             <CardTitle
               id="buy-title"
@@ -283,6 +285,7 @@ export function Analytics() {
           <Breakdown title="📅 曜日別（帰宅日）" rows={result.byWeekday} />
           <Breakdown title="📱 サービス別" rows={result.byPlatform} />
           <Breakdown title="📍 エリア別" rows={result.byArea} />
+          </div></details>
         </>
       )}
     </div>

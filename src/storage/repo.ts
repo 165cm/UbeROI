@@ -106,6 +106,7 @@ export async function saveSettings(db: DeliKanDB, patch: Partial<Omit<SettingsRe
   }
   if (patch.availability != null) problems.push(...availabilityProblems(patch.availability))
   if (patch.weatherOverrides !== undefined) problems.push(...weatherOverrideProblems(patch.weatherOverrides))
+  if (patch.maxDayHours !== undefined && (!Number.isSafeInteger(patch.maxDayHours) || patch.maxDayHours < 2 || patch.maxDayHours > 16)) problems.push('1日の最長は2〜16時間で入れてください')
   if (patch.homeDeadline != null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(patch.homeDeadline)) {
     problems.push('帰宅締切は 21:30 のように入力してください')
   }

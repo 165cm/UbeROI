@@ -26,8 +26,7 @@
 | `src/domain/equipment.ts` | 装備プラン（初級／中級／上級）の合計・必要な現金 |
 | `src/domain/quest.ts` | 選択制クエストの期間、クエストの進み具合、休憩前の返却で節約できる額 |
 | `src/domain/areaRoute.ts` | 時間帯ごとのエリア計画（正時で区切り、移動の分と1回200円を引いて、どの時間にどのエリアにいるかを選ぶ） |
-| `src/domain/weekBoard.ts` | 計画の「💡 空いている、稼げそうな時間」（予定のない3時間の枠を、見込みの大きい順に1日1つ・最大3つ）と、クエストのための時間（必要な時間を見込みの大きい枠で埋める `suggestHours`） |
-| `src/domain/questStrategy.ts` | クエスト作戦表（日跨ぎ＋ピーク：段階ごとに残りの日の件数・時間・報酬・1件あたりの上乗せ）と、作戦の時間を働ける時間の中の実際の時間に置く `scheduleStrategy` |
+| `src/domain/weekPlanner.ts` | 週の作戦エンジン（日ごとの候補：休み・1回・昼と夜の2回、レンタルの借りたまま／返す、ピークと日跨ぎの報酬、動的計画法で目標ごとの選択肢） |
 | `src/domain/weather.ts` | 天気（晴れ・くもり・雨・荒天）：予報の1時間の判定、記録の天気のまとめ、日の代表、手で直した天気、雨の倍率 |
 | `src/adapters/weather.ts` | 天気予報の取得（Open-Meteo の気象庁モデル。緯度経度を小数1桁に丸めて送る・3時間端末に覚える） |
 | `src/features/useForecast.ts` | 計画を開いた時に主なエリアの天気予報を取る |
@@ -56,8 +55,7 @@
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集・📷 スクショから読み取り |
 | `src/features/ocr.ts` | 端末の中の文字認識（tesseract.js・日本語）。必要なファイルは `ocr/` から使う時だけ読み込む |
 | `src/features/AreaRoutePlan.tsx` | 計画の「🧭 時間帯ごとのエリア計画」：候補枠を選び、エリアの順番と、ずっと主なエリアにいる場合との差 |
-| `src/features/AvailabilitySettings.tsx` | 設定 → 基本の「🕒 働ける時間」：プリセット・曜日ごとの時間帯の編集 |
-| `src/features/QuestStrategyCard.tsx` | 計画の「🧭 クエスト作戦」：最低・本命の切り替え、日ごとの件数（ピーク・ほか）と時間、ピークの注意 |
+| `src/features/AvailabilitySettings.tsx` | 設定 → 基本の「🕒 働ける時間」：プリセット・曜日ごとの時間帯の編集・1日の最長 |
 | `src/features/QuestWeek.tsx` | 計画の「🎯 クエストから見たこの週」：届く段階・足す時間・純時給 |
 | `src/features/CashChange.tsx` | ホームの「💴 お釣り」 |
 | `src/features/OfferJudge.tsx` | オファー判定（`#offer`。設定でオンの時だけ。手入力の報酬・分・km・届け先の地名で判定。前のショートカットの text=・cfg= も読めるが案内はしない）、判定の基準、持ち帰り／取り込み、地名の評価の一覧 |
@@ -65,7 +63,7 @@
 | `src/features/OutlookCard.tsx` | ホームの「🏁 終了までの見通し」カード（稼働中だけ表示。終了予定は端末に覚える） |
 | `src/features/ContinueCard.tsx` | ホームの「🤔 あと少し続ける？」（30・60・90分延ばした時の GO/WAIT/STOP。畳んで表示） |
 | `src/features/Plan.tsx` | 計画：週の稼働量を決める画面。上に WeekBoard とクエスト、「📋 くわしく見る」に3つの見込みの比較・候補枠の一覧・エリアの順番・装備の回収の目安。候補枠の入力 |
-| `src/features/WeekBoard.tsx` | 計画の上の3枚：⏱️ この週の稼働（量のバー）・📅 いつ働くか（7日の帯と 🎯 クエストのための時間）・💡 空いている、稼げそうな時間 |
+| `src/features/WeekBoard.tsx` | 計画の上：⏱️ この週の稼働（量のバー）・🧭 今週の作戦（選択肢）・📅 いつ働くか（7日の帯：天気・作戦・予定・実績・働けない時間、日ごとの作戦の一覧と＋） |
 | `src/features/Analytics.tsx` | 分析：期間の成績、売上→利益の内訳、回収の推移、買うか借りるか、所得の目安、内訳表、CSV |
 | `src/components/charts.tsx` | 折れ線（なぞると値が出る）と横棒の部品 |
 | `src/components/fields.tsx` | 入力欄（整数円・未設定の区別。説明と誤りは読み上げで欄と一緒に読まれる）、エラー表示、「元に戻す」つきのお知らせ |
@@ -92,7 +90,7 @@
 ## データ
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
-- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない。版11で働ける時間 `availability`、版12で天気の手直し `weatherOverrides` を追加、未定義は制限なし・予報のまま）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
+- 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない。版11で働ける時間 `availability`、版12で天気の手直し `weatherOverrides`、版13で1日の最長 `maxDayHours` を追加、未定義は制限なし・予報のまま・10時間）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える
 - 金額は整数円、日時は UTC で保存し、表示や週・月の区切りは日本時間（週は月曜始まり）
 - 項目の詳細：`docs/spec/docs/03-data-model.md`

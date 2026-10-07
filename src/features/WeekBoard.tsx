@@ -2,6 +2,7 @@
 // ① 稼働の量（実績・これからの予定・週の上限）、② 7日の帯（混み具合の色の上に、予定と実績）、③ 空いている稼げそうな時間
 import {
   PLAN_WEATHERS,
+  type WeekOption,
   PLAN_WEATHER_ICONS,
   PLAN_WEATHER_LABELS,
   busyLevelAt,
@@ -9,7 +10,6 @@ import {
   weatherAt,
   type BusynessTable,
   type PlanWeather,
-  type SuggestedWindow,
   type WeatherFactors,
 } from '../domain'
 import type { ForecastState } from './useForecast'
@@ -31,32 +31,6 @@ export interface BoardSlot {
   label: string
 }
 
-/** クエストの次の段階まで、計画の後に足す時間と、それを働く時間のおすすめ */
-export interface QuestTarget {
-  key: string
-  label: string
-  tier: number
-  gainYen: number
-  extraHours: number
-  /** その時間のボーナス込みの純時給 */
-  hourlyYen: number | null
-  belowTarget: boolean
-  windows: SuggestedWindow[]
-  /** 期間の空き時間に入らなかった時間 */
-  shortHours: number
-}
-
-/** 🧭 クエスト作戦の、選んだ目標の時間を実際の時間に置いたもの */
-export interface StrategyPlan {
-  label: string
-  goalName: string
-  target: number
-  days: { startsAt: string; needHours: number; plannedHours: number; creditHours: number; windows: SuggestedWindow[]; shortHours: number }[]
-  windows: SuggestedWindow[]
-  hours: number
-  shortHours: number
-}
-
 const pad = (n: number) => String(n).padStart(2, '0')
 const hm = (ms: number) => {
   const d = new Date(ms)
@@ -73,13 +47,12 @@ export function WeekBoard({
   budgetHours,
   profitYen,
   busyness,
-  suggestions,
   onAdd,
   onEdit,
-  onAddSuggestion,
-  questTargets,
-  onAddQuestWindows,
-  strategyPlan,
+  options,
+  selectedKey,
+  onSelect,
+  onAddPlan,
   allowed,
   forecast,
   weatherOverrides,
@@ -96,13 +69,14 @@ export function WeekBoard({
   /** 選んだ枠の見込み利益（選んでいる見込み） */
   profitYen: number | null
   busyness: BusynessTable | null
-  suggestions: SuggestedWindow[]
   onAdd: (date: string) => void
   onEdit: (id: string) => void
-  onAddSuggestion: (w: SuggestedWindow) => void
-  questTargets: QuestTarget[]
-  onAddQuestWindows: (windows: SuggestedWindow[]) => void
-  strategyPlan: StrategyPlan | null
+  /** 週の作戦の選択肢（§5.12）。先頭がおすすめ */
+  options: WeekOption[]
+  selectedKey: string | null
+  onSelect: (key: string) => void
+  /** 選んだ作戦のシフトをまとめて候補枠に入れる */
+  onAddPlan: (shifts: { startsAt: string; endsAt: string }[]) => void
   /** 働ける時間（設定）。null は制限なし */
   allowed: readonly (readonly [number, number])[] | null
   forecast: ForecastState
@@ -122,7 +96,9 @@ export function WeekBoard({
     return { date, start, end: start + DAY, label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}` }
   })
   const weekEnd = days[6]!.end
-  const questWindows = [...questTargets.flatMap((t) => t.windows), ...(strategyPlan?.windows ?? [])]
+  const plan = options.find((o) => o.key === selectedKey) ?? options[0] ?? null
+  /** 作戦で新しく働く時間（すでに選んだ候補枠の日は除く） */
+  const planShifts = plan ? plan.days.filter((d) => !d.fixed).flatMap((d) => d.shifts) : []
   /** その日の、働けない時間（帯に斜線で出す） */
   const offSpans = (start: number, end: number): [number, number][] => {
     if (!allowed) return []
@@ -160,11 +136,6 @@ export function WeekBoard({
   const dayLabel = (iso: string) => {
     const d = new Date(Date.parse(iso))
     return `${WEEKDAYS[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`
-  }
-  const winText = (w: { startsAt: string; endsAt: string }) => {
-    const st = Date.parse(w.startsAt)
-    const d = new Date(st)
-    return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]}) ${hm(st)}〜${hm(Date.parse(w.endsAt))}`
   }
   const range = (x: { startsAt: string; endsAt: string }) => [Date.parse(x.startsAt), Date.parse(x.endsAt)] as const
 
@@ -213,6 +184,37 @@ export function WeekBoard({
             見込み利益 <strong className="num">{profitYen === null ? '算出不可' : formatYen(profitYen)}</strong>
           </span>
         </p>
+      </section>
+
+      <section className="card stack" aria-labelledby="week-plan-title">
+        <CardTitle
+          id="week-plan-title"
+          tip="この週の残りの時間で、どの日に・何時から何時まで働くと利益が一番大きいかを、目標ごとに比べます。天気（雨は件数と単価が上がる・荒天は入れない）、混み具合と自分の実績、レンタルの上限（長く1回借りる方が安い）、1日は1回か昼と夜の2回まで（間で返すか借りたままかは安い方）、働ける時間・週の上限・帰宅締切、日跨ぎとピークのクエストの報酬を入れて計算します。目標時給があれば「利益−目標時給×時間」が一番大きいものをおすすめにします。見込みなので実績には入りません。"
+        >
+          🧭 今週の作戦
+        </CardTitle>
+        {options.length === 0 || options.every((o) => o.hours === 0) ? (
+          <p className="hint">この週の残りに働ける時間がないか、働いても得にならない見込みです（働ける時間・週の上限・天気を確かめてください）</p>
+        ) : (
+          <div className="week-options" role="radiogroup" aria-label="作戦の選択肢">
+            {options.map((o) => (
+              <button key={o.key} type="button" role="radio" aria-checked={o.key === plan?.key} className="week-option" onClick={() => onSelect(o.key)}>
+                <strong>{o.label}</strong>
+                <span>
+                  {o.workDays}日・{fmtH(o.hours)}・約{o.orders}件
+                </span>
+                <span>
+                  利益 <strong>{formatYen(o.profitYen)}</strong>
+                  {o.hourlyYen !== null && <span className="hint">（{formatYen(o.hourlyYen)}/時）</span>}
+                </span>
+                <span className="hint">
+                  🚲{formatYen(o.rentalYen)}
+                  {o.bonusYen > 0 && `・クエスト+${formatYen(o.bonusYen)}`}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="card stack" aria-labelledby="week-board-title">
@@ -295,11 +297,11 @@ export function WeekBoard({
                     {dayDone.map((x) => (
                       <span key={x.startsAt} className="wb-done" style={pos(...range(x))} title={`実績 ${hm(Date.parse(x.startsAt))}〜${hm(Date.parse(x.endsAt))}`} />
                     ))}
-                    {questWindows
+                    {planShifts
                       .filter((w) => Date.parse(w.startsAt) < d.end && Date.parse(w.endsAt) > d.start)
                       .map((w) => (
                         <span key={w.startsAt} className="wb-quest" style={pos(...range(w))} aria-hidden="true">
-                          🎯
+                          🧭
                         </span>
                       ))}
                     {daySlots.map((s) => (
@@ -328,10 +330,10 @@ export function WeekBoard({
           </ul>
         </div>
         <p className="wb-legend hint" aria-hidden="true">
-          <span className="key chosen" />予定 <span className="key cand" />候補 <span className="key done" />実績{questWindows.length > 0 && (
+          <span className="key chosen" />予定 <span className="key cand" />候補 <span className="key done" />実績{planShifts.length > 0 && (
             <>
               {' '}
-              <span className="key quest" />クエスト用
+              <span className="key quest" />作戦
             </>
           )}
           {allowed && (
@@ -359,104 +361,42 @@ export function WeekBoard({
                 : `🌦️ 天気：Open-Meteo（気象庁）${forecast.fetchedAt ? `・${hm(Date.parse(forecast.fetchedAt))}取得` : ''}${forecast.status === 'error' ? '（前に取得した予報）' : ''}`}
           ・雨の日 件数×{weatherFactors.rainOrders}・1件×{weatherFactors.rainPerOrder}（{weatherFactors.source === 'personal' ? '自分の記録' : '目安'}）
         </p>
-        {strategyPlan && (
-          <div className="stack strategy-plan" role="group" aria-label="クエスト作戦の時間">
+        {plan && plan.days.some((d) => d.shifts.length > 0) && (
+          <div className="stack strategy-plan" role="group" aria-label="作戦の日ごとの時間">
             <p className="line">
               <span className="grow">
-                🧭 <strong>{strategyPlan.label}</strong> {strategyPlan.goalName}{strategyPlan.target}件：この週 <strong>{fmtH(strategyPlan.hours + strategyPlan.days.reduce((a, d) => a + d.plannedHours, 0))}</strong>
-                {strategyPlan.shortHours > 0 && <span className="warn-text">（⚠️ 働ける時間に {fmtH(strategyPlan.shortHours)} 入らない）</span>}
+                🧭 <strong>{plan.label}</strong>：{plan.workDays}日・<strong>{fmtH(plan.hours)}</strong>・約{plan.orders}件・利益 {formatYen(plan.profitYen)}
+                {plan.bonusYen > 0 && `（クエスト+${formatYen(plan.bonusYen)}）`}
               </span>
-              {strategyPlan.windows.length > 0 && (
-                <button type="button" className="icon" aria-label="作戦の時間を候補枠に入れる" onClick={() => onAddQuestWindows(strategyPlan.windows)}>
+              {planShifts.length > 0 && (
+                <button type="button" className="icon" aria-label="作戦の時間を候補枠に入れる" onClick={() => onAddPlan(planShifts)}>
                   ＋
                 </button>
               )}
             </p>
-            <ul className="list" aria-label="作戦の日ごとの時間">
-              {strategyPlan.days.map((d) => (
-                <li key={d.startsAt} className="line">
-                  <strong className="strategy-day">{dayLabel(d.startsAt)}</strong>
-                  <span className="grow hint">
-                    {d.windows.length > 0
-                      ? d.windows.map((w) => `${hm(Date.parse(w.startsAt))}〜${hm(Date.parse(w.endsAt))}`).join('・')
-                      : d.plannedHours > 0
-                        ? '選んだ枠で足りる'
-                        : d.creditHours > 0
-                          ? 'ほかの日の選んだ枠でまかなう'
-                          : '—'}
-                    {d.plannedHours > 0 && d.windows.length > 0 && `（＋選んだ枠 ${fmtH(d.plannedHours)}）`}
-                    {d.shortHours > 0 && ` ⚠️${fmtH(d.shortHours)}入らない`}
-                  </span>
-                  <span className="num">{fmtH(d.needHours)}</span>
-                </li>
-              ))}
+            <ul className="list" aria-label="作戦の日ごと">
+              {plan.days
+                .filter((d) => d.shifts.length > 0)
+                .map((d) => (
+                  <li key={d.dayStart} className="stack strategy-row">
+                    <span className="line">
+                      <strong className="strategy-day">{dayLabel(d.dayStart)}</strong>
+                      <span className="grow">{d.shifts.map((x) => `${hm(Date.parse(x.startsAt))}〜${hm(Date.parse(x.endsAt))}`).join('・')}</span>
+                      <span className="num">{fmtH(d.hours)}</span>
+                    </span>
+                    <span className="hint">
+                      約{d.orders}件・{formatYen(d.revenueYen)}
+                      {d.rentalYen > 0 && `・🚲${formatYen(d.rentalYen)}${d.shifts.length > 1 ? (d.returnBetween ? '（間で返す）' : '（借りたまま）') : ''}`}
+                      {d.peakBonusYen > 0 && `・ピーク+${formatYen(d.peakBonusYen)}`}
+                      {d.fixed && '・選んだ候補枠'}
+                    </span>
+                  </li>
+                ))}
             </ul>
           </div>
         )}
-        {questTargets.length > 0 && (
-          <ul className="list quest-targets" aria-label="クエストのための時間">
-            {questTargets.map((t) => (
-              <li key={t.key} className="stack">
-                <span className="line">
-                  <span className="grow">
-                    🎯 <strong>{t.label}</strong> 第{t.tier}段階（+{formatYen(t.gainYen)}）まで あと<strong>{fmtH(t.extraHours)}</strong>
-                  </span>
-                  {t.windows.length > 0 && (
-                    <button type="button" className="icon" aria-label={`${t.label}のための時間を候補枠に入れる`} onClick={() => onAddQuestWindows(t.windows)}>
-                      ＋
-                    </button>
-                  )}
-                </span>
-                <span className="hint">
-                  {t.windows.length > 0 ? t.windows.map(winText).join('・') : busyness ? '期間の中に空いている時間がありません' : '設定 → エリアで混み具合を入れると、働く時間を出します'}
-                  {t.shortHours > 0 && t.windows.length > 0 && `（${fmtH(t.shortHours)}足りない）`}
-                  {t.hourlyYen !== null && ` ・純時給 ${formatYen(t.hourlyYen)}/時${t.belowTarget ? ' ⚠️目標未満' : ''}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
-      <section className="card stack" aria-labelledby="suggest-title">
-        <CardTitle
-          id="suggest-title"
-          tip="まだ予定・実績のない時間から、主なエリアの混み具合と自分の実績で、3時間の売上の見込みが大きい時間を1日1つ、最大3つ出します。帰宅締切を過ぎる時間は出しません。＋で候補枠の入力を開きます（見込みは入った状態）。"
-        >
-          💡 空いている、稼げそうな時間
-        </CardTitle>
-        {!busyness ? (
-          <p className="hint">設定 → エリアで主なエリアの混み具合を入れると、稼げそうな時間を出します</p>
-        ) : suggestions.length === 0 ? (
-          <p className="hint">この週の残りに、おすすめできる空き時間はありません</p>
-        ) : (
-          <ul className="list" aria-label="稼げそうな時間">
-            {suggestions.map((w) => {
-              const s = Date.parse(w.startsAt)
-              const d = new Date(s)
-              const text = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]}) ${hm(s)}〜${hm(Date.parse(w.endsAt))}`
-              return (
-                <li key={w.startsAt} className="line">
-                  <span className="grow">
-                    <strong>{text}</strong>
-                    <span className="levels" role="img" aria-label={`混み具合 ${w.levels.join('・')}`}>
-                      {w.levels.map((l, i) => (
-                        <span key={i} className="lv" style={{ background: `var(--busy-${l})` }} aria-hidden="true">
-                          {l}
-                        </span>
-                      ))}
-                    </span>
-                  </span>
-                  <span className="num">約{formatYen(w.revenueYen)}</span>
-                  <button type="button" className="icon" aria-label={`${text}を候補枠に入れる`} onClick={() => onAddSuggestion(w)}>
-                    ＋
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
     </>
   )
 }

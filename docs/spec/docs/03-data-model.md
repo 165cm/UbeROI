@@ -33,6 +33,7 @@ IDはUUID、金額は整数円、割合は0〜10000のbasis points、日時はIS
 - インデックス: Session(returned_at), Delivery(session_id), Expense(allocation_month), Rental(session_id), Asset(in_service_month), StationSnapshot(station_id,observed_at)。
 - 設定の働ける時間（版11）: settings.availability＝曜日（0＝日〜6＝土）ごとの時間帯 {start, end}（HH:mm・1日3つまで）の配列。null／未定義は制限なし。版10までのバックアップは制限なしとして復元する。
 - 天気の手直し（版12）: settings.weatherOverrides＝日付（YYYY-MM-DD・4時区切り）→ clear/cloudy/rain/storm。未定義は予報のまま。版11までのバックアップはそのまま復元する。
+- 1日の最長（版13）: settings.maxDayHours＝整数（2〜16時間）。未定義は10時間。版12までのバックアップはそのまま復元する。
 - バックアップ形式: {schema_version, exported_at, app_version, datasets:{settings:[],sessions:[],...}}。復元は全体置換のみをMVPとし、マージを実装しない。
 
 ## CSV v1（独自形式）

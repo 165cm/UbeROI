@@ -10,13 +10,17 @@ import { weatherSessionsFor } from '../storage/toDomain'
 const STORE_KEY = 'deli-kan:quest-push'
 interface Stored {
   sessionId: string
-  /** この稼働で配達した件数（利用者が ＋／− で直したもの） */
-  added: number
+  /** ＋／− で直した分（受けたオファーの数への足し引き。後から受けたオファーも数えるため、差だけを覚える） */
+  adjust: number
 }
-function load(sessionId: string): Stored | null {
+function load(sessionId: string, acceptedOffers: number): Stored | null {
   try {
-    const v = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as Stored | null
-    return v?.sessionId === sessionId && Number.isSafeInteger(v.added) ? v : null
+    const v = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as (Stored & { added?: number }) | null
+    if (v?.sessionId !== sessionId) return null
+    if (Number.isSafeInteger(v.adjust)) return { sessionId, adjust: v.adjust }
+    // 前の版は件数そのもの（added）を覚えていた
+    if (Number.isSafeInteger(v.added)) return { sessionId, adjust: v.added! - acceptedOffers }
+    return null
   } catch {
     return null
   }
@@ -59,7 +63,9 @@ export function QuestPush({
 }) {
   const { db } = useData()
   const data = useLiveQuery(async () => ({ quests: await db.quests.toArray(), sessions: await db.sessions.toArray() }), [db])
-  const [stored, setStored] = useState<Stored>(() => load(sessionId) ?? { sessionId, added: acceptedOffers })
+  const [stored, setStored] = useState<Stored>(() => load(sessionId, acceptedOffers) ?? { sessionId, adjust: 0 })
+  // この稼働の件数＝受けたオファーの数＋直した分（0より少なくしない）
+  const added = Math.max(0, acceptedOffers + stored.adjust)
   useEffect(() => save(stored), [stored])
   if (!data) return null
 
@@ -73,15 +79,15 @@ export function QuestPush({
 
   const rate = ordersPerHour(weatherSessionsFor(data.sessions))
   const sessionMinutes = Math.max(0, (nowMs - Date.parse(departedAt)) / 60_000)
-  const pace = pushOrdersPerHour(rate.rate, sessionMinutes, stored.added)
-  const step = (d: number) => setStored({ ...stored, added: Math.max(0, stored.added + d) })
+  const pace = pushOrdersPerHour(rate.rate, sessionMinutes, added)
+  const step = (d: number) => setStored({ ...stored, adjust: Math.max(-acceptedOffers, added + d - acceptedOffers) })
 
   return (
     <div className="stack quest-push" role="group" aria-label="あと何件？">
       <p className="line">
         <strong className="grow">🎯 あと何件？</strong>
-        <span className="hint">この稼働 {stored.added}件</span>
-        <button type="button" className="icon" aria-label="この稼働の件数を1件減らす" disabled={stored.added === 0} onClick={() => step(-1)}>
+        <span className="hint">この稼働 {added}件</span>
+        <button type="button" className="icon" aria-label="この稼働の件数を1件減らす" disabled={added === 0} onClick={() => step(-1)}>
           −
         </button>
         <button type="button" className="icon" aria-label="この稼働の件数を1件増やす" onClick={() => step(1)}>
@@ -95,7 +101,7 @@ export function QuestPush({
           data.sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
           now,
         )
-        const count = p.count + stored.added
+        const count = p.count + added
         const board = q.leaderboard ? leaderboardOutlook({ ...q.leaderboard, startsAt: occ.startsAt, endsAt: occ.endsAt, myCountNow: count }) : null
         const r = questPushGoals({
           now,
@@ -108,7 +114,7 @@ export function QuestPush({
           board,
           baseOrdersPerHour: rate.rate,
           sessionMinutes,
-          sessionCount: stored.added,
+          sessionCount: added,
           revenuePerHourYen,
         })
         const last = Math.max(...q.tiers.map((t) => t.count))
@@ -127,7 +133,7 @@ export function QuestPush({
                 {r.goals.map((g) => (
                   <li key={g.target} className="line">
                     <span className="grow">
-                      {g.labels.join('・')}：あと<strong>{g.more}件</strong>・約{duration(g.minutes)}
+                      {g.labels.join('・')}：あと<strong>{g.more}件</strong>・{g.minutes === null ? '時間は算出不可' : `約${duration(g.minutes)}`}
                       {g.gainYen > 0 && `・+${formatYen(g.gainYen)}`}
                       {g.hourlyYen !== null && <span className="hint">（{formatYen(g.hourlyYen)}/時）</span>}
                     </span>

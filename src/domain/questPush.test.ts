@@ -49,6 +49,11 @@ describe('あと何件続ける？', () => {
     expect(pushOrdersPerHour(2, 90, 0)).toEqual({ rate: 2, usesPace: false })
   })
 
+  it('1時間の件数が0（件数入りの記録がすべて0件など）なら、時間は出せず届かない', () => {
+    const g = questPushGoals({ ...base, baseOrdersPerHour: 0 }).goals[0]!
+    expect(g).toMatchObject({ more: 3, minutes: null, hourlyYen: null, reach: 'no' })
+  })
+
   it('リーダーボード：まだ抜いていない一番近い上の順位と、攻める目標。同じ件数の目標は1つの行にまとめる', () => {
     const r = questPushGoals({
       ...base,

@@ -36,7 +36,8 @@ export interface QuestPushGoal {
   /** 目標の件数（その回の数え方） */
   target: number
   more: number
-  minutes: number
+  /** 要る分（1時間の件数が0で出せない時は null） */
+  minutes: number | null
   /** 届くと増える段階の報酬 */
   gainYen: number
   /** 延ばした分の時給の目安（ボーナス込み） */
@@ -108,7 +109,7 @@ export function questPushGoals(input: QuestPushInput): QuestPushResult {
         labels,
         target,
         more,
-        minutes: Number.isFinite(minutes) ? minutes : 0,
+        minutes: Number.isFinite(minutes) ? minutes : null,
         gainYen,
         hourlyYen: Number.isFinite(minutes) && hours > 0 ? Math.round((input.revenuePerHourYen * hours + gainYen) / hours) : null,
         reach,

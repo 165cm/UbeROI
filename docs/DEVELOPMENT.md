@@ -103,6 +103,7 @@ npm run dev
 
 ## 変更の時に必ずやること（このリポジトリ用）
 
+- 古い iPhone の Safari（iOS 16.3 まで）でも読み込めるようにする。正規表現の後ろ読み（`(?<=` `(?<!`）は使わない（読み込めない書き方が1つでもあると画面が真っ白になる。`src/compat.test.ts` で確かめる）
 - 計算式を変える時は、先に `docs/spec/docs/02-profitability.md` との食い違いがないか確かめ、`src/domain/core.ts` の `CALCULATION_VERSION` を上げる
 - 保存データの形を変える時は、データの版（schema_version）を上げて移行処理を書く
 - 画面から計算式を書かない。必ず `src/domain/` の関数を使う

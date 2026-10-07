@@ -15,7 +15,42 @@
     <title>デリ勘</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- アプリが読み込めなかった時だけ見える案内（読み込めれば React がこの中身を置き換える）。古い端末でも動くよう、ここの書き方は古い JavaScript だけにする -->
+      <div class="boot-fallback">
+        <p><strong>デリ勘を読み込めませんでした</strong></p>
+        <p>新しい版に切り替えると直ることがあります。記録は端末に残っています。</p>
+        <p><button type="button" id="boot-reload">🔄 新しい版を読み込む</button></p>
+        <p>直らない時は、アプリ（Safari のタブ）を完全に閉じてから開き直してください。</p>
+      </div>
+    </div>
+    <style>
+      .boot-fallback { padding: 24px 16px; font-family: system-ui, sans-serif; line-height: 1.6; opacity: 0; animation: boot-show 0s linear 8s forwards; }
+      .boot-fallback button { min-height: 44px; padding: 0 16px; font-size: 1rem; }
+      @keyframes boot-show { to { opacity: 1; } }
+    </style>
+    <script>
+      ;(function () {
+        var button = document.getElementById('boot-reload')
+        if (!button) return
+        button.addEventListener('click', function () {
+          var sw = navigator.serviceWorker
+          if (!sw) return location.reload()
+          sw.addEventListener('controllerchange', function () { location.reload() })
+          sw.getRegistration().then(function (reg) {
+            if (!reg) return location.reload()
+            var skip = function (w) { w.postMessage('SKIP_WAITING') }
+            if (reg.waiting) return skip(reg.waiting)
+            reg.update().then(function () {
+              var w = reg.installing || reg.waiting
+              if (!w) return location.reload()
+              if (w.state === 'installed') return skip(w)
+              w.addEventListener('statechange', function () { if (w.state === 'installed') skip(w) })
+            }, function () { location.reload() })
+          }, function () { location.reload() })
+        })
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

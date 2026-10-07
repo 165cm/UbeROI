@@ -30,7 +30,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
   const [s, setS] = useState<SessionRecord>(initial)
   const [problems, setProblems] = useState<string[]>([])
   // 天気・エリア・メモは、最初から入っている時だけ開いておく。開閉は押した時だけ変え、入力中に畳まれないようにする
-  const [memoOpen, setMemoOpen] = useState(() => Boolean(initial.weather || initial.areaLabel || initial.note))
+  const [memoOpen, setMemoOpen] = useState(() => Boolean(initial.areaLabel || initial.note))
   const tariffs = useLiveQuery(() => listTariffs(db), [db]) ?? []
   const settings = useLiveQuery(() => db.settings.get('settings'), [db])
   const defaultTariff = pickDefaultTariff(tariffs, settings)
@@ -164,19 +164,25 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         ))}
       </section>
 
+      <section className="card stack" aria-labelledby="session-weather-title">
+        <CardTitle id="session-weather-title" tip="天気ごとの時給・件数を分析と計画（雨の日の倍率）に使います。走っていた時間の多くの天気を1つ選んでください">
+          🌦️ 天気
+        </CardTitle>
+        <div className="buttons weather-chips" role="group" aria-label="天気">
+          {(Object.keys(WEATHER_LABELS) as Weather[]).map((w) => (
+            <button key={w} type="button" aria-pressed={s.weather === w} onClick={() => set({ weather: s.weather === w ? null : w })}>
+              {WEATHER_LABELS[w]}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <details className="card fold" open={memoOpen} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
         <summary>
-          <strong>🏷️ 天気・エリア・メモ</strong>
-          <span className="hint">{[s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note].filter(Boolean).join('・') || '任意'}</span>
+          <strong>🏷️ エリア・メモ</strong>
+          <span className="hint">{[s.areaLabel, s.note].filter(Boolean).join('・') || '任意'}</span>
         </summary>
         <div className="stack">
-          <Select
-            label="天気"
-            value={(s.weather ?? '') as Weather | ''}
-            options={[{ value: '' as const, label: '記録しない' }, ...(Object.keys(WEATHER_LABELS) as Weather[]).map((w) => ({ value: w, label: WEATHER_LABELS[w] }))]}
-            onChange={(v) => set({ weather: v === '' ? null : v })}
-            tip="天気ごとの時給を分析に使います"
-          />
           <div className="row">
             <TextInput label="エリア（任意）" value={s.areaLabel} onChange={(v) => set({ areaLabel: v })} placeholder="例：駅前" />
             <TextInput label="メモ（任意）" value={s.note} onChange={(v) => set({ note: v })} />

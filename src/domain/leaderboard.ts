@@ -63,13 +63,16 @@ export function parseLeaderboardText(text: string): LeaderboardReading {
     // 順位と件数：「9位 (名前) 23件」「3. (名前) 31回の配達」「あなた:9位 23件」。
     // 順位の後の「位」か、件数の後の「件・回」のどちらかが要る。件数は行の最後の数（名前の中の数字を拾わないように、後ろから探す）
     const r = raw.match(/^(\D{0,12}?)(\d{1,3})\|?(位|\.|\))?/)
-    const tail = raw.match(/(?<=^|\D)(\d{1,4})\|?(件|回)?\D*$/)
+    // 正規表現の後ろ読みは古い iPhone の Safari（iOS 16.3 まで）で読み込めず画面が真っ白になるので使わない
+    const tail = raw.match(/(?:^|\D)(\d{1,4})\|?(件|回)?\D*$/)
     const isMe = isMeLine(raw, line)
     if (r && tail && (r[3] === '位' || tail[2])) {
       const rankEnd = r[0].length
       const rank = Number(r[2])
       const count = Number(tail[1])
-      if (rank >= 1 && rank <= MAX_LEADERBOARD_RANK && tail.index! >= rankEnd) {
+      // 件数の数字の始まり（前の1文字が数字でない文字の時は、その次）
+      const countStart = tail.index! + tail[0].search(/\d/)
+      if (rank >= 1 && rank <= MAX_LEADERBOARD_RANK && countStart >= rankEnd) {
         if (!rows.has(rank)) rows.set(rank, count)
         if (isMe || meNext) me = { rank, count }
         meNext = false

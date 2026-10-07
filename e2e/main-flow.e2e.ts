@@ -44,13 +44,14 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
   await page.getByRole('button', { name: '帰宅して精算' }).click()
 
   // 4. 精算：売上 6,600 + 180 + 400 = 7,180円、その他経費 200円（レンタルは見積 1,760円）
-  await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('6600')
+  await page.getByLabel('基本報酬', { exact: true }).fill('6600')
   await page.getByLabel('チップ', { exact: true }).fill('180')
   await page.getByLabel('確定ボーナス', { exact: true }).fill('400')
+  await page.getByText('📝 件数・天気・メモを追加').click()
   await page.getByLabel('完了件数', { exact: true }).fill('10')
   await page.getByRole('button', { name: '経費を追加' }).click()
   await page.getByLabel('金額', { exact: true }).fill('200')
-  await page.getByRole('button', { name: '✅ 確定して保存' }).click()
+  await page.getByRole('button', { name: '精算を保存' }).click()
   await expect(page.locator('.list-item').first()).toContainText('5,220円')
 
   // 5. 分析（A01）：営業純利益 5,220円・時給 1,740円/時。回収（A03）：残り 24,780円
@@ -65,7 +66,7 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
   await goto(page, 'records')
   await page.locator('.list-item').first().click()
   await page.getByLabel('チップ', { exact: true }).fill('480')
-  await page.getByRole('button', { name: '✅ 確定して保存' }).click()
+  await page.getByRole('button', { name: '精算を保存' }).click()
   await expect(page.locator('.list-item').first()).toContainText('5,520円')
 
   // 7. バックアップを書き出す

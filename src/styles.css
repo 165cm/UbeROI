@@ -1745,3 +1745,33 @@ p.next-charge { padding: 10px 12px; justify-content: space-between; }
 .today-clock { grid-template-columns: minmax(0, 1fr) auto; }
 p.next-charge { flex-wrap: wrap; }
 p.next-charge > .grow { min-width: 0; white-space: normal; }
+
+/* UI刷新 第4段階：デザイン案「帰宅後の精算」 */
+.app-main:has(.settle-head) > #page-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.settle-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; }
+.settle-title { text-align: center; }
+.settle-title h3 { margin: 0; font-size: 1.25rem; }
+.settle-title .hint { display: block; }
+.back-button { font-size: 1.5rem; background: transparent; border: none; color: var(--text); }
+details.time-band { background: color-mix(in srgb, var(--text) 6%, var(--surface)); border-radius: 12px; padding: 0 14px; }
+details.time-band > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; font-size: .9375rem; }
+details.time-band[open] { padding-bottom: 14px; }
+.settle-section > h3, .settle-section .card-title h3 { font-size: 1.125rem; margin: 4px 0 0; }
+.money-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.money-field { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.money-field input { font-size: 1.5rem; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.money-field.wide .field { display: grid; grid-template-columns: 1fr minmax(0, 11rem); align-items: center; gap: 4px 12px; }
+.settlement-result { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border: none; border-radius: 16px; padding: 16px; }
+.result-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.result-row .label { display: block; font-weight: 700; font-size: .9375rem; }
+.result-big { display: block; font-size: min(2.5rem, 11vw); font-weight: 850; line-height: 1.1; overflow-wrap: anywhere; }
+.result-hourly { border-left: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); padding-left: 12px; }
+.result-hourly strong { font-size: 1.5rem; font-weight: 800; }
+.result-hourly .unit { font-size: .8125rem; margin-left: 2px; }
+.settlement-actions { display: grid; gap: 8px; }
+.settlement-actions button { width: 100%; min-height: 52px; }
+@media (max-width: 359px) {
+  .money-grid { grid-template-columns: 1fr; }
+  .money-field.wide .field { grid-template-columns: 1fr; }
+}
+details.time-band > summary { color: var(--text); }

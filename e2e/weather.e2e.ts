@@ -100,6 +100,7 @@ test('天気予報が届かない時は、手で入れるよう案内する。�
 test('記録の天気は1タップで選び、押し直すと外せる', async ({ page }) => {
   await page.goto('#records')
   await page.getByRole('button', { name: /過去の稼働をまとめて入力/ }).click()
+  await page.getByText('📝 件数・天気・メモを追加').click()
   const rain = page.getByRole('group', { name: '天気' }).getByRole('button', { name: '🌦️ 小雨' })
   await rain.click()
   await expect(rain).toHaveAttribute('aria-pressed', 'true')

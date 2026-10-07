@@ -50,17 +50,18 @@ test('雨の日曜に1回長く借りて働く作戦をおすすめにし、天�
   await expect(page.getByText('中野エリア')).toBeVisible()
 
   await page.goto('#plan')
+  // 天気・7日の帯は「条件と計算根拠を見る」の中
+  await page.getByText('条件と計算根拠を見る').click()
   await expect(page.getByRole('button', { name: '日 11日の天気：雨（予報）。押すと変える' })).toBeVisible()
-  const options = page.getByRole('radiogroup', { name: '作戦の選択肢' }).getByRole('radio')
-  await expect(options.first()).toContainText('おすすめ')
-  await expect(options.first()).toHaveAttribute('aria-checked', 'true')
+  // 選択肢が1つ（おすすめ）なので、提案のカードにそのまま出る
+  const big = page.locator('.proposal-big')
   // 週の上限10時間を、雨の日曜に1回（レンタルは上限 2,500円）
-  await expect(options.first()).toContainText('1日・10h')
+  await expect(big).toContainText('10時間 / 1日')
   const plan = page.getByRole('group', { name: '作戦の日ごとの時間' })
   const rows = plan.getByRole('list', { name: '作戦の日ごと' }).getByRole('listitem')
   await expect(rows).toHaveCount(1)
   await expect(rows.first()).toContainText('日 10/11')
-  await expect(rows.first()).toContainText('10h')
+  await expect(rows.first()).toContainText('10時間')
   await expect(rows.first()).toContainText('🚲2,500円')
   // 帯にも作戦の時間（🧭）が日曜に出る
   await expect(page.getByRole('list', { name: 'この週の予定' }).getByRole('listitem').nth(6).locator('.wb-quest').first()).toBeVisible()
@@ -73,10 +74,10 @@ test('雨の日曜に1回長く借りて働く作戦をおすすめにし、天�
   // 雨に戻すと、また日曜1日にまとめる
   for (let i = 0; i < 2; i++) await page.getByRole('button', { name: /^日 11日の天気/ }).click()
   await expect(page.getByRole('button', { name: '日 11日の天気：雨（手で直した）。押すと変える' })).toBeVisible()
-  await expect(options.first()).toContainText('1日・10h')
+  await expect(big).toContainText('10時間 / 1日')
 
   // ＋で作戦の時間を候補枠に入れる
-  await plan.getByRole('button', { name: '作戦の時間を候補枠に入れる' }).click()
+  await page.getByRole('button', { name: 'この提案を予定に追加' }).click()
   await expect(page.getByText(/🧭 \dつの候補枠を入れました/)).toBeVisible()
   await expect(page.getByRole('button', { name: /10\/11\(日\).*（✅ おすすめ）を編集$/ }).first()).toBeVisible()
   // 入れた日は、その枠で固定（選んだ候補枠）として作戦に出る

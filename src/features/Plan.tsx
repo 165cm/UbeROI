@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   SCENARIOS,
+  AVAILABILITY_PRESETS,
   availabilityRanges,
   deadlineMs,
   weatherFactors,
@@ -88,6 +89,8 @@ export function Plan() {
   const [scenario, setScenario] = useState<Scenario>('standard')
   // 🧭 今週の作戦で選んでいる選択肢（null＝おすすめ）
   const [planKey, setPlanKey] = useState<string | null>(null)
+  // デザイン案「週間計画」：予定（登録した候補・稼働の量）と提案（おすすめの作戦）を切り替える。最初は提案
+  const [view, setView] = useState<'proposal' | 'schedule'>('proposal')
   const [editing, setEditing] = useState<SlotRecord | null>(null)
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
 
@@ -265,13 +268,23 @@ export function Plan() {
     <div className="stack">
       <div className="period-nav">
         <button type="button" aria-label="前の週" onClick={() => setAnchor(shiftPeriod('week', anchor, -1))}>‹</button>
-        <strong>{Number(week.from.slice(5, 7))}/{Number(week.from.slice(8))}（月）〜{Number(week.to.slice(5, 7))}/{Number(week.to.slice(8))}（日）</strong>
+        <strong className="num">{Number(week.from.slice(5, 7))}/{Number(week.from.slice(8))} — {Number(week.to.slice(5, 7))}/{Number(week.to.slice(8))}</strong>
         <button type="button" aria-label="次の週" onClick={() => setAnchor(shiftPeriod('week', anchor, 1))}>›</button>
+      </div>
+      <p className="hint plan-conditions">
+        週の上限 {budget === null ? '未設定' : `${Math.round((budget / 60) * 10) / 10}時間`}
+        {' ・ '}
+        {availability ? (AVAILABILITY_PRESETS.find((p) => JSON.stringify(p.days) === JSON.stringify(availability))?.label.replace(/^\S+\s/, '') ?? '働ける時間（自分で設定）') : '働ける時間 未設定'}
+      </p>
+      <div className="segmented view-switch" role="tablist" aria-label="予定と提案">
+        <button type="button" role="tab" aria-selected={view === 'schedule'} onClick={() => setView('schedule')}>予定</button>
+        <button type="button" role="tab" aria-selected={view === 'proposal'} onClick={() => setView('proposal')}>提案</button>
       </div>
       {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
 
       <PlanningSetup settings={data.settings} tariffs={data.tariffs} />
       <WeekBoard
+        view={view}
         now={nowIso}
         weekFrom={week.from}
         slots={inWeek.map((s) => ({ id: s.id, startsAt: s.startsAt, endsAt: s.endsAt, chosen: chosen.has(s.id), label: slotLabel(s) }))}

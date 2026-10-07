@@ -23,6 +23,7 @@ test('開くと、この週の稼働の量といつ働くかがひと目で出�
   await page.getByRole('button', { name: '💾 保存' }).click()
   await addBusyArea(page)
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   for (const [d, s, e] of <[string, string, string][]>[['2026-10-05', '18:00', '21:00'], ['2026-10-08', '17:00', '21:00'], ['2026-10-10', '11:00', '15:00']]) {
     await page.getByRole('button', { name: '候補枠を追加' }).click()
     await page.getByLabel('日付', { exact: true }).fill(d)
@@ -35,6 +36,7 @@ test('開くと、この週の稼働の量といつ働くかがひと目で出�
   await expect(page.getByRole('button', { name: /（✅ おすすめ）を編集$/ })).toHaveCount(3)
   await page.clock.setFixedTime(new Date('2026-10-07T12:00:00+09:00'))
   await page.reload()
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('heading', { name: /この週の稼働/ })).toBeVisible()
   // ① 稼働の量：月曜の枠は過ぎたので、これからは木・土の8時間。上限15時間まであと7時間
   const amount = page.getByRole('region', { name: '⏱️ この週の稼働' })
@@ -57,6 +59,7 @@ test('開くと、この週の稼働の量といつ働くかがひと目で出�
 
 test('週に使える時間がない時は、入れ方を案内する', async ({ page }) => {
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('region', { name: '⏱️ この週の稼働' })).toContainText('「週に使える時間」を入れると')
 })
 
@@ -77,6 +80,7 @@ test('この週の実績の時間を上限から引いて、残りの時間に�
 
   // 水曜 17〜21時（4時間）と木曜 17〜20時（3時間）。残りは 6 − 3 = 3時間なので、入るのは木曜だけ
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   for (const [d, e] of [['2026-10-07', '21:00'], ['2026-10-08', '20:00']] as const) {
     await page.getByRole('button', { name: '候補枠を追加' }).click()
     await page.getByLabel('日付', { exact: true }).fill(d)

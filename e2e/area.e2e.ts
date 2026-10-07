@@ -39,6 +39,7 @@ test('エリアの混み具合を登録すると、ホームに今の混み具�
 
   // 計画：月曜 18〜20時の候補で見込みを自動で入れると、混み具合を使った推計になる
   await page.goto('#plan')
+  await page.getByRole('tab', { name: '予定' }).click()
   await page.getByRole('button', { name: '候補枠を追加' }).click()
   await page.getByLabel('出発', { exact: true }).fill('18:00')
   await page.getByLabel('帰宅', { exact: true }).fill('20:00')

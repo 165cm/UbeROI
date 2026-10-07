@@ -8,6 +8,7 @@ import {
   weatherFactors,
   weatherAt,
   planWeekShifts,
+  leaderboardOutlook,
   DEFAULT_MAX_DAY_HOURS,
   MAIN_QUEST_MIN_HOURS,
   SCENARIO_FACTORS,
@@ -196,6 +197,11 @@ export function Plan() {
   // 働ける時間が未設定なら、毎日 9〜24時の中で組む（深夜・早朝の短い見込みで組まないように）
   const planAllowed = allowed ?? availabilityRanges(Array.from({ length: 7 }, () => [{ start: '09:00', end: '00:00' }]), Date.parse(weekStartIso), Date.parse(weekEndIso))
   const tariff = pickDefaultTariff(data.tariffs, data.settings)
+  // 🏆 リーダーボード（§5.13）：日跨ぎに付けた順位から、攻める目標の件数
+  const board = mainItem?.q.leaderboard
+    ? leaderboardOutlook({ ...mainItem.q.leaderboard, startsAt: mainItem.occ.startsAt, endsAt: mainItem.occ.endsAt, myCountNow: mainItem.progress.count })
+    : null
+  const attack = board?.target ? { rank: board.target.rank, count: board.target.need, prizeYen: board.target.prizeYen } : null
   const doneHours = done.reduce((acc, x) => acc + lengthH(x), 0)
   const planner = planWeekShifts({
     now: nowIso,
@@ -217,8 +223,10 @@ export function Plan() {
     maxDayHours: data.settings?.maxDayHours ?? DEFAULT_MAX_DAY_HOURS,
     budgetHours: budget === null ? null : Math.max(0, budget / 60 - doneHours),
     fixed: questInput.chosenSlots,
-    quest: mainItem ? toPlannerQuest(mainItem) : null,
+    // リーダーボードの自分の件数の方が多ければ（記録していない配達がある）、そちらに合わせる
+    quest: mainItem ? { ...toPlannerQuest(mainItem), count: Math.max(mainItem.progress.count, board?.myCount ?? 0) } : null,
     peaks: peakItems.map(toPlannerQuest),
+    attack,
     targetHourlyYen: target,
   })
   /** おすすめの時間から、見込みを入れた候補枠の入力を開く */

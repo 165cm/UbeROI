@@ -7,6 +7,7 @@ import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { newId, saveQuest } from '../storage/repo'
 import { PLATFORM_LABELS, type QuestRecord } from '../storage/schema'
+import { LeaderboardForm, LeaderboardSummary } from './Leaderboard'
 import { recognizeImages } from './ocr'
 
 function periodText(q: { startsAt: string; endsAt: string }): string {
@@ -37,6 +38,8 @@ export function QuestCard({ now }: { now: string }) {
   // 編集するクエストと、件数の調整を入れる回（くり返すクエストは回ごとに調整を持つ）
   const [editing, setEditing] = useState<{ quest: QuestRecord; index: number } | null>(null)
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
+  // リーダーボードを入れているクエスト
+  const [boardFor, setBoardFor] = useState<string | null>(null)
   if (!data) return null
 
   const nowMs = Date.parse(now)
@@ -98,6 +101,7 @@ export function QuestCard({ now }: { now: string }) {
                     {repeat !== 'none' && <span className="hint"> 🔁 {QUEST_REPEAT_LABELS[repeat]}</span>}
                   </strong>
                   <span className="tag">{p.ended ? '⌛ 終了' : upcoming ? '🕒 これから' : PLATFORM_LABELS[q.platform]}</span>
+                  <button type="button" className="icon" aria-label={`${q.label}のリーダーボードを入れる`} aria-expanded={boardFor === q.id} onClick={() => setBoardFor(boardFor === q.id ? null : q.id)}>🏆</button>
                   <button type="button" className="icon" aria-label={`${q.label}を編集・件数の調整`} onClick={() => setEditing({ quest: q, index: occ.index })}>✏️</button>
                   <button
                     type="button"
@@ -123,6 +127,18 @@ export function QuestCard({ now }: { now: string }) {
                   <span className="hint">{periodText(occ)}</span>
                 </p>
                 {p.unknownCountSessions > 0 && <p className="hint">⚠️ 件数未入力の記録{p.unknownCountSessions}件は数えていません</p>}
+                {q.leaderboard && <LeaderboardSummary board={q.leaderboard} occ={occ} countNow={p.count} />}
+                {boardFor === q.id && (
+                  <LeaderboardForm
+                    quest={q}
+                    onCancel={() => setBoardFor(null)}
+                    onSave={async (board) => {
+                      await saveQuest(db, { ...q, leaderboard: board })
+                      setBoardFor(null)
+                      setNotice({ message: '🏆 リーダーボードを保存しました', undo: () => void db.quests.put(q).then(() => setNotice(null)) })
+                    }}
+                  />
+                )}
               </div>
             )
           })}

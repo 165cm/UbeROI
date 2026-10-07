@@ -319,7 +319,7 @@ export function parseBackup(text: string): ParseResult {
   }
   const c = new Checker()
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }
-  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし、6：エリアの移動の分なし、7：オファー判定の切り替えなし、8：エリアの地図の場所なし、9：クエストのくり返しなし、10：働ける時間なし、11：天気の手直しなし、12：1日の最長なし）のバックアップは、足りない一覧を空として読み込む。
+  // 古い版（1：候補枠なし、2：クエストなし、3：取り込み元なし、4：エリアなし、5：オファーなし、6：エリアの移動の分なし、7：オファー判定の切り替えなし、8：エリアの地図の場所なし、9：クエストのくり返しなし、10：働ける時間なし、11：天気の手直しなし、12：1日の最長なし、13：リーダーボードなし）のバックアップは、足りない一覧を空として読み込む。
   // 版6までのエリアには移動の分（moveMinutes）が無いが、無ければ移動を候補にしないだけなので、そのままでよい
   // 版7までの設定にはオファー判定の切り替え（offerJudgeEnabled）が無いが、無ければ「使わない」なので、そのままでよい
   // 版8までのエリアには地図の場所（center・radiusM）が無いが、無ければ地図に出さないだけなので、そのままでよい
@@ -327,8 +327,9 @@ export function parseBackup(text: string): ParseResult {
   // 版10までの設定には働ける時間（availability）が無いが、無ければ「制限なし」なので、そのままでよい
   // 版11までの設定には天気の手直し（weatherOverrides）が無いが、無ければ予報のままなので、そのままでよい
   // 版12までの設定には1日の最長（maxDayHours）が無いが、無ければ10時間なので、そのままでよい
+  // 版13までのクエストにはリーダーボード（leaderboard）が無いが、無ければ使わないだけなので、そのままでよい
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
     raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], offers: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }

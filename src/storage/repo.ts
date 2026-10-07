@@ -1,5 +1,5 @@
 // データの読み書き。保存前の検証と、まとめて書く操作（トランザクション）をここに集める
-import { QUEST_REPEAT_LABELS, QUEST_REPEAT_MAX_MS, assertYen, availabilityProblems, weatherOverrideProblems, isBusynessTable, isCalendarDate, localMonth, parseInstant } from '../domain'
+import { QUEST_REPEAT_LABELS, QUEST_REPEAT_MAX_MS, assertYen, leaderboardProblems, availabilityProblems, weatherOverrideProblems, isBusynessTable, isCalendarDate, localMonth, parseInstant } from '../domain'
 import type { DeliKanDB } from './db'
 import { EQUIPMENT_PRESETS, TARIFF_PRESETS, type EquipmentPresetItem } from './presets'
 import type {
@@ -504,6 +504,7 @@ export function questProblems(quest: QuestRecord): string[] {
     if (length > QUEST_REPEAT_MAX_MS[repeat]) problems.push(`${QUEST_REPEAT_LABELS[repeat]}くり返すクエストの期間は、次の回と重ならない長さ（${repeat === 'daily' ? '1日' : repeat === 'weekly' ? '7日' : '28日'}まで）にしてください`)
   }
   if (quest.offsets && Object.entries(quest.offsets).some(([k, v]) => !/^\d+$/.test(k) || !Number.isSafeInteger(v))) problems.push('件数の調整は整数で入力してください')
+  if (quest.leaderboard !== undefined) problems.push(...leaderboardProblems(quest.leaderboard))
   if (quest.rewardMode === 'cumulative') {
     // 累積（達成時の合計額）は、件数が増えるほど同じか増えていないとおかしい
     const sorted = [...quest.tiers].sort((a, b) => a.count - b.count)

@@ -210,6 +210,7 @@ export function WeekBoard({
                 <span className="hint">
                   🚲{formatYen(o.rentalYen)}
                   {o.bonusYen > 0 && `・クエスト+${formatYen(o.bonusYen)}`}
+                  {o.prizeYen > 0 && `・🏆届けば+${formatYen(o.prizeYen)}`}
                 </span>
               </button>
             ))}

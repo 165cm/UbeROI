@@ -37,6 +37,7 @@
 | `src/domain/analytics.ts` | 期間の区切り（日・週・月・年）、内訳、回収の推移、CSV（数式のエスケープ） |
 | `src/domain/csv.ts` | CSVの読み取り（引用符・改行・BOM） |
 | `src/domain/busyness.ts` | エリアの混み具合：曜日×時間の表（4時区切り）、段階の倍率、区間の積算 |
+| `src/domain/leaderboard.ts` | リーダーボード（§5.13）：スクショの文字から順位と件数・賞金だけを読む（名前は捨てる）、順位ごとの終了の時の見込み、上との差、攻める目標の件数 |
 | `src/domain/questScreenshot.ts` | クエストの進捗の画面のスクショを文字認識した結果から、期間（または開始の曜日・時刻）と段階（件数は足していく・¥ の読み違いを直す）を読む |
 | `src/domain/busyScreenshot.ts` | 配達アプリの「時間帯ごとの傾向」のスクリーンショットから、24本の棒の段階と曜日（画面下の点）を読む。画像は端末の中で読むだけ |
 | `src/domain/offer.ts` `offerConfig.ts` | オファー判定：画面の文字の読み取り、実質時給と判定、設定コード（URL に入れる設定。学習した地名の評価も入れる） |
@@ -52,6 +53,7 @@
 | `src/features/DataSettings.tsx` | データ：デモ切り替え、バックアップの書き出し・復元、全削除 |
 | `src/features/CsvImport.tsx` | データ：CSVから記録を取り込む（見本・確認・まとめて確定） |
 | `src/features/Equipment.tsx` | 装備と投資：初級／中級／上級プラン、購入・所有の登録、回収状況 |
+| `src/features/Leaderboard.tsx` | 🏆 リーダーボード：クエストごとのまとめ（順位・上との差・攻める目標）と入力（📷 スクショから読み取り・順位と件数・賞金・狙う順位） |
 | `src/features/QuestCard.tsx` | ホームの「🎯 クエスト」：進み具合の表示・追加・編集・📷 スクショから読み取り |
 | `src/features/ocr.ts` | 端末の中の文字認識（tesseract.js・日本語）。必要なファイルは `ocr/` から使う時だけ読み込む |
 | `src/features/AreaRoutePlan.tsx` | 計画の「🧭 時間帯ごとのエリア計画」：候補枠を選び、エリアの順番と、ずっと主なエリアにいる場合との差 |

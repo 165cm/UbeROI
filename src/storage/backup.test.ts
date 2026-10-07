@@ -293,5 +293,23 @@ describe('データの版の移行（版4）とエリアの検証', () => {
     b.datasets.settings = [{ ...settings, weatherOverrides: { '2026-10-10': 'typhoon' } as never }]
     expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
   })
+  it('版13（リーダーボードがない頃）のバックアップもそのまま復元でき、順位と件数だけのリーダーボードを持つクエストを復元する', async () => {
+    const b = await createBackup(db, 'real')
+    expect(parseBackup(JSON.stringify({ ...b, schema_version: 13 })).ok).toBe(true)
+    const quest = {
+      id: 'q1', label: '日跨ぎ', platform: 'uber', startsAt: '2026-10-08T19:00:00.000Z', endsAt: '2026-10-11T19:00:00.000Z', rewardMode: 'incremental', tiers: [{ count: 40, rewardYen: 3770 }], manualOffset: 0,
+      createdAt: '2026-10-07T00:00:00.000Z', updatedAt: '2026-10-07T00:00:00.000Z', revision: 1,
+      leaderboard: { snapshots: [{ at: '2026-10-10T07:00:00.000Z', myRank: 9, myCount: 23, rows: [{ rank: 4, count: 27 }, { rank: 9, count: 23 }] }], prizes: [{ upToRank: 5, rewardYen: 1000 }], targetRank: null },
+    }
+    b.datasets.quests = [quest as never]
+    const ok = parseBackup(JSON.stringify(b))
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      await restoreBackup(db, ok.backup)
+      expect((await db.quests.get('q1'))?.leaderboard?.snapshots[0]?.rows).toHaveLength(2)
+    }
+    b.datasets.quests = [{ ...quest, leaderboard: { ...quest.leaderboard, snapshots: [{ ...quest.leaderboard.snapshots[0]!, rows: [{ rank: 0, count: 3 }] }] } } as never]
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false)
+  })
 })
 

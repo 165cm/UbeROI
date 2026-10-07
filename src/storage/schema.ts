@@ -1,15 +1,15 @@
 // 端末に保存するデータの形（docs/spec/docs/03-data-model.md を MVP 向けに簡略化）
 // 子レコード（レンタル・調整・直接経費）はセッションの中に持ち、1回の書き込みでまとめて保存・削除する
-import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, QuestRepeat, PlanWeather, Tariff, WeeklyAvailability } from '../domain'
+import type { BusynessTable, EquipmentCategory, LeaderboardPrize, LeaderboardSnapshot, OfferDecision, Platform, QuestRepeat, PlanWeather, Tariff, WeeklyAvailability } from '../domain'
 
 /**
  * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
  * 5：エリアの混み具合（areas）と、設定の主なエリア（primaryAreaId）を追加。
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
- * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。13：設定の1日の最長（maxDayHours）。
+ * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。13：設定の1日の最長（maxDayHours）。14：クエストのリーダーボード（leaderboard）。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 
 interface Stamped {
   createdAt: string
@@ -213,6 +213,16 @@ export interface QuestRecord extends Stamped {
   repeat?: QuestRepeat
   /** くり返すクエストの、2回目以降の件数の調整（キーは回の番号。最初の回は manualOffset） */
   offsets?: Record<string, number>
+  /**
+   * リーダーボード（版14で追加。未定義は「使わない」）。同じ期間・同じ件数で競うので、クエストに付ける。
+   * 撮った時点ごとの順位と件数だけを持ち、他の人の名前・顔写真は持たない
+   */
+  leaderboard?: {
+    snapshots: LeaderboardSnapshot[]
+    prizes: LeaderboardPrize[]
+    /** 狙う順位（null は既定：賞金のある一番下の順位か、1つ上の順位） */
+    targetRank: number | null
+  }
 }
 
 /**

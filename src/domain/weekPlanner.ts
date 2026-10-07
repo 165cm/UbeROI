@@ -49,6 +49,8 @@ export interface PlannerInput {
   quest: PlannerQuest | null
   /** 同じサービスの短いクエスト（ピーク） */
   peaks: readonly PlannerQuest[]
+  /** リーダーボードで攻める目標（§5.13）：日跨ぎと同じ数え方の件数。賞金は届くか分からないので、利益には入れず添えるだけ */
+  attack?: { rank: number; count: number; prizeYen: number } | null
   targetHourlyYen: number | null
 }
 
@@ -72,7 +74,7 @@ export interface DayPlan {
 }
 
 export interface WeekOption {
-  /** 'best'＝おすすめ、'tier-N'＝日跨ぎの第N段階まで、'none'＝クエストを気にしない */
+  /** 'best'＝おすすめ、'tier-N'＝日跨ぎの第N段階まで、'attack'＝リーダーボードを攻める、'none'＝クエストを気にしない */
   key: string
   label: string
   /** 日跨ぎで届く段階（0は届かない） */
@@ -86,6 +88,8 @@ export interface WeekOption {
   bonusYen: number
   profitYen: number
   hourlyYen: number | null
+  /** 攻める目標に届く時の、順位の賞金（届けば。利益には入れていない） */
+  prizeYen: number
 }
 
 const iso = (ms: number) => new Date(ms).toISOString()
@@ -287,9 +291,11 @@ export function planWeekShifts(input: PlannerInput): { options: WeekOption[]; re
     days.push(fixed.length ? [fixedDay(input, d, fixed)] : [rest, ...dayOptions(input, d, Math.max(fromMs, d))])
   }
 
-  // 日跨ぎで数える件数の上限（最後の段階まで。それより多くは区別しない）
+  // 日跨ぎで数える件数の上限（最後の段階か、攻める目標まで。それより多くは区別しない）
   const quest = input.quest
-  const need = quest ? Math.max(0, Math.max(0, ...quest.tiers.map((t) => t.count)) - quest.count) : 0
+  const lastTier = quest ? Math.max(0, ...quest.tiers.map((t) => t.count)) : 0
+  const attack = quest && input.attack && input.attack.count > lastTier ? input.attack : null
+  const need = quest ? Math.max(0, Math.max(lastTier, attack?.count ?? 0) - quest.count) : 0
   const cap = days.reduce((a, opts) => a + Math.max(...opts.map((o) => o.hoursInt)), 0)
   const maxHours = Math.min(cap, input.budgetHours === null ? cap : Math.max(0, Math.floor(input.budgetHours)))
   const W = need + 1
@@ -355,6 +361,7 @@ export function planWeekShifts(input: PlannerInput): { options: WeekOption[]; re
       bonusYen,
       profitYen,
       hourlyYen: hours > 0 ? Math.round(profitYen / hours) : null,
+      prizeYen: attack && quest && st % W >= attack.count - quest.count ? attack.prizeYen : 0,
     }
   }
   // 状態ごとの点数：利益（日跨ぎの報酬込み）。目標時給があれば「利益−目標×時間」
@@ -393,6 +400,8 @@ export function planWeekShifts(input: PlannerInput): { options: WeekOption[]; re
       const next = sorted[i + 1]
       push(`tier-${i + 1}`, label, bestWhere((o) => o >= t.count - quest.count && (!next || o < next.count - quest.count)))
     })
+    // 攻める：リーダーボードの目標の件数まで（本命より多い時だけ）
+    if (attack) push('attack', `攻める ${attack.rank}位 ${attack.count}件`, bestWhere((o) => o >= attack.count - quest.count))
     // クエストを気にしない：日跨ぎの報酬を入れずに点数が最大
     const plain = (st: number) => dp[st]! - (input.targetHourlyYen ?? 0) * Math.floor(st / W)
     let free: number | null = null

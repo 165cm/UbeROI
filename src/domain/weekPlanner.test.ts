@@ -95,6 +95,27 @@ describe('週の作戦エンジン', () => {
     expect(s.options[0]).toMatchObject({ orders: 30, revenueYen: 21000, bonusYen: 5000, profitYen: 26000 })
   })
 
+  it('リーダーボードの攻める目標（本命より多い件数）の選択肢を出す。賞金は届くか分からないので利益に入れない', () => {
+    const s = planWeekShifts({
+      ...base,
+      rentalFee: null,
+      budgetHours: null,
+      targetHourlyYen: 1500,
+      quest: { startsAt: jst('2026-10-09T04:00:00'), endsAt: jst('2026-10-12T04:00:00'), rewardMode: 'incremental', tiers: [{ count: 20, rewardYen: 3000 }, { count: 30, rewardYen: 2000 }], count: 0 },
+      attack: { rank: 4, count: 36, prizeYen: 1000 },
+    })
+    expect(s.options.map((o) => [o.key, o.label, o.hours, o.orders, o.prizeYen])).toEqual([
+      ['best', 'おすすめ・本命 30件', 15, 30, 0],
+      ['tier-1', '最低 20件', 10, 20, 0],
+      ['attack', '攻める 4位 36件', 18, 36, 1000],
+      ['none', 'クエストを気にしない', 0, 0, 0],
+    ])
+    expect(s.options[2]).toMatchObject({ bonusYen: 5000, profitYen: 18 * 1400 + 5000 })
+    // 本命で届くなら、攻める選択肢は出さない
+    const within = planWeekShifts({ ...base, rentalFee: null, budgetHours: null, quest: { startsAt: jst('2026-10-09T04:00:00'), endsAt: jst('2026-10-12T04:00:00'), rewardMode: 'incremental', tiers: [{ count: 30, rewardYen: 2000 }], count: 0 }, attack: { rank: 4, count: 25, prizeYen: 0 } })
+    expect(within.options.some((o) => o.key === 'attack')).toBe(false)
+  })
+
   it('すでに選んだ候補枠のある日はその枠で固定し、週の残り時間の中で組む', () => {
     const slot = { startsAt: jst('2026-10-11T12:00:00'), endsAt: jst('2026-10-11T16:00:00') }
     const best = planWeekShifts({ ...base, fixed: [slot] }).options[0]!

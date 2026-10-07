@@ -10,7 +10,7 @@
 
 | 担当 | ブランチ | 内容 | 触るファイル |
 |---|---|---|---|
-| Claude | codex/ui-03-visual-system | UI刷新3段階（PR #40）を Codex から引き継ぎ：main へ載せ直し・レビューの指摘の修正・公開承認待ち | `src/` `e2e/` `docs/` |
+| Claude | claude/gallant-bohr-c8bux9 | UI刷新3段階（PR #40 の中身）を Codex から引き継ぎ：main へ載せ直し・レビューの指摘の修正。PR #40 の代わりの新しいPRで公開承認待ち | `src/` `e2e/` `docs/` |
 
 ## 次のタスク（上から優先）
 

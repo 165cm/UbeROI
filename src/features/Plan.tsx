@@ -39,6 +39,7 @@ import { QuestWeek, questWeekItems } from './QuestWeek'
 import { WeekBoard } from './WeekBoard'
 import { AreaRoutePlan } from './AreaRoutePlan'
 import { useForecast } from './useForecast'
+import { PlanningSetup } from './PlanningSetup'
 
 const HOUR = 3_600_000
 
@@ -203,7 +204,7 @@ export function Plan() {
     : null
   const attack = board?.target ? { rank: board.target.rank, count: board.target.need, prizeYen: board.target.prizeYen } : null
   const doneHours = done.reduce((acc, x) => acc + lengthH(x), 0)
-  const planner = planWeekShifts({
+  const planner = budget === null ? { options: [] } : planWeekShifts({
     now: nowIso,
     from: weekStartIso,
     to: weekEndIso,
@@ -269,6 +270,7 @@ export function Plan() {
       </div>
       {notice && <Notice message={notice.message} onUndo={notice.undo} onClose={() => setNotice(null)} />}
 
+      <PlanningSetup settings={data.settings} tariffs={data.tariffs} />
       <WeekBoard
         now={nowIso}
         weekFrom={week.from}
@@ -280,6 +282,8 @@ export function Plan() {
         onAdd={(date) => setEditing(newSlot(date))}
         onEdit={(id) => setEditing(inWeek.find((s) => s.id === id) ?? null)}
         options={planner.options}
+        needsSetup={budget === null}
+        estimateNote={past.length < 3 ? '参考値を含む推計・実績が少ないため目安です' : '自分の実績をもとに推計・時間帯によって参考値を使用します'}
         selectedKey={planKey}
         onSelect={setPlanKey}
         allowed={allowed}

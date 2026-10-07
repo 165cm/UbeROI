@@ -87,6 +87,7 @@ test('日跨ぎの段階ごとに、作戦の選択肢（最低・本命・ク�
   await page.clock.install({ time: new Date('2026-10-05T12:00:00+09:00') })
   await page.goto('#settings')
   await page.getByLabel('目標の営業純時給', { exact: true }).fill('1500')
+  await page.getByLabel('週に使える時間', { exact: true }).fill('40')
   await page.getByRole('button', { name: '💾 保存' }).first().click()
   await page.goto('#home')
   await page.getByRole('button', { name: 'クエストを追加' }).click()

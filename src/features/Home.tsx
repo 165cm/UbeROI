@@ -229,9 +229,11 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
           </dd>
         </div>
       </dl>
+      <details className="rental-details"><summary>料金の上限・休憩の比較</summary>
       {rental.startAt && rental.tariff.kind === 'tiered' && <CapLine tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       {rental.tariff.kind !== 'none' && <CostByLength tariff={rental.tariff} />}
       {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
+      </details>
       <button type="button" onClick={onReturn}>
         🅿️ 返却した
       </button>

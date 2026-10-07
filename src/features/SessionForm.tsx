@@ -212,6 +212,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
 
       <Problems items={problems} />
       <div className="actions settlement-actions">
+        {s.returnedAt && s.baseYen !== null && !('error' in preview) && preview.errors.length === 0 && <p className="settlement-summary">今回の利益 <strong>{formatYen(preview.operatingProfitYen)}</strong> · 時給 {preview.hourlyYen === null ? '算出不可' : `${formatYen(preview.hourlyYen)}/時`}</p>}
         <button type="submit" className="primary" disabled={!s.returnedAt}>
           ✅ 確定して保存
         </button>

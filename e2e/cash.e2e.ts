@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 
 test('支払い金額を入れると、出されそうな額ごとのお釣りが並び、受け取った額でお釣りが出る', async ({ page }) => {
   await page.goto('#home')
+  await page.getByText('📋 判断のたすけ').click()
   await page.getByText('💴 お釣り').click()
   await page.getByLabel('支払い金額', { exact: true }).fill('4260')
   const rows = page.locator('.cash-row')

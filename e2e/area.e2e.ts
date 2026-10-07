@@ -27,6 +27,7 @@ test('エリアの混み具合を登録すると、ホームに今の混み具�
 
   // ホーム：この先4時間の表。今（18時台）は混む、19時台はやや混む、20・21時台は未入力
   await page.goto('#home')
+  await page.getByText('📋 判断のたすけ').click()
   const ahead = page.getByRole('region', { name: 'この先4時間の混み具合' })
   await expect(ahead.getByRole('columnheader')).toHaveText(['📈 エリア', '今 18時', '19時', '20時', '21時'])
   const row = ahead.getByRole('row', { name: /中野・荻窪エリア/ })
@@ -130,6 +131,7 @@ test('ホームのこの先4時間：登録したエリアは未入力でも並�
   await add('新宿エリア', [[1, 18, 4]])
   await add('吉祥寺エリア', [[2, 18, 2]])
   await page.goto('#home')
+  await page.getByText('📋 判断のたすけ').click()
   const ahead = page.getByRole('region', { name: 'この先4時間の混み具合' })
   await expect(ahead.getByRole('row')).toHaveCount(4)
   await expect(ahead.getByRole('row', { name: /吉祥寺エリア/ }).getByRole('cell').nth(0)).toHaveAccessibleName('未入力')

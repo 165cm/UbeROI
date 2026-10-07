@@ -1678,3 +1678,70 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 
 .settlement-summary { grid-column: 1 / -1; margin: 0 0 6px; font-size: .875rem; }
 .rental-details > summary { font-size: .875rem; }
+
+/* UI刷新 第4段階：デザイン案（今日・昼／夜）の形。色は :root の色の名前を使う */
+.app-header { align-items: baseline; flex-wrap: nowrap; }
+.app-header .logo { margin: 0; font-size: 2rem; font-weight: 900; color: var(--accent); letter-spacing: -.05em; transform: skewX(-9deg); line-height: 1.1; }
+.header-date { font-size: .875rem; color: var(--text); white-space: nowrap; }
+.saved-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .75rem; font-weight: 650; color: var(--accent); white-space: nowrap; }
+.saved-chip > span[aria-hidden] { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: .625rem; }
+.saved-chip.offline { color: var(--warn); }
+.settings-link { margin-left: auto; align-self: center; }
+.pill { display: inline-flex; align-items: center; padding: 2px 12px; border-radius: 999px; font-size: .8125rem; font-weight: 750; white-space: nowrap; }
+.working-pill { background: var(--accent); color: var(--accent-text); }
+.estimate-pill { border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); font-weight: 650; }
+.home .card h3 { font-size: 1.125rem; margin: 0; }
+.today-card { border-top: none; }
+.today-clock { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 16px; }
+.today-clock .label { display: block; font-size: .875rem; color: var(--text); }
+.today-clock .clock { display: block; font-size: 3.75rem; font-weight: 850; line-height: 1; letter-spacing: -.02em; }
+.today-return { border-left: 1px solid var(--border); padding-left: 16px; }
+.today-return strong { display: block; font-size: 1.75rem; font-weight: 800; line-height: 1.1; }
+.num { font-variant-numeric: tabular-nums; }
+.rental-status { border: none; padding: 18px 16px; }
+.rental-amount { margin: 0; font-size: 2.75rem; font-weight: 850; line-height: 1.1; letter-spacing: -.02em; }
+p.next-charge { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--attention-bg); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); color: var(--text); font-size: .875rem; gap: 8px; }
+p.next-charge strong { font-size: 1.375rem; font-weight: 800; color: var(--text); }
+button.outline { background: var(--surface); color: var(--accent); border: 2px solid var(--accent); }
+.quest-count { margin: 0; font-size: 1.125rem; font-weight: 700; }
+.quest-count strong { font-size: 2.75rem; font-weight: 850; line-height: 1; }
+.quest-today .meter { height: 12px; border-radius: 6px; }
+.quest-today .gain { color: var(--accent); font-size: 1.25rem; font-weight: 800; }
+.quest-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button.chevron { display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 0 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 12px; font-weight: 650; }
+button.chevron::after { content: '›'; font-size: 1.25rem; color: var(--text-muted); }
+button.chevron[aria-expanded='true']::after { content: '⌄'; }
+.settle-bar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 3; padding-top: 4px; }
+.settle-bar button.primary { width: 100%; min-height: 56px; font-size: 1.125rem; box-shadow: 0 6px 18px #0000001f; }
+.helpers > summary { min-height: 48px; }
+@media (max-width: 359px) {
+  .today-clock .clock { font-size: 3rem; }
+  .rental-amount, .quest-count strong { font-size: 2.25rem; }
+  .app-header .logo { font-size: 1.6rem; }
+  .saved-chip { display: none; }
+}
+p.next-charge { flex-wrap: nowrap; align-items: center; }
+p.next-charge > span { white-space: nowrap; }
+p.next-charge > .grow { overflow: hidden; text-overflow: ellipsis; }
+.today-clock { margin-top: 10px; }
+.quest-today > p { margin: 0; }
+.quest-today.stack { gap: 12px; }
+.rental-status.stack { gap: 12px; }
+.rental-details > summary, .rental-status details > summary { min-height: 40px; display: flex; align-items: center; }
+@media (max-width: 359px) {
+  p.next-charge strong { font-size: 1.125rem; }
+}
+p.next-charge > .grow { overflow: visible; min-width: max-content; }
+p.next-charge strong { font-size: 1.25rem; }
+p.next-charge { padding: 10px 12px; justify-content: space-between; }
+.today-card > button.primary { margin-top: 12px; }
+.today-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.today-title .hint { font-weight: 400; }
+/* 文字を大きくしても横にはみ出さないよう、大きい数字は画面の幅も上限にする */
+.app-header { flex-wrap: wrap; }
+.today-clock .clock { font-size: min(3.75rem, 17vw); }
+.today-return strong { font-size: min(1.75rem, 8vw); }
+.rental-amount, .quest-count strong { font-size: min(2.75rem, 12vw); overflow-wrap: anywhere; }
+.today-clock { grid-template-columns: minmax(0, 1fr) auto; }
+p.next-charge { flex-wrap: wrap; }
+p.next-charge > .grow { min-width: 0; white-space: normal; }

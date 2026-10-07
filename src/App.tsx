@@ -25,6 +25,12 @@ function currentTab(): TabId {
   return TABS.some((t) => t.id === hash) ? (hash as TabId) : 'home'
 }
 
+/** 頭の部分の今日の日付（例：10月7日(水)） */
+function todayLabel(): string {
+  const d = new Date()
+  return `${d.getMonth() + 1}月${d.getDate()}日(${'日月火水木金土'[d.getDay()]})`
+}
+
 export function App() {
   return (
     <DataProvider>
@@ -57,13 +63,18 @@ function Shell() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>デリ勘</h1>
-        <a className="settings-link" href="#settings" aria-label="設定" aria-current={tab === 'settings' ? 'page' : undefined}><Icon name="settings" />設定</a>
-        {!online && (
-          <span className="tag" role="status" title="電波がなくても記録できます（端末に保存されます）">
+        <h1 className="logo">デリ勘</h1>
+        <span className="header-date">{todayLabel()}</span>
+        {online ? (
+          <span className="saved-chip" title="記録はこの端末の中に保存しています（外へは送りません）">
+            <span aria-hidden="true">✓</span> 端末に保存済み
+          </span>
+        ) : (
+          <span className="saved-chip offline" role="status" title="電波がなくても記録できます（端末に保存されます）">
             📴 オフライン・記録できます
           </span>
         )}
+        <a className="settings-link" href="#settings" aria-label="設定" aria-current={tab === 'settings' ? 'page' : undefined}><Icon name="settings" /></a>
       </header>
       {updateReady && (
         <div className="update-banner" role="status">
@@ -80,7 +91,8 @@ function Shell() {
       )}
       <main className="app-main" aria-labelledby="page-title">
         {/* メニューに加え、画面の見出しでも現在地を示す */}
-        <h2 id="page-title">{tab === 'offer' ? 'オファー判定' : tab === 'settings' ? '設定' : active?.label}</h2>
+        {/* 「今日」は見出しを画面に出さず（カードの題で分かる）、読み上げだけに残す */}
+        <h2 id="page-title" className={tab === 'home' ? 'visually-hidden' : undefined}>{tab === 'offer' ? 'オファー判定' : tab === 'settings' ? '設定' : active?.label}</h2>
         {tab === 'home' && (
           <Home
             onSettle={(id) => {

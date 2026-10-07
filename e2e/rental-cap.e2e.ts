@@ -4,8 +4,8 @@ import { expect, test } from '@playwright/test'
 test('レンタル中は上限までの残りと、上限の後は追加 0円になる時刻が出る。長く乗るほど1時間あたりが下がる表も見られる', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-05T14:00:00+09:00') })
   await page.goto('#home')
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
-  await page.getByRole('button', { name: '🚲 レンタル開始' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
+  await page.getByRole('button', { name: 'レンタル開始' }).click()
   await page.getByText('料金の上限・乗る長さごとの料金', { exact: true }).click()
   await expect(page.getByText(/上限 2,500円 まで あと/)).toBeVisible()
   // 14:00 に借りると、18:00（240分1秒）に上限に達し、翌2:00（12時間）までは増えない
@@ -25,6 +25,7 @@ test('レンタル中は上限までの残りと、上限の後は追加 0円に
   await expect(page.getByText(/上限 2,500円 に到達。02:00 まで追加 0円/)).toBeVisible()
 
   // 終了までの見通しにも出る。上限で乗れる時間（翌2:00）を過ぎる終了予定なら、その先は見積の対象外と伝える
+  await page.getByText('📋 判断のたすけ').click()
   const end = page.getByLabel('終了予定（配達をやめる時刻）', { exact: true })
   await end.fill('23:00')
   await expect(page.getByText('レンタルは上限 2,500円 に達しています。02:00 までは追加のレンタル代がかかりません')).toBeVisible()

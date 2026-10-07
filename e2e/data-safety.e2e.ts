@@ -7,8 +7,8 @@ import { expect, test } from '@playwright/test'
 test('A21：稼働中に再読み込みしても、オフラインでも、記録とタイマーが残る', async ({ page, context }) => {
   await page.clock.install({ time: new Date('2026-10-04T18:00:00+09:00') })
   await page.goto('#home')
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
-  await page.getByRole('button', { name: '🚲 レンタル開始' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
+  await page.getByRole('button', { name: 'レンタル開始' }).click()
   // アプリ本体が端末に保存される（Service Worker）のを待つ
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready
@@ -16,13 +16,13 @@ test('A21：稼働中に再読み込みしても、オフラインでも、記�
   await page.clock.fastForward('45:00')
   await page.reload()
   await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
-  await expect(page.locator('dd', { hasText: '45分' }).first()).toBeVisible()
+  await expect(page.getByLabel('出発から0時間45分')).toHaveText('00:45')
 
   await context.setOffline(true)
   await page.reload()
   await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
   await expect(page.getByText(/オフライン/).first()).toBeVisible()
-  await page.getByRole('button', { name: '🏁 帰宅して精算' }).click()
+  await page.getByRole('button', { name: '帰宅して精算' }).click()
   await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('1500')
   await page.getByRole('button', { name: '✅ 確定して保存' }).click()
   await expect(page.locator('.list-item').first()).toContainText('確定')

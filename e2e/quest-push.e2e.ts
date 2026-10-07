@@ -33,7 +33,10 @@ test('稼働中に ＋ で件数を数えると、次の段階・順位まであ
   await form.getByRole('button', { name: '💾 保存' }).click()
   await expect(page.getByText('🏆 リーダーボードを保存しました')).toBeVisible()
 
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
+  // 「クエスト」カードに、先に終わるクエストの件数。「件数を記録」で ＋／− と目標の行が開く
+  await expect(page.getByRole('region', { name: 'クエスト' })).toContainText('40 / 50件')
+  await page.getByRole('button', { name: '件数を記録' }).click()
   const push = page.getByRole('group', { name: 'あと何件？' })
   await expect(push).toContainText('日跨ぎ 40/50件')
   // この稼働で7件配達した
@@ -52,5 +55,8 @@ test('稼働中に ＋ で件数を数えると、次の段階・順位まであ
   expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([])
 
   await page.reload()
+  await expect(page.getByRole('region', { name: 'クエスト' })).toContainText('47 / 50件')
+  await expect(page.getByRole('region', { name: 'クエスト' })).toContainText('あと3件で +1,170円')
+  await page.getByRole('button', { name: '件数を記録' }).click()
   await expect(page.getByRole('group', { name: 'あと何件？' })).toContainText('日跨ぎ 47/50件')
 })

@@ -37,11 +37,11 @@ test('初期設定から復元まで、1本の流れで数字が合う', async (
   // 3. 出発 → レンタル開始（18:00）→ 3時間後に帰宅して精算
   await page.clock.fastForward('10:00')
   await goto(page, 'home')
-  await page.getByRole('button', { name: '🏠 自宅を出発' }).click()
-  await page.getByRole('button', { name: '🚲 レンタル開始' }).click()
+  await page.getByRole('button', { name: '自宅を出発' }).click()
+  await page.getByRole('button', { name: 'レンタル開始' }).click()
   await expect(page.getByRole('heading', { name: /稼働中/ })).toBeVisible()
   await page.clock.fastForward('03:00:00')
-  await page.getByRole('button', { name: '🏁 帰宅して精算' }).click()
+  await page.getByRole('button', { name: '帰宅して精算' }).click()
 
   // 4. 精算：売上 6,600 + 180 + 400 = 7,180円、その他経費 200円（レンタルは見積 1,760円）
   await page.getByLabel('基本報酬（配送料の合計）', { exact: true }).fill('6600')

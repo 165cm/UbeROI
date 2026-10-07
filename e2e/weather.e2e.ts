@@ -9,7 +9,7 @@ function forecastBody() {
   const time: string[] = []
   const precipitation: number[] = []
   const weather_code: number[] = []
-  const wind_gusts_10m: number[] = []
+  const wind_speed_10m: number[] = []
   for (let d = 0; d < 8; d++) {
     for (let h = 0; h < 24; h++) {
       const day = 5 + d
@@ -17,10 +17,10 @@ function forecastBody() {
       const rain = day === 10 && h >= 10 && h < 20 ? 2 : day === 11 && h === 12 ? 8 : 0
       precipitation.push(rain)
       weather_code.push(rain >= 5 ? 65 : rain > 0 ? 61 : 1)
-      wind_gusts_10m.push(4)
+      wind_speed_10m.push(4)
     }
   }
-  return { hourly: { time, precipitation, weather_code, wind_gusts_10m } }
+  return { hourly: { time, precipitation, weather_code, wind_speed_10m } }
 }
 
 async function primaryAreaWithCenter(page: Page) {
@@ -54,6 +54,8 @@ test('主なエリアの場所（約10kmに丸めた緯度経度だけ）から�
   expect(url.origin + url.pathname).toBe('https://api.open-meteo.com/v1/jma')
   expect(url.searchParams.get('latitude')).toBe('36.5')
   expect(url.searchParams.get('longitude')).toBe('138')
+  // 気象庁モデルで取れる項目だけを頼む（突風の値はない）
+  expect(url.searchParams.get('hourly')).toBe('precipitation,weather_code,wind_speed_10m')
 
   await expect(page.getByRole('button', { name: '土 10日の天気：雨（予報）。押すと変える' })).toHaveText('☔')
   await expect(page.getByRole('button', { name: '日 11日の天気：荒天（予報）。押すと変える' })).toHaveText('⛈️')

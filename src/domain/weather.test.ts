@@ -5,13 +5,14 @@ import { businessDate, classifyHour, dayWeather, planWeatherOfRecord, weatherAt,
 const ms = (s: string) => Date.parse(`${s}+09:00`)
 
 describe('天気', () => {
-  it('予報の1時間：0.5mm 以上は雨、5mm 以上・突風15m/s 以上・雷・雪は荒天、雲が多ければくもり', () => {
+  it('予報の1時間：0.5mm 以上は雨、5mm 以上・風速10m/s 以上・雷・雪は荒天、雲が多ければくもり', () => {
     expect(classifyHour(0, 3, 0)).toBe('clear')
     expect(classifyHour(0, 3, 3)).toBe('cloudy')
     expect(classifyHour(0.5, 3, 3)).toBe('rain')
     expect(classifyHour(0.1, 3, 61)).toBe('rain')
     expect(classifyHour(6, 3, 63)).toBe('storm')
-    expect(classifyHour(0, 16, 3)).toBe('storm')
+    expect(classifyHour(0, 10, 3)).toBe('storm')
+    expect(classifyHour(0, 9.9, 3)).toBe('cloudy')
     expect(classifyHour(0, 3, 95)).toBe('storm')
     expect(classifyHour(0.2, 3, 73)).toBe('storm')
     expect(classifyHour(null, null, null)).toBe('clear')

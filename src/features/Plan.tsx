@@ -313,7 +313,11 @@ export function Plan() {
           const cur = { ...(data.settings?.weatherOverrides ?? {}) }
           if (next === null) delete cur[date]
           else cur[date] = next
-          await saveSettings(db, { weatherOverrides: cur })
+          try {
+            await saveSettings(db, { weatherOverrides: cur })
+          } catch (e) {
+            setNotice({ message: `⚠️ 天気を保存できませんでした：${errorMessages(e).join('・')}` })
+          }
         }}
         onAddQuestWindows={async (windows) => {
           const slots = windows.map(fromSuggestion)

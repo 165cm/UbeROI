@@ -11,9 +11,9 @@ export const PLAN_WEATHER_LABELS: Record<PlanWeather, string> = { clear: '晴れ
 
 /** 雨とみなす1時間の降水量（mm） */
 export const RAIN_MM = 0.5
-/** 荒天とみなす1時間の降水量（mm）と、最大瞬間風速（m/s） */
+/** 荒天とみなす1時間の降水量（mm）と、平均の風速（m/s。気象庁モデルには突風の値がないため、平均の風速で見る。10m/s は自転車で走りにくい強さ） */
 export const STORM_MM = 5
-export const STORM_GUST_MS = 15
+export const STORM_WIND_MS = 10
 
 /** 記録の天気（記録の画面の7つ）を、計画の4つにまとめる。本降りは働いた実績なので雨に数える */
 export function planWeatherOfRecord(w: string | null | undefined): PlanWeather | null {
@@ -25,12 +25,12 @@ export function planWeatherOfRecord(w: string | null | undefined): PlanWeather |
   return null
 }
 
-/** 予報の1時間（降水量 mm・最大瞬間風速 m/s・天気コード WMO）から、計画の天気 */
-export function classifyHour(precipMm: number | null, gustMs: number | null, code: number | null): PlanWeather {
+/** 予報の1時間（降水量 mm・平均の風速 m/s・天気コード WMO）から、計画の天気 */
+export function classifyHour(precipMm: number | null, windMs: number | null, code: number | null): PlanWeather {
   const mm = precipMm ?? 0
-  const gust = gustMs ?? 0
+  const wind = windMs ?? 0
   // 雷（95〜99）・雪（71〜77・85〜86）は荒天
-  if (mm >= STORM_MM || gust >= STORM_GUST_MS || (code !== null && (code >= 95 || (code >= 71 && code <= 77) || code === 85 || code === 86))) return 'storm'
+  if (mm >= STORM_MM || wind >= STORM_WIND_MS || (code !== null && (code >= 95 || (code >= 71 && code <= 77) || code === 85 || code === 86))) return 'storm'
   if (mm >= RAIN_MM || (code !== null && ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)))) return 'rain'
   if (code !== null && code >= 2) return 'cloudy'
   return 'clear'

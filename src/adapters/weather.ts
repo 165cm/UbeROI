@@ -43,18 +43,18 @@ export async function fetchForecast(center: { lat: number; lng: number }, nowMs 
   const lng = roundCoord(center.lng)
   const cached = load(lat, lng, nowMs)
   if (cached) return cached
-  const url = `${ENDPOINT}?latitude=${lat}&longitude=${lng}&hourly=precipitation,weather_code,wind_gusts_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo&forecast_days=8`
+  const url = `${ENDPOINT}?latitude=${lat}&longitude=${lng}&hourly=precipitation,weather_code,wind_speed_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo&forecast_days=8`
   const res = await fetch(url)
   if (!res.ok) throw new Error(`天気予報を取得できませんでした（${res.status}）`)
   const body = (await res.json()) as {
-    hourly?: { time?: string[]; precipitation?: (number | null)[]; weather_code?: (number | null)[]; wind_gusts_10m?: (number | null)[] }
+    hourly?: { time?: string[]; precipitation?: (number | null)[]; weather_code?: (number | null)[]; wind_speed_10m?: (number | null)[] }
   }
   const h = body.hourly
   if (!h?.time) throw new Error('天気予報の形が想定外です')
   // 時刻は日本時間の "2026-10-10T12:00"（timezone=Asia/Tokyo）
   const hours: [number, PlanWeather][] = h.time.map((t, i) => [
     Date.parse(`${t}:00+09:00`),
-    classifyHour(h.precipitation?.[i] ?? null, h.wind_gusts_10m?.[i] ?? null, h.weather_code?.[i] ?? null),
+    classifyHour(h.precipitation?.[i] ?? null, h.wind_speed_10m?.[i] ?? null, h.weather_code?.[i] ?? null),
   ])
   const f: Forecast = { fetchedAt: new Date(nowMs).toISOString(), lat, lng, hours }
   try {

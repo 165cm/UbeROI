@@ -6,10 +6,10 @@ import type { BusynessTable, EquipmentCategory, OfferDecision, Platform, QuestRe
  * 2：計画の候補枠（slots）を追加。3：クエスト（quests）を追加。4：記録に取り込み元（imported）を追加。
  * 5：エリアの混み具合（areas）と、設定の主なエリア（primaryAreaId）を追加。
  * 6：オファーの記録（offers）と、設定のオファー判定の基準（offerBufferMinutes・offerMinKmYen）を追加。
- * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。
+ * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。13：設定の1日の最長（maxDayHours）。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 12
+export const SCHEMA_VERSION = 13
 
 interface Stamped {
   createdAt: string
@@ -40,6 +40,8 @@ export interface SettingsRecord extends Stamped {
   availability?: WeeklyAvailability | null
   /** 計画の帯で手で直した天気（日付 YYYY-MM-DD・4時区切り → 天気。版12で追加。未定義は予報のまま） */
   weatherOverrides?: Record<string, PlanWeather>
+  /** 1日に働く最長の時間（週の作戦。版13で追加。未定義は10時間） */
+  maxDayHours?: number
 }
 
 export interface TariffRecord extends Stamped {

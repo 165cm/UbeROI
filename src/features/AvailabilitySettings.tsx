@@ -2,8 +2,8 @@
 // 計画のおすすめ・クエストのための時間・作戦は、この中だけで組む（未設定は制限なし）
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AVAILABILITY_MAX_RANGES, AVAILABILITY_PRESETS, weeklyAvailableHours, type WeeklyAvailability } from '../domain'
-import { CardTitle, Notice, Problems, errorMessages } from '../components/fields'
+import { AVAILABILITY_MAX_RANGES, AVAILABILITY_PRESETS, DEFAULT_MAX_DAY_HOURS, weeklyAvailableHours, type WeeklyAvailability } from '../domain'
+import { CardTitle, IntInput, Notice, Problems, errorMessages } from '../components/fields'
 import { useData } from '../storage/context'
 import { saveSettings } from '../storage/repo'
 
@@ -18,12 +18,14 @@ export function AvailabilitySettings() {
   const [form, setForm] = useState<WeeklyAvailability | null>(null)
   const [problems, setProblems] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
+  const [maxDay, setMaxDay] = useState<number | null>(null)
   if (!saved) return null
+  const savedMaxDay = saved.maxDayHours ?? DEFAULT_MAX_DAY_HOURS
   const current = saved.availability ?? null
 
   const save = async (av: WeeklyAvailability | null) => {
     try {
-      await saveSettings(db, { availability: av })
+      await saveSettings(db, { availability: av, maxDayHours: maxDay ?? savedMaxDay })
       setProblems([])
       setForm(null)
       setNotice(av ? `💾 働ける時間を保存しました（1週間 ${weeklyAvailableHours(av)}時間）` : '💾 制限なし（いつでも）にしました')
@@ -38,7 +40,7 @@ export function AvailabilitySettings() {
       tip="計画の「💡 空いている、稼げそうな時間」「🎯 クエストのための時間」「🧭 クエスト作戦」は、この時間の中だけで組みます。プリセットを選んでから、曜日ごとに直せます。終了が開始より前（例：19:00〜02:00）は翌日までです。未設定は制限なし（いつでも）です"
       right={
         !form && (
-          <button type="button" className="icon" aria-label="働ける時間を編集" onClick={() => setForm(current ?? AVAILABILITY_PRESETS[0]!.days)}>
+          <button type="button" className="icon" aria-label="働ける時間を編集" onClick={() => (setForm(current ?? AVAILABILITY_PRESETS[0]!.days), setMaxDay(savedMaxDay))}>
             ✏️
           </button>
         )
@@ -61,13 +63,17 @@ export function AvailabilitySettings() {
                 <dd>{dayText(current[d] ?? [])}</dd>
               </div>
             ))}
-            <div className="wide">
+            <div>
               <dt>1週間</dt>
               <dd>{weeklyAvailableHours(current)}時間</dd>
             </div>
+            <div>
+              <dt>1日の最長</dt>
+              <dd>{savedMaxDay}時間</dd>
+            </div>
           </dl>
         ) : (
-          <p className="hint">制限なし（いつでも）。✏️ で「平日は夜だけ」「午前だけ」などを選べます</p>
+          <p className="hint">制限なし（作戦は毎日 9〜24時の中で組みます）・1日の最長 {savedMaxDay}時間。✏️ で「平日は夜だけ」「午前だけ」などを選べます</p>
         )}
       </section>
     )
@@ -121,6 +127,13 @@ export function AvailabilitySettings() {
         })}
       </ul>
       <p className="hint">1週間 {weeklyAvailableHours(form)}時間</p>
+      <IntInput
+        label="1日の最長"
+        unit="時間"
+        value={maxDay}
+        onChange={setMaxDay}
+        tip="週の作戦で、1日に働く時間の上限（昼と夜の2回の合計）。疲れや翌日の予定に合わせて（2〜16時間）"
+      />
       <Problems items={problems} />
       <div className="actions">
         <button type="button" className="primary" onClick={() => void save(form)}>

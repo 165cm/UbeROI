@@ -4,11 +4,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   SCENARIOS,
   availabilityRanges,
-  scheduleStrategy,
   deadlineMs,
-  suggestHours,
   weatherFactors,
-  suggestWindows,
+  weatherAt,
+  planWeekShifts,
+  DEFAULT_MAX_DAY_HOURS,
+  MAIN_QUEST_MIN_HOURS,
   SCENARIO_FACTORS,
   SCENARIO_LABELS,
   estimateRevenue,
@@ -34,13 +35,11 @@ import { listTariffs, newId, pickDefaultTariff, primaryArea, saveSettings, saveS
 import type { SlotRecord, TariffRecord } from '../storage/schema'
 import { expandRecurring, pastSessionsFor, weatherSessionsFor } from '../storage/toDomain'
 import { QuestWeek, questWeekItems } from './QuestWeek'
-import { WeekBoard, type QuestTarget, type StrategyPlan } from './WeekBoard'
-import { QuestStrategyCard, buildStrategy, goalIndexOf } from './QuestStrategyCard'
+import { WeekBoard } from './WeekBoard'
 import { AreaRoutePlan } from './AreaRoutePlan'
 import { useForecast } from './useForecast'
 
-/** 7日の帯に出すクエストの数の上限（毎日のクエストなどで帯が埋まらないように） */
-const MAX_QUEST_TARGETS = 3
+const HOUR = 3_600_000
 
 const ISSUE_LABELS: Record<SlotIssue | 'overlap_or_budget', string> = {
   invalid_time: '時間が正しくない',
@@ -85,8 +84,8 @@ export function Plan() {
   }), [db])
   const [anchor, setAnchor] = useState(localToday())
   const [scenario, setScenario] = useState<Scenario>('standard')
-  // 🧭 クエスト作戦で選んでいる目標（null＝本命）。帯の作戦の時間と同じものを使う
-  const [goalPick, setGoalPick] = useState<number | null>(null)
+  // 🧭 今週の作戦で選んでいる選択肢（null＝おすすめ）
+  const [planKey, setPlanKey] = useState<string | null>(null)
   const [editing, setEditing] = useState<SlotRecord | null>(null)
   const [notice, setNotice] = useState<{ message: string; undo?: () => void } | null>(null)
 
@@ -168,8 +167,6 @@ export function Plan() {
   const { done, weekStartIso, weekEndIso, nowIso } = computed
   const busyness = primaryArea(data.areas, data.settings)?.levels ?? null
   const homeDeadline = data.settings?.homeDeadline ?? null
-  const estimate = (st: string, e: string) => estimateRevenue(st, e, past, busyness).revenueYen
-  const deadline = homeDeadline ? (st: string) => deadlineMs(st, homeDeadline) : null
   // 働ける時間（設定）。この週の中の区間。未設定なら制限なし
   const availability = data.settings?.availability ?? null
   const allowed = availability ? availabilityRanges(availability, Date.parse(weekStartIso), Date.parse(weekEndIso)) : null
@@ -185,72 +182,45 @@ export function Plan() {
     costPerHourYen: costPerHour,
     targetHourlyYen: target,
   }
-  const questTargets: QuestTarget[] = []
-  const taken: { startsAt: string; endsAt: string }[] = [...inWeek, ...done]
-  // 🧭 クエスト作戦：選んだ目標の日ごとの時間を、働ける時間の中の実際の時間に置く（帯に出す）
-  const strategy = buildStrategy(questInput, allowed)
-  const strategyPlan: StrategyPlan | null = (() => {
-    if (!strategy) return null
-    const goal = strategy.strategy.goals[goalIndexOf(strategy.strategy, goalPick)]!
-    const sched = scheduleStrategy({
-      now: nowIso,
-      goal,
-      peaks: strategy.strategy.peaks,
-      allowed,
-      busy: taken,
-      planned: questInput.chosenSlots,
-      busyness,
-      estimate,
-      deadline,
-      ordersPerHour: strategy.rate.rate,
-    })
-    taken.push(...sched.windows)
-    return {
-      label: strategy.main.q.label,
-      target: goal.target,
-      goalName: goalIndexOf(strategy.strategy, goalPick) === strategy.strategy.goals.length - 1 ? '本命' : goalIndexOf(strategy.strategy, goalPick) === 0 ? '最低' : `第${goal.tier}段階`,
-      days: sched.days,
-      windows: sched.windows,
-      hours: sched.hours,
-      shortHours: sched.shortHours,
-    }
-  })()
-  // 先に終わる回から（§5.8）
-  const questItems = [...questWeekItems(questInput).items].sort((a, b) => a.occ.endsAt.localeCompare(b.occ.endsAt))
-  for (const { q, occ, plan: qp } of questItems) {
-    // 作戦で扱うクエスト（日跨ぎと、そのピーク）は作戦の時間に入っているので重ねない
-    if (strategy?.keys.has(`${q.id}-${occ.index}`)) continue
-    const goal = qp.tiers.find((t) => !t.reachedByPlan && t.possible)
-    if (!goal || goal.extraHours <= 0 || questTargets.length >= MAX_QUEST_TARGETS) continue
-    const found = busyness
-      ? suggestHours({
-          now: nowIso,
-          from: occ.startsAt > weekStartIso ? occ.startsAt : weekStartIso,
-          to: occ.endsAt < weekEndIso ? occ.endsAt : weekEndIso,
-          busyness,
-          allowed,
-          busy: taken,
-          estimate,
-          deadline,
-          hoursNeeded: goal.extraHours,
-        })
-      : null
-    if (found) taken.push(...found.windows)
-    questTargets.push({
-      key: `${q.id}-${occ.index}`,
-      label: q.label,
-      tier: goal.tier,
-      gainYen: goal.gainYen,
-      extraHours: goal.extraHours,
-      hourlyYen: goal.extraHourlyYen,
-      belowTarget: target !== null && goal.extraHourlyYen !== null && goal.extraHourlyYen < target,
-      windows: found?.windows ?? [],
-      shortHours: found?.shortHours ?? 0,
-    })
-  }
-  const suggestions = busyness
-    ? suggestWindows({ now: nowIso, from: weekStartIso, to: weekEndIso, busyness, allowed, busy: taken, estimate, deadline })
-    : []
+  // 🧭 今週の作戦（§5.12）：天気・混み具合・レンタルの上限・クエストから、日ごとのシフトの組み合わせを選ぶ
+  const qwi = questWeekItems(questInput)
+  const lengthH = (o: { startsAt: string; endsAt: string }) => (Date.parse(o.endsAt) - Date.parse(o.startsAt)) / HOUR
+  // 作戦の軸：日をまたぐクエスト（12時間以上）のうち先に終わる回。ピークは同じサービスの短いクエスト
+  const mainItem = qwi.items.filter((it) => lengthH(it.occ) >= MAIN_QUEST_MIN_HOURS && !it.progress.ended).sort((x, y) => x.occ.endsAt.localeCompare(y.occ.endsAt))[0]
+  const peakItems = mainItem ? qwi.items.filter((it) => lengthH(it.occ) < MAIN_QUEST_MIN_HOURS && it.q.platform === mainItem.q.platform) : []
+  const toPlannerQuest = (it: (typeof qwi.items)[number]) => ({ startsAt: it.occ.startsAt, endsAt: it.occ.endsAt, rewardMode: it.q.rewardMode, tiers: it.q.tiers, count: it.progress.count })
+  const perOrder = qwi.rate.rate > 0 ? qwi.revenuePerHour / qwi.rate.rate : qwi.revenuePerHour / 2
+  const factors = weatherFactors(weatherSessionsFor(data.sessions))
+  const hourlyForecast = 'forecast' in forecastState ? forecastState.forecast : null
+  const overrides = data.settings?.weatherOverrides ?? {}
+  // 働ける時間が未設定なら、毎日 9〜24時の中で組む（深夜・早朝の短い見込みで組まないように）
+  const planAllowed = allowed ?? availabilityRanges(Array.from({ length: 7 }, () => [{ start: '09:00', end: '00:00' }]), Date.parse(weekStartIso), Date.parse(weekEndIso))
+  const tariff = pickDefaultTariff(data.tariffs, data.settings)
+  const doneHours = done.reduce((acc, x) => acc + lengthH(x), 0)
+  const planner = planWeekShifts({
+    now: nowIso,
+    from: weekStartIso,
+    to: weekEndIso,
+    hour: (t) => {
+      if (!planAllowed.some(([x, y]) => x <= t && t + HOUR <= y)) return null
+      if (homeDeadline) {
+        const dayStart = Math.floor((t + 5 * HOUR) / (24 * HOUR)) * 24 * HOUR - 5 * HOUR
+        if (t + HOUR > deadlineMs(new Date(dayStart).toISOString(), homeDeadline)) return null
+      }
+      const w = weatherAt(t, hourlyForecast, overrides)
+      if (w === 'storm') return null
+      const baseYen = estimateRevenue(new Date(t).toISOString(), new Date(t + HOUR).toISOString(), past, busyness).revenueYen
+      const rain = w === 'rain'
+      return { revenueYen: baseYen * (rain ? factors.rainOrders * factors.rainPerOrder : 1), orders: (baseYen / perOrder) * (rain ? factors.rainOrders : 1) }
+    },
+    rentalFee: tariff ? (sec) => feeFor(tariff.tariff, sec) : null,
+    maxDayHours: data.settings?.maxDayHours ?? DEFAULT_MAX_DAY_HOURS,
+    budgetHours: budget === null ? null : Math.max(0, budget / 60 - doneHours),
+    fixed: questInput.chosenSlots,
+    quest: mainItem ? toPlannerQuest(mainItem) : null,
+    peaks: peakItems.map(toPlannerQuest),
+    targetHourlyYen: target,
+  })
   /** おすすめの時間から、見込みを入れた候補枠の入力を開く */
   const fromSuggestion = (w: { startsAt: string; endsAt: string }): SlotRecord => {
     const est = estimateRevenue(w.startsAt, w.endsAt, past, busyness)
@@ -299,12 +269,11 @@ export function Plan() {
         budgetHours={budget === null ? null : budget / 60}
         profitYen={plan.profitYen[scenario]}
         busyness={busyness}
-        suggestions={suggestions}
         onAdd={(date) => setEditing(newSlot(date))}
         onEdit={(id) => setEditing(inWeek.find((s) => s.id === id) ?? null)}
-        onAddSuggestion={(w) => setEditing(fromSuggestion(w))}
-        questTargets={questTargets}
-        strategyPlan={strategyPlan}
+        options={planner.options}
+        selectedKey={planKey}
+        onSelect={setPlanKey}
         allowed={allowed}
         forecast={forecastState}
         weatherOverrides={data.settings?.weatherOverrides ?? {}}
@@ -319,8 +288,8 @@ export function Plan() {
             setNotice({ message: `⚠️ 天気を保存できませんでした：${errorMessages(e).join('・')}` })
           }
         }}
-        onAddQuestWindows={async (windows) => {
-          const slots = windows.map(fromSuggestion)
+        onAddPlan={async (shifts) => {
+          const slots = shifts.map(fromSuggestion)
           try {
             await saveSlots(db, slots)
           } catch (e) {
@@ -328,13 +297,12 @@ export function Plan() {
             return
           }
           setNotice({
-            message: `🎯 ${slots.length}つの候補枠を入れました`,
+            message: `🧭 ${slots.length}つの候補枠を入れました`,
             undo: () => void db.slots.bulkDelete(slots.map((x) => x.id)).then(() => setNotice(null)),
           })
         }}
       />
 
-      {strategy && <QuestStrategyCard data={strategy} picked={goalPick} onPick={setGoalPick} />}
       <QuestWeek {...questInput} onAddSlot={() => setEditing(newSlot())} />
 
       <details className="more">

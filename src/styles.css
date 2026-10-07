@@ -191,7 +191,7 @@ a:focus-visible {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom);
@@ -444,7 +444,8 @@ select:focus-visible {
 }
 
 .segmented button[aria-selected='true'],
-.segmented button[aria-checked='true'] {
+.segmented button[aria-checked='true'],
+.segmented button[aria-pressed='true'] {
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 700;
@@ -1603,3 +1604,13 @@ details.more[open] > summary {
 .strategy-row {
   gap: 0;
 }
+
+/* UI刷新：画面の役割と操作の位置 */
+.settings-link { margin-left: auto; min-height: 44px; display: flex; align-items: center; padding: 8px; text-decoration: none; }
+.settlement-actions { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); background: var(--surface); padding: 8px; border: 1px solid var(--border); border-radius: 12px; z-index: 2; }
+.settlement-result { border: 2px solid var(--accent); }
+.settlement-form { padding-bottom: 16px; }
+
+.wb-readable { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .875rem; padding: 4px 0 8px; color: var(--text); }
+.wb-day { border-bottom: 1px solid var(--border); }
+.wb-day > .wb-add { grid-column: 5; grid-row: 1; }

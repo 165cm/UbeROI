@@ -79,9 +79,9 @@ test('文字を200%にしても、横にはみ出さず、下のメニューと�
   })
   expect(found).toEqual([])
   // 下のメニューで全画面へ行ける
-  for (const name of ['記録', '分析', '計画', '設定', 'ホーム']) {
-    await page.getByRole('link', { name: new RegExp(name) }).click()
-    await expect(page.getByRole('link', { name: new RegExp(name) })).toHaveAttribute('aria-current', 'page')
+  for (const name of ['記録', '分析', '計画', '設定', '今日']) {
+    await page.getByRole('link', { name, exact: true }).click()
+    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page')
   }
 })
 
@@ -117,7 +117,7 @@ test('キーボードだけで、出発 → 帰宅 → 精算の入力 → 保�
   const base = page.getByLabel('基本報酬（配送料の合計）', { exact: true })
   await expect(base).toHaveAttribute('aria-invalid', 'true')
   await expect(base).toHaveAccessibleDescription(/0以上の整数/)
-  await page.keyboard.press('Control+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('3000')
   await expect(base).not.toHaveAttribute('aria-invalid', 'true')
   await tabTo(page, /確定して保存/)

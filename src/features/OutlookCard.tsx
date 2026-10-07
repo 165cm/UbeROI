@@ -51,7 +51,7 @@ function defaultEnd(nowIso: string, homeDeadline: string | null, departedAt: str
 
 /**
  * 終了予定（配達をやめる時刻）。この稼働で決めた時刻があればそれ、なければ帰宅締切から決める初期値。
- * ホームの「帰宅予定」と「🎯 あと何件？」も同じ時刻を使う
+ * ホームの「配達終了予定」と「🎯 あと何件？」も同じ時刻を使う
  */
 export function outlookEndAt(sessionId: string, nowIso: string, homeDeadline: string | null, departedAt: string): string {
   const clock = load(sessionId)?.end ?? defaultEnd(nowIso, homeDeadline, departedAt, loadPrefs().minutesToHome)

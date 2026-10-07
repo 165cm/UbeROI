@@ -1,4 +1,4 @@
-// ホーム（S02）「今日」：今日の稼働（出発からの時計・帰宅予定）・レンタル料金・クエスト・帰宅して精算。そのほかの判断のたすけは折りたたみに
+// ホーム（S02）「今日」：今日の稼働（出発からの時計・配達終了予定）・レンタル料金・クエスト・帰宅して精算。そのほかの判断のたすけは折りたたみに
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { averageLevel, breakAdvice, busyAhead, calculateRental, deadlineMs, estimateRevenue, localDate, nextChargeYen, rentalCostByHours, tieredCapInfo, timeSlotOf, type Tariff } from '../domain'
@@ -187,7 +187,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
               </strong>
             </div>
             <div className="today-return">
-              <span className="label">帰宅予定</span>
+              <span className="label">配達終了予定</span>
               <strong className="num">{endAt ? formatClock(endAt).slice(0, 5) : '—'}</strong>
             </div>
           </div>

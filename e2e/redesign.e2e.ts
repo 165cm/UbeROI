@@ -52,17 +52,17 @@ test('稼働中の主な操作は52px以上。昼下がりは休憩の比較が�
   await expect(page.getByText(/☕ 休憩するなら/).locator('xpath=..')).toHaveAttribute('open', '')
 })
 
-test('デザイン案「今日」：頭に日付と保存済み、時計と帰宅予定、レンタル料金と次回の課金、精算ボタンはメニューのすぐ上', async ({ page }) => {
+test('デザイン案「今日」：頭に日付と保存場所、時計と配達終了予定、レンタル料金と次回の課金、精算ボタンはメニューのすぐ上', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-07T18:00:00+09:00') })
   await page.goto('#home')
   await expect(page.locator('.app-header')).toContainText('10月7日(水)')
-  await expect(page.locator('.app-header')).toContainText('端末に保存済み')
+  await expect(page.locator('.app-header')).toContainText('端末内で記録')
   await page.getByRole('button', { name: '自宅を出発' }).click()
   await page.getByRole('button', { name: 'レンタル開始' }).click()
   await page.clock.fastForward('02:18:00')
   await expect(page.getByRole('heading', { name: '今日の稼働 稼働中' })).toBeVisible()
   await expect(page.getByLabel('出発から2時間18分')).toHaveText('02:18')
-  await expect(page.locator('.today-return')).toContainText('帰宅予定')
+  await expect(page.locator('.today-return')).toContainText('配達終了予定')
   const rental = page.getByRole('region', { name: /レンタル料金/ })
   await expect(rental).toContainText('次の課金まで')
   await expect(rental).toContainText(/次回 \+\d+円/)
@@ -125,4 +125,18 @@ test('デザイン案「週間計画」：予定／提案の切り替え、お�
   await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('heading', { name: /この週の稼働/ })).toBeVisible()
   await expect(page.getByRole('list', { name: 'この週の予定' })).toBeVisible()
+})
+
+
+test('入力済みの精算の補足欄も閉じられ、別の金額を入力しても閉じた状態を保つ', async ({ page }) => {
+  await page.goto('#records')
+  await page.getByRole('button', { name: /過去の稼働をまとめて入力/ }).click()
+  await page.locator('details.extras > summary').click()
+  await page.getByLabel('完了件数', { exact: true }).fill('5')
+  await page.locator('details.extras > summary').click()
+  await page.getByLabel('基本報酬', { exact: true }).fill('3000')
+  await expect(page.getByLabel('完了件数', { exact: true })).toBeHidden()
+  await expect(page.locator('.app-header')).not.toContainText('保存済み')
+  await page.locator('details.extras > summary').click()
+  await expect(page.getByLabel('完了件数', { exact: true })).toHaveValue('5')
 })

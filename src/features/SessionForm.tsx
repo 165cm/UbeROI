@@ -30,7 +30,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
   const [s, setS] = useState<SessionRecord>(initial)
   const [problems, setProblems] = useState<string[]>([])
   // 天気・エリア・メモは、最初から入っている時だけ開いておく。開閉は押した時だけ変え、入力中に畳まれないようにする
-  const [memoOpen, setMemoOpen] = useState(() => Boolean(initial.areaLabel || initial.note))
+  const [memoOpen, setMemoOpen] = useState(() => Boolean(initial.areaLabel || initial.note || initial.completedCount !== null || initial.weather !== null || adjustmentAmount(initial, 'other') !== null || initial.summaryOnlineSeconds !== null))
   const tariffs = useLiveQuery(() => listTariffs(db), [db]) ?? []
   const settings = useLiveQuery(() => db.settings.get('settings'), [db])
   const defaultTariff = pickDefaultTariff(tariffs, settings)
@@ -60,8 +60,6 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
   const clock = (iso: string) => new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
   const hours = s.returnedAt ? (Date.parse(s.returnedAt) - Date.parse(s.departedAt)) / 3_600_000 : null
   const ok = !('error' in preview) && preview.errors.length === 0
-  // 件数・天気・メモなど、毎回は入れない項目。入っている時だけ最初から開く
-  const extrasFilled = [s.completedCount !== null, s.weather !== null, Boolean(s.areaLabel || s.note), adjustmentAmount(s, 'other') !== null, onlineMinutes !== null].filter(Boolean).length
 
   return (
     <form
@@ -163,7 +161,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         ))}
       </section>
 
-      <details className="card fold extras" open={memoOpen || extrasFilled > 0 || undefined} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
+      <details className="card fold extras" open={memoOpen} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
         <summary>
           <strong>📝 件数・天気・メモを追加</strong>
           <span className="hint">{[s.completedCount !== null && `${s.completedCount}件`, s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note].filter(Boolean).join('・') || '任意'}</span>

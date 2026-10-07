@@ -67,7 +67,7 @@ function Shell() {
         <span className="header-date">{todayLabel()}</span>
         {online ? (
           <span className="saved-chip" title="記録はこの端末の中に保存しています（外へは送りません）">
-            <span aria-hidden="true">✓</span> 端末に保存済み
+            <span aria-hidden="true">✓</span> 端末内で記録
           </span>
         ) : (
           <span className="saved-chip offline" role="status" title="電波がなくても記録できます（端末に保存されます）">

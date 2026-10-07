@@ -145,6 +145,8 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
           targetHourlyYen={target}
           homeDeadline={data.settings?.homeDeadline ?? null}
           moveAreas={data.areas.filter((a) => area && a.id !== area.id && a.moveMinutes && a.moveFromAreaId === area.id).map((a) => ({ name: a.name, minutes: a.moveMinutes!, levels: a.levels }))}
+          platform={active.platform}
+          acceptedOffers={data.offers.filter((o) => o.outcome === 'accepted' && o.at >= active.departedAt).length}
         />
       )}
 

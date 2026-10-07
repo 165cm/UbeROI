@@ -6,8 +6,9 @@ const CACHE = `deli-kan-${VERSION}`
 // スクショの文字の読み取りのファイル：使った時に保存し、版が変わっても消さない（2回目からはオフラインでも読み取れる）
 const OCR_CACHE = 'deli-kan-ocr-v1'
 
+// 新版のHTMLをHTTPキャッシュから再利用しない（旧版が新版のキャッシュに残るのを防ぐ）。
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)))
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' })))))
 })
 
 self.addEventListener('activate', (event) => {
@@ -31,7 +32,7 @@ self.addEventListener('fetch', (event) => {
   // 別のサイトへの通信には関わらない（キャッシュしない）
   if (url.origin !== self.location.origin) return
   if (request.mode === 'navigate') {
-    event.respondWith(caches.match('index.html').then((cached) => cached || fetch(request)))
+    event.respondWith(caches.open(CACHE).then((cache) => cache.match('index.html')).then((cached) => cached || fetch(request)))
     return
   }
   if (url.pathname.includes('/ocr/')) {
@@ -49,5 +50,5 @@ self.addEventListener('fetch', (event) => {
     )
     return
   }
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request)))
+  event.respondWith(caches.open(CACHE).then((cache) => cache.match(request)).then((cached) => cached || fetch(request)))
 })

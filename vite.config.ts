@@ -15,14 +15,16 @@ function serviceWorker(): Plugin {
       const publicFiles = readdirSync('public')
       // 文字認識のファイル（ocr/）は重いので、最初の保存の一覧には入れない
       const files = ['index.html', ...Object.keys(bundle).filter((f) => f !== 'index.html' && !f.startsWith('ocr/')), ...publicFiles].sort()
-      const hash = createHash('sha256')
+      const template = readFileSync('sw/sw.template.js', 'utf8')
+      // 更新処理だけの修正でも新しいキャッシュを用意し、汚れた旧キャッシュを引き継がない。
+      const hash = createHash('sha256').update(template)
       for (const name of Object.keys(bundle).filter((f) => !f.startsWith('ocr/')).sort()) {
         const item = bundle[name]!
         hash.update(name)
         hash.update(item.type === 'chunk' ? item.code : typeof item.source === 'string' ? item.source : Buffer.from(item.source))
       }
       for (const name of publicFiles.sort()) hash.update(readFileSync(`public/${name}`))
-      const source = readFileSync('sw/sw.template.js', 'utf8')
+      const source = template
         .replace('__VERSION__', JSON.stringify(hash.digest('hex').slice(0, 12)))
         .replace('__PRECACHE__', JSON.stringify(files))
       this.emitFile({ type: 'asset', fileName: 'sw.js', source })

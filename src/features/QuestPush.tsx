@@ -1,3 +1,4 @@
+import { Icon } from '../components/Icon'
 // 稼働中のホームの「クエスト」カードと「🎯 あと何件？」：今の件数から、クエストの次の段階・リーダーボードの順位まで
 // あと何件・何分か、終了予定までに届くか（延ばせば届くか）。計算は src/domain/questPush.ts（§5.14）
 import { useEffect, useState } from 'react'
@@ -145,11 +146,11 @@ export function QuestPush({
       <div className="row quest-actions">
         {head && (
           <button type="button" className="chevron" aria-expanded={open === 'count'} onClick={() => setOpen(open === 'count' ? null : 'count')}>
-            件数を記録
+            <Icon name="document" />件数を記録
           </button>
         )}
         <button type="button" className="chevron" aria-expanded={open === 'cash'} onClick={() => setOpen(open === 'cash' ? null : 'cash')}>
-          お釣り
+          <Icon name="coins" />お釣り
         </button>
       </div>
       {open === 'count' && head && (

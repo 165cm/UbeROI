@@ -104,6 +104,7 @@ test('日跨ぎの段階ごとに、作戦の選択肢（最低・本命・ク�
   await expect(page.locator('.subcard', { hasText: '日跨ぎ' })).toBeVisible()
 
   await page.goto('#plan')
+  await page.getByText('条件と計算根拠を見る', { exact: true }).click()
   const options = page.getByRole('radiogroup', { name: '作戦の選択肢' }).getByRole('radio')
   await expect(options.first()).toContainText('おすすめ')
   const labels = await options.allInnerTexts()

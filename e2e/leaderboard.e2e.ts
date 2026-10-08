@@ -51,6 +51,7 @@ test('順位と件数・賞金を入れると、上との差と攻める目標�
   await expect(board).toContainText('9位・23件')
 
   await page.goto('#plan')
+  await page.getByText('条件と計算根拠を見る', { exact: true }).click()
   const options = page.getByRole('radiogroup', { name: '作戦の選択肢' }).getByRole('radio')
   const attack = options.filter({ hasText: '攻める 5位 51件' })
   await expect(attack).toHaveCount(1)

@@ -15,6 +15,8 @@ test('初回は長時間の作戦を出さず、条件を保存して初めて�
   await expect(setup).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '💡 おすすめの提案' })).toBeVisible()
   await expect(page.locator('.proposal-big')).toContainText(/\d+時間 \/ \d+日/)
+  await expect(page.locator('.proposal-card').getByText('参考値を含む推計・未採用')).toBeVisible()
+  await page.getByText('条件と計算根拠を見る', { exact: true }).click()
   await expect(page.getByText(/未採用（予定に追加するまで集計に入りません）/)).toBeVisible()
   await page.getByRole('tab', { name: '予定' }).click()
   await expect(page.getByRole('region', { name: '⏱️ この週の稼働' }).getByRole('definition')).toHaveText(['0h', '0h', '12h'])

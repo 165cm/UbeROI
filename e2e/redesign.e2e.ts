@@ -16,7 +16,7 @@ test('4つのメニューから未精算を再開し、明暗・縦横・拡大�
   await page.getByRole('button', { name: '未精算・下書き（1）', exact: true }).click()
   await page.locator('.record-item').click()
   await expect(page.getByLabel('帰宅', { exact: true })).toBeHidden()
-  await expect(page.locator('.settlement-summary')).toContainText('7,180円')
+  await expect(page.locator('.settlement-result')).toContainText('7,180円')
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
     for (const [width, height] of [[320, 700], [390, 844], [844, 390], [1280, 800]]) {

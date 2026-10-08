@@ -4,6 +4,7 @@ import { App } from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { registerServiceWorker } from './pwa'
 import './styles.css'
+import './design-system.css'
 
 registerServiceWorker()
 

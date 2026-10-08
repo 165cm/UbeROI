@@ -265,11 +265,14 @@ export function Plan() {
   }
 
   return (
-    <div className="stack">
-      <div className="period-nav">
-        <button type="button" aria-label="前の週" onClick={() => setAnchor(shiftPeriod('week', anchor, -1))}>‹</button>
-        <strong className="num">{Number(week.from.slice(5, 7))}/{Number(week.from.slice(8))} — {Number(week.to.slice(5, 7))}/{Number(week.to.slice(8))}</strong>
-        <button type="button" aria-label="次の週" onClick={() => setAnchor(shiftPeriod('week', anchor, 1))}>›</button>
+    <div className="stack plan-main">
+      <div className="plan-heading">
+        <h2 id="page-title">週間計画</h2>
+        <div className="period-nav">
+          <button type="button" aria-label="前の週" onClick={() => setAnchor(shiftPeriod('week', anchor, -1))}>‹</button>
+          <strong className="num">{Number(week.from.slice(5, 7))}/{Number(week.from.slice(8))} — {Number(week.to.slice(5, 7))}/{Number(week.to.slice(8))}</strong>
+          <button type="button" aria-label="次の週" onClick={() => setAnchor(shiftPeriod('week', anchor, 1))}>›</button>
+        </div>
       </div>
       <p className="hint plan-conditions">
         週の上限 {budget === null ? '未設定' : `${Math.round((budget / 60) * 10) / 10}時間`}

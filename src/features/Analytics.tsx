@@ -1,3 +1,4 @@
+import { Money } from '../components/Money'
 // 分析（S04）：期間の損益・本当の時給・投資回収の推移・内訳。すべて税引前・確定した記録のみ
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -172,7 +173,7 @@ export function Analytics() {
               📊 {periodLabel(kind, range.from, range.to)}の成績
             </CardTitle>
             <dl className="stats">
-              <div><dt>営業純利益</dt><dd className="big">{formatYen(result.period.totals.operatingProfitYen)}</dd></div>
+              <div><dt>営業純利益</dt><dd className="big"><Money value={result.period.totals.operatingProfitYen} /></dd></div>
               <div>
                 <dt>営業純時給</dt>
                 <dd>

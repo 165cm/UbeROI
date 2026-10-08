@@ -1,3 +1,5 @@
+import { Money } from '../components/Money'
+import { Icon } from '../components/Icon'
 // ホーム（S02）「今日」：今日の稼働（出発からの時計・配達終了予定）・レンタル料金・クエスト・帰宅して精算。そのほかの判断のたすけは折りたたみに
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -116,6 +118,7 @@ export function Home({ onSettle }: { onSettle: (sessionId: string) => void }) {
         <span className="hint">{active ? '終了までの見通し・あと少し続ける？・混み具合・今月の成績' : 'お釣り・混み具合・今月の成績'}</span>
       </summary>
       <div className="stack">
+        {openRental && <RentalDetails rental={openRental} now={now} />}
         {data.settings?.offerJudgeEnabled && <a className="button-link" href="#offer">🧾 オファー判定</a>}
         {active && (
           <>
@@ -280,12 +283,12 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
         <h3 id="rental-title" className="grow">レンタル料金<span className="hint">（見積）</span></h3>
         <Tip label="レンタル料金">{rental.tariffName}。料金設定からの見積です。返却した時は、シェアサイクルのアプリに出る請求額が正しい額です。</Tip>
       </div>
-      <p className="rental-amount num">{r.amountYen === null ? '見積の対象外' : formatYen(r.amountYen)}</p>
+      <p className="rental-amount num">{r.amountYen === null ? '見積の対象外' : <Money value={r.amountYen} />}</p>
       <p className="next-charge line">
         {left !== null ? (
           <>
             <span className="grow">
-              ⏱ 次の課金まで <strong className="num">{pad2(Math.floor(left / 60))}:{pad2(left % 60)}</strong>
+              <Icon name="clock" /> 次の課金まで <strong className="num">{pad2(Math.floor(left / 60))}:{pad2(left % 60)}</strong>
               <span className="visually-hidden">（{formatClock(r.nextIncreaseAt!)}）</span>
             </span>
             {step !== null && step > 0 && <span>次回 <strong className="num">+{formatYen(step)}</strong></span>}
@@ -297,15 +300,22 @@ function RentalStatus({ rental, now, onReturn }: { rental: { tariff: Parameters<
         )}
       </p>
       <button type="button" className="main-action outline" onClick={onReturn}>
-        ↩ 返却を記録
+        <Icon name="return" /><span className="visually-hidden">↩ </span>返却を記録
       </button>
+
+      {/* 休憩の比較は折りたたみの外に置く（昼下がりは自動で開く） */}
+      {rental.startAt && rental.tariff.kind !== 'none' && timeSlotOf(now) === 'idle' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
+    </section>
+  )
+}
+
+function RentalDetails({ rental, now }: { rental: { tariff: Tariff; startAt: string | null }; now: string }) {
+  return (
       <details className="rental-details"><summary>料金の上限・乗る長さごとの料金</summary>
       {rental.startAt && rental.tariff.kind === 'tiered' && <CapLine tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       {rental.tariff.kind !== 'none' && <CostByLength tariff={rental.tariff} />}
+      {rental.startAt && rental.tariff.kind !== 'none' && timeSlotOf(now) !== 'idle' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
       </details>
-      {/* 休憩の比較は折りたたみの外に置く（昼下がりは自動で開く） */}
-      {rental.startAt && rental.tariff.kind !== 'none' && <BreakAdviceBox tariff={rental.tariff} startAt={rental.startAt} now={now} />}
-    </section>
   )
 }
 

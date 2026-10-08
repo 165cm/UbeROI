@@ -1,3 +1,4 @@
+import { Money } from '../components/Money'
 // 稼働記録・終了精算（S03）。保存前に計算明細を見せ、帰宅未入力は下書きにする
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -59,7 +60,6 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
 
   const clock = (iso: string) => new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
   const hours = s.returnedAt ? (Date.parse(s.returnedAt) - Date.parse(s.departedAt)) / 3_600_000 : null
-  const ok = !('error' in preview) && preview.errors.length === 0
 
   return (
     <form
@@ -81,6 +81,12 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
             <DateTimeInput label="出発（自宅を出た時刻）" value={s.departedAt} onChange={(v) => v && set({ departedAt: v })} />
             <DateTimeInput label="帰宅" value={s.returnedAt} onChange={(v) => set({ returnedAt: v })} tip="空欄なら下書き（確定の集計に入りません）" />
           </div>
+          {s.rentals.map((r, i) => <div className="subcard stack" key={r.id}>
+            <p className="hint">{r.tariffName}</p>
+            <DateTimeInput label="貸出" value={r.startAt} onChange={(v) => set({ rentals: s.rentals.map((x, j) => j === i ? { ...x, startAt: v } : x) })} />
+            <DateTimeInput label="返却" value={r.endAt} onChange={(v) => set({ rentals: s.rentals.map((x, j) => j === i ? { ...x, endAt: v } : x) })} />
+            <button type="button" className="danger-text" onClick={() => set({ rentals: s.rentals.filter((_, j) => j !== i) })}>このレンタルを外す</button>
+          </div>)}
         </div>
       </details>
 
@@ -130,16 +136,6 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
                 tip="シェアサイクルのアプリに出た請求額。空欄なら見積を使います。0円も有効です"
               />
               {est.reason && <p className="hint">{est.reason}</p>}
-              <details>
-                <summary className="hint">{r.tariffName}・貸出・返却の時刻を修正</summary>
-                <div className="row">
-                  <DateTimeInput label="貸出" value={r.startAt} onChange={(v) => update({ startAt: v })} />
-                  <DateTimeInput label="返却" value={r.endAt} onChange={(v) => update({ endAt: v })} />
-                </div>
-                <button type="button" className="danger-text" onClick={() => set({ rentals: s.rentals.filter((_, j) => j !== i) })}>
-                  このレンタルを外す
-                </button>
-              </details>
             </div>
           )
         })}
@@ -151,9 +147,9 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         </div>
         {s.directExpenses.length === 0 && <p className="hint">なし（＋で追加）</p>}
         {s.directExpenses.map((e, i) => (
-          <div key={e.id} className="row">
+          <div key={e.id} className="expense-row money-field">
             <IntInput label="金額" unit="円" value={e.amountYen} onChange={(v) => set({ directExpenses: s.directExpenses.map((x, j) => (j === i ? { ...x, amountYen: v ?? 0 } : x)) })} />
-            <TextInput label="内容" value={e.memo} onChange={(v) => set({ directExpenses: s.directExpenses.map((x, j) => (j === i ? { ...x, memo: v } : x)) })} />
+            <details className="expense-note"><summary>用途</summary><TextInput label="内容" value={e.memo} onChange={(v) => set({ directExpenses: s.directExpenses.map((x, j) => (j === i ? { ...x, memo: v } : x)) })} /></details>
             <button type="button" className="icon danger-text" aria-label="この経費を外す" onClick={() => set({ directExpenses: s.directExpenses.filter((_, j) => j !== i) })}>
               ✕
             </button>
@@ -209,11 +205,11 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
             <div className="result-row">
               <div>
                 <span className="label">今日の利益</span>
-                <strong className="result-big num">{formatYen(preview.operatingProfitYen)}</strong>
+                <strong className="result-big num"><Money value={preview.operatingProfitYen} /></strong>
               </div>
               <div className="result-hourly">
                 <span className="label">実質時給</span>
-                <strong className="num">{preview.hourlyYen === null ? '算出不可' : formatYen(preview.hourlyYen)}</strong>
+                <strong className="num"><Money value={preview.hourlyYen} /></strong>
                 {preview.hourlyYen !== null && <span className="unit">/時間</span>}
               </div>
             </div>
@@ -237,7 +233,6 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
 
       <Problems items={problems} />
       <div className="settlement-actions">
-        {s.returnedAt && s.baseYen !== null && ok && <p className="settlement-summary">今回の利益 <strong>{formatYen(preview.operatingProfitYen)}</strong> · 時給 {preview.hourlyYen === null ? '算出不可' : `${formatYen(preview.hourlyYen)}/時`}</p>}
         <button type="submit" className="primary" disabled={!s.returnedAt}>
           精算を保存
         </button>

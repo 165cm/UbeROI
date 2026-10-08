@@ -1,5 +1,6 @@
+import { Icon } from './Icon'
 // 入力欄の共通部品。金額は整数円、空欄は「未設定」（null）として0と区別する
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { Children, useEffect, useId, useState, type ReactNode } from 'react'
 
 /**
  * 毎回読まなくていい説明。ⓘ を押した時だけ開く（UI_RULES「文字は最小限」）。
@@ -32,7 +33,13 @@ function textOf(node: ReactNode): string {
 export function CardTitle({ id, children, tip, right }: { id?: string; children: ReactNode; tip?: ReactNode; right?: ReactNode }) {
   return (
     <div className="card-title">
-      <h3 id={id}>{children}</h3>
+      <h3 id={id}>{Children.toArray(children).map((child, i) => {
+        if (i !== 0 || typeof child !== 'string') return child
+        const mark = child.match(/^[\p{Extended_Pictographic}\uFE0F\s]+/u)?.[0]
+        if (!mark?.trim()) return child
+        const name = /📊|📈|🧮/.test(mark) ? 'analytics' : /💰|💴/.test(mark) ? 'coins' : /📅|🗓/.test(mark) ? 'plan' : 'document'
+        return <span className="title-label" key="title"><Icon name={name} /><span className="visually-hidden">{mark}</span>{child.slice(mark.length)}</span>
+      })}</h3>
       {tip && <Tip label={textOf(children).replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '').trim() || '見出し'}>{tip}</Tip>}
       {right && <span className="card-title-right">{right}</span>}
     </div>
@@ -94,7 +101,7 @@ export function IntInput({
   return (
     <Field label={label} hint={error ?? hint} tip={tip}>
       {(id, describedBy) => (
-        <div className="input-unit">
+        <div className="input-unit" data-unit={unit}>
           <input
             id={id}
             aria-describedby={describedBy}
@@ -120,7 +127,7 @@ export function IntInput({
               onChange(n)
             }}
           />
-          {unit && <span aria-hidden="true">{unit}</span>}
+          {unit && <span aria-hidden="true">{unit === '円' ? '¥' : unit}</span>}
         </div>
       )}
     </Field>

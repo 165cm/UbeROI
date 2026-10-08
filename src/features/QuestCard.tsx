@@ -1,3 +1,4 @@
+import { questSession } from '../storage/services'
 // ホームの「🎯 クエスト」：今の期間のクエストの進み具合（見込みの管理用。実績の売上には自動で入れない）
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -88,7 +89,7 @@ export function QuestCard({ now }: { now: string }) {
             const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
             const p = questProgress(
               { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
-              data.sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
+              data.sessions.map((s) => questSession(s, q.platform)),
               now,
             )
             const target = p.next ? p.count + p.next.remaining : q.tiers[q.tiers.length - 1]?.count ?? p.count

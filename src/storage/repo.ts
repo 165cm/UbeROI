@@ -1,6 +1,7 @@
 // データの読み書き。保存前の検証と、まとめて書く操作（トランザクション）をここに集める
 import { QUEST_REPEAT_LABELS, QUEST_REPEAT_MAX_MS, assertYen, leaderboardProblems, availabilityProblems, weatherOverrideProblems, isBusynessTable, isCalendarDate, localMonth, parseInstant } from '../domain'
 import type { DeliKanDB } from './db'
+import { serviceRevenues, serviceRevenueYen } from './services'
 import { EQUIPMENT_PRESETS, TARIFF_PRESETS, type EquipmentPresetItem } from './presets'
 import type {
   AreaRecord,
@@ -195,6 +196,15 @@ export function sessionRecordProblems(s: SessionRecord): string[] {
   }
   yen(s.baseYen, '基本報酬')
   yen(s.tipsYen, 'チップ')
+  const services = serviceRevenues(s)
+  if (new Set(services.map(r => r.platform)).size !== services.length) problems.push('同じサービスは1つにまとめてください')
+  for (const r of services) {
+    if (!['uber', 'demaecan', 'rocketnow', 'other'].includes(r.platform)) problems.push('サービスを選んでください')
+    if (s.status === 'completed' && r.baseYen === null) problems.push('各サービスの基本報酬（0円も可）を入力してください')
+    try { serviceRevenueYen(r) } catch (e) { problems.push((e as Error).message) }
+    if (r.completedCount != null && (!Number.isSafeInteger(r.completedCount) || r.completedCount < 0)) problems.push('件数は0以上の整数で入力してください')
+  }
+  try { assertYen(services.reduce((n, r) => n + serviceRevenueYen(r), 0), '売上合計', { allowNegative: true }) } catch (e) { problems.push((e as Error).message) }
   s.adjustments.forEach((a) => yen(a.amountYen, a.kind === 'quest' ? 'クエスト' : '調整', a.kind === 'other'))
   s.rentals.forEach((r) => yen(r.billedYen, '実請求額'))
   s.directExpenses.forEach((e) => yen(e.amountYen, '経費'))

@@ -9,6 +9,7 @@ import { useData } from '../storage/context'
 import { listTariffs, newId, pickDefaultTariff, saveSession } from '../storage/repo'
 import { PLATFORM_LABELS, WEATHER_LABELS, type SessionRecord, type Weather } from '../storage/schema'
 import { sessionToInput } from '../storage/toDomain'
+import { serviceRevenues, serviceRevenueYen } from '../storage/services'
 
 const QUEST_PREFIX = 'quest:'
 const OTHER_PREFIX = 'other:'
@@ -35,7 +36,10 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
   const tariffs = useLiveQuery(() => listTariffs(db), [db]) ?? []
   const settings = useLiveQuery(() => db.settings.get('settings'), [db])
   const defaultTariff = pickDefaultTariff(tariffs, settings)
-  const set = (patch: Partial<SessionRecord>) => setS((cur) => ({ ...cur, ...patch }))
+  const set = (patch: Partial<SessionRecord>) => {
+    setProblems([])
+    setS((cur) => ({ ...cur, ...patch }))
+  }
 
   const preview = useMemo(() => {
     try {
@@ -92,6 +96,9 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
 
       <section className="settle-section stack" aria-labelledby="settle-revenue">
         <h3 id="settle-revenue">売上</h3>
+        <fieldset className="service-revenue stack">
+        <legend>{PLATFORM_LABELS[s.platform]}</legend>
+        <Select label="サービス" value={s.platform} options={(Object.keys(PLATFORM_LABELS) as Platform[]).filter(p => p === s.platform || !(s.additionalServices ?? []).some(r => r.platform === p)).map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))} onChange={(v) => set({ platform: v })} />
         <div className="money-field wide">
           <IntInput label="基本報酬" unit="円" value={s.baseYen} onChange={(v) => set({ baseYen: v })} tip="配送料の合計（配達アプリの今日の売上の明細）" />
         </div>
@@ -99,6 +106,42 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
           <div className="money-field"><IntInput label="チップ" unit="円" value={s.tipsYen} onChange={(v) => set({ tipsYen: v })} /></div>
           <div className="money-field"><IntInput label="確定ボーナス" unit="円" value={adjustmentAmount(s, 'quest')} onChange={(v) => setS((cur) => withAdjustment(cur, 'quest', v))} tip="クエスト・ボーナスのうち、確定した額だけ（見込みは入れない）" /></div>
         </div>
+        {(s.additionalServices?.length ?? 0) > 0 && <>
+          <IntInput label="完了件数" unit="件" value={s.completedCount} onChange={v => set({ completedCount: v })} />
+          <IntInput label="その他の調整（±）" unit="円" allowNegative value={adjustmentAmount(s, 'other')} onChange={v => setS(cur => withAdjustment(cur, 'other', v))} />
+        </>}
+        </fieldset>
+        {(s.additionalServices ?? []).map((r, i) => {
+          const update = (patch: Partial<typeof r>) => set({ additionalServices: s.additionalServices!.map((x, j) => j === i ? { ...x, ...patch } : x) })
+          return <fieldset className="service-revenue stack" key={i}>
+            <legend>{PLATFORM_LABELS[r.platform]}</legend>
+            <Select label="サービス" value={r.platform} options={(Object.keys(PLATFORM_LABELS) as Platform[]).filter(p => p === r.platform || !serviceRevenues(s).some(x => x.platform === p)).map(p => ({ value: p, label: PLATFORM_LABELS[p] }))} onChange={v => update({ platform: v })} />
+            <div className="money-field wide"><IntInput label="基本報酬" unit="円" value={r.baseYen} onChange={v => update({ baseYen: v })} /></div>
+            <div className="money-grid">
+              <div className="money-field"><IntInput label="チップ" unit="円" value={r.tipsYen} onChange={v => update({ tipsYen: v })} /></div>
+              <div className="money-field"><IntInput label="確定ボーナス" unit="円" value={r.bonusYen} onChange={v => update({ bonusYen: v })} /></div>
+            </div>
+            <IntInput label="完了件数" unit="件" value={r.completedCount} onChange={v => update({ completedCount: v })} />
+            <IntInput label="その他の調整（±）" unit="円" allowNegative value={r.adjustmentYen} onChange={v => update({ adjustmentYen: v })} />
+            <button type="button" className="danger-text" onClick={() => {
+              if (Object.entries(r).some(([key, value]) => key !== 'platform' && value !== null) && !window.confirm(`${PLATFORM_LABELS[r.platform]}の入力を外しますか？`)) return
+              set({ additionalServices: s.additionalServices!.filter((_, j) => j !== i) })
+            }}>このサービスを外す</button>
+          </fieldset>
+        })}
+        {serviceRevenues(s).length < 4 && <button type="button" className="outline" onClick={() => {
+          const platform = (['rocketnow', 'uber', 'demaecan', 'other'] as Platform[]).find(p => !serviceRevenues(s).some(r => r.platform === p))!
+          set({ additionalServices: [...(s.additionalServices ?? []), { platform, baseYen: null, tipsYen: null, bonusYen: null, adjustmentYen: null, completedCount: null }] })
+        }}>＋ サービスを追加</button>}
+        {(s.additionalServices?.length ?? 0) > 0 && <div className="subcard stack" aria-label="サービス別売上">
+          <p className="hint">経費と出発〜帰宅の時間は、稼働全体で1回だけ計上します。</p>
+          {serviceRevenues(s).map(r => {
+            let total: number | null = null
+            try { if (r.baseYen !== null) total = serviceRevenueYen(r) } catch { /* 入力エラーは利益欄に表示 */ }
+            return <div className="line" key={r.platform}><span className="grow">{PLATFORM_LABELS[r.platform]}</span><strong>{total === null ? '未入力・要確認' : formatYen(total)}</strong></div>
+          })}
+        </div>}
+
       </section>
 
       <section className="settle-section stack" aria-labelledby="settle-cost">
@@ -164,8 +207,7 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
         </summary>
         <div className="stack">
           <div className="row">
-            <IntInput label="完了件数" unit="件" value={s.completedCount} onChange={(v) => set({ completedCount: v })} />
-            <Select label="サービス" value={s.platform} options={(Object.keys(PLATFORM_LABELS) as Platform[]).map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))} onChange={(v) => set({ platform: v })} />
+            {!s.additionalServices?.length && <IntInput label="完了件数" unit="件" value={s.completedCount} onChange={(v) => set({ completedCount: v })} />}
           </div>
           <div role="group" aria-labelledby="session-weather-title" className="stack">
             <CardTitle id="session-weather-title" tip="天気ごとの時給・件数を分析と計画（雨の日の倍率）に使います。走っていた時間の多くの天気を1つ選んでください">
@@ -184,13 +226,13 @@ export function SessionForm({ initial, onDone }: { initial: SessionRecord; onDon
             <TextInput label="メモ（任意）" value={s.note} onChange={(v) => set({ note: v })} />
           </div>
           <div className="row">
-            <IntInput label="その他の調整（±）" unit="円" allowNegative value={adjustmentAmount(s, 'other')} onChange={(v) => setS((cur) => withAdjustment(cur, 'other', v))} tip="キャンセル報酬など。マイナスも可" />
+            {!s.additionalServices?.length && <IntInput label="その他の調整（±）" unit="円" allowNegative value={adjustmentAmount(s, 'other')} onChange={(v) => setS((cur) => withAdjustment(cur, 'other', v))} tip="キャンセル報酬など。マイナスも可" />}
             <IntInput
               label="オンライン時間"
               unit="分"
               value={onlineMinutes}
               onChange={(v) => set({ summaryOnlineSeconds: v === null ? null : v * 60 })}
-              tip="配達アプリをオンラインにしていた合計。自宅との往復は含めない"
+              tip="いずれかのサービスでオンラインだった時間。同時にオンラインにしていた時間は1回だけ数え、自宅との往復は含めない"
             />
           </div>
         </div>

@@ -1,4 +1,8 @@
 # 03 データモデル
+
+## 版15：複数サービス精算（2026-10-08）
+SessionRecordの既存platform/baseYen/tipsYen/completedCount/adjustmentsは先頭サービスとして維持する。追加サービスは任意のadditionalServices配列で保持し、各要素はplatform、baseYen、tipsYen、bonusYen、adjustmentYen、completedCount。金額・件数は整数またはnull。adjustmentYenのみ負値を許す。同じサービスを重複登録できない。
+既存版1〜14はadditionalServices未定義のまま単一サービスとして読み込む。IndexedDBの表・インデックスは変更しない。バックアップは版15で書き出し、復元時に追加分も形・値・重複・確定条件を検証する。分析CSVは1稼働1行を保ち、サービス別の基本報酬・チップ・ボーナス・調整・件数を追加列で出力する。独自CSV v1の取り込みは引き続き単一サービス。
 ## 共通規約
 IDはUUID、金額は整数円、割合は0〜10000のbasis points、日時はISO 8601 UTC、local_dateはAsia/Tokyo。created_at/updated_at/revisionを持つ。外部由来にはsource、observed_at、import_batch_idを付ける。全データにschema_versionを付けて移行する。以下の?はnullable。列挙型以外の未知値を黙って補完しない。
 

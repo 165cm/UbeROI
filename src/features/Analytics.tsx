@@ -1,3 +1,4 @@
+import { serviceLabel, serviceRevenues, serviceRevenueYen } from '../storage/services'
 import { Money } from '../components/Money'
 // 分析（S04）：期間の損益・本当の時給・投資回収の推移・内訳。すべて税引前・確定した記録のみ
 import { useMemo, useState } from 'react'
@@ -84,7 +85,7 @@ export function Analytics() {
       byWeather: breakdown(rows, (x) => (x.session.weather ? WEATHER_LABELS[x.session.weather] : '記録なし'), value),
       bySlot: breakdown(rows, (x) => TIME_SLOT_LABELS[timeSlotOf(x.session.departedAt)], value),
       byWeekday: breakdown(rows, (x) => `${weekdayOf(x.session.returnedAt!)}曜`, value),
-      byPlatform: breakdown(rows, (x) => PLATFORM_LABELS[x.session.platform], value),
+      byPlatform: breakdown(rows, (x) => serviceLabel(x.session), value),
       byArea: breakdown(rows, (x) => x.session.areaLabel.trim() || '未入力', value),
       recovery: recoveryFor(data, nowIso),
       series: recoverySeries(events),
@@ -101,11 +102,11 @@ export function Analytics() {
   const exportCsv = () => {
     if (!result) return
     const csv = toCsv(
-      ['出発', '帰宅', 'サービス', '天気', 'エリア', '件数', '売上', 'レンタル', 'その他経費', '固定費配分', '営業純利益', '投資配賦', '配賦後利益', '拘束時間'],
+      ['出発', '帰宅', 'サービス', '天気', 'エリア', '件数', '売上', 'レンタル', 'その他経費', '固定費配分', '営業純利益', '投資配賦', '配賦後利益', '拘束時間', ...Object.values(PLATFORM_LABELS).flatMap(p => ['基本報酬', 'チップ', '確定ボーナス', '調整', '件数'].map(k => `${p} ${k}`))],
       result.rows.map(({ row, session }) => [
         session.departedAt,
         session.returnedAt,
-        PLATFORM_LABELS[session.platform],
+        serviceLabel(session),
         session.weather ? WEATHER_LABELS[session.weather] : '',
         session.areaLabel,
         row.result.completedCount,
@@ -117,6 +118,10 @@ export function Analytics() {
         row.result.allocatedInvestmentYen,
         row.result.afterAllocationProfitYen,
         row.result.hours === null ? null : Number(row.result.hours.toFixed(2)),
+        ...Object.keys(PLATFORM_LABELS).flatMap(p => {
+          const r = serviceRevenues(session).find(r => r.platform === p)
+          return r ? [r.baseYen, r.tipsYen, r.bonusYen, r.adjustmentYen, r.completedCount] : [null, null, null, null, null]
+        }),
       ]),
     )
     const url = URL.createObjectURL(new Blob(['﻿', csv], { type: 'text/csv' }))
@@ -284,7 +289,16 @@ export function Analytics() {
           <Breakdown title="🌦️ 天気別" rows={result.byWeather} />
           <Breakdown title="🕐 出発の時間帯別" rows={result.bySlot} />
           <Breakdown title="📅 曜日別（帰宅日）" rows={result.byWeekday} />
-          <Breakdown title="📱 サービス別" rows={result.byPlatform} />
+          <section className="card stack" aria-label="サービス別売上">
+            <h3>サービス別売上</h3>
+            {Object.entries(PLATFORM_LABELS).map(([platform, label]) => {
+              const entries = result.rows.flatMap(({ session }) => serviceRevenues(session)).filter(r => r.platform === platform)
+              if (!entries.length) return null
+              return <div className="line" key={platform}><span className="grow">{label}</span><strong>{formatYen(entries.reduce((n, r) => n + serviceRevenueYen(r), 0))}</strong></div>
+            })}
+            <p className="hint">経費を引く前の売上。掛け持ちの経費と時間はサービス別に分けず、稼働全体で計算します。</p>
+          </section>
+          <Breakdown title="📱 サービスの組み合わせ別" rows={result.byPlatform} />
           <Breakdown title="📍 エリア別" rows={result.byArea} />
           </div></details>
         </>

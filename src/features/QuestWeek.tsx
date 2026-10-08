@@ -1,3 +1,4 @@
+import { questSession, serviceCount } from '../storage/services'
 // 計画：クエストを軸にした週の組み立て。今の件数と、この週に選んだ候補枠から、どの段階まで届きそうか、
 // 次の段階まで何時間足せばよいか、その時間はボーナス込みで時給いくらかを出す（見込み。実績には入れない）
 import {
@@ -51,7 +52,7 @@ export function questWeekItems(input: QuestWeekInput) {
     return out
   })
   const rate = ordersPerHour(
-    sessions.filter((s) => s.status === 'completed').map((s) => ({ hours: (Date.parse(s.returnedAt ?? s.departedAt) - Date.parse(s.departedAt)) / 3_600_000, completedCount: s.completedCount })),
+    sessions.filter((s) => s.status === 'completed').map((s) => ({ hours: (Date.parse(s.returnedAt ?? s.departedAt) - Date.parse(s.departedAt)) / 3_600_000, completedCount: serviceCount(s) })),
   )
   const pastHours = past.reduce((a, p) => a + p.hours, 0)
   const revenuePerHour = past.length >= 10 && pastHours > 0 ? Math.round(past.reduce((a, p) => a + p.revenueYen, 0) / pastHours) : REFERENCE_HOURLY_REVENUE_YEN
@@ -59,7 +60,7 @@ export function questWeekItems(input: QuestWeekInput) {
     const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
     const progress = questProgress(
       { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
-      sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
+      sessions.map((s) => questSession(s, q.platform)),
       now,
     )
     const plan = planQuest({

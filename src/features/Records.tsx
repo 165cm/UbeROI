@@ -1,3 +1,4 @@
+import { serviceLabel } from '../storage/services'
 // 記録の一覧と編集・削除（削除は確認と直後の取り消しつき）
 import { useCallback, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -6,7 +7,7 @@ import { Notice } from '../components/fields'
 import { formatYen } from '../format'
 import { useData } from '../storage/context'
 import { deleteSession, emptySession, restoreSession } from '../storage/repo'
-import { PLATFORM_LABELS, WEATHER_LABELS, type SessionRecord } from '../storage/schema'
+import { WEATHER_LABELS, type SessionRecord } from '../storage/schema'
 import { sessionToInput } from '../storage/toDomain'
 import { SessionForm } from './SessionForm'
 
@@ -101,7 +102,7 @@ export function Records({ editId, onEdit }: { editId: string | null; onEdit: (id
             } catch {
               main = '⚠️ 入力に誤り'
             }
-            const meta = [PLATFORM_LABELS[s.platform], s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note === 'デモ用の合成データ' && 'デモ'].filter(Boolean).join('・')
+            const meta = [serviceLabel(s), s.weather && WEATHER_LABELS[s.weather], s.areaLabel, s.note === 'デモ用の合成データ' && 'デモ'].filter(Boolean).join('・')
             return (
               <li key={s.id}>
                 <button type="button" className="list-item record-item" onClick={() => onEdit(s.id)}>

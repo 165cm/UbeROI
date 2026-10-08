@@ -161,6 +161,13 @@ const RECORD_CHECKS: Record<TableName, (c: Checker, r: Record<string, unknown>, 
     c.int(r, 'baseYen', path, { nullable: true })
     c.int(r, 'tipsYen', path, { nullable: true })
     c.int(r, 'completedCount', path, { nullable: true })
+    if (r.additionalServices !== undefined) c.arr(r, 'additionalServices', path).forEach((x, i) => {
+      const p = `${path}.additionalServices[${i}]`
+      if (!c.obj(x, p)) return
+      c.oneOf(x, 'platform', p, ['uber', 'demaecan', 'rocketnow', 'other'])
+      for (const key of ['baseYen', 'tipsYen', 'bonusYen', 'completedCount']) c.int(x, key, p, { nullable: true })
+      c.int(x, 'adjustmentYen', p, { nullable: true, min: null })
+    })
     c.num(r, 'summaryOnlineSeconds', path, { nullable: true })
     c.str(r, 'note', path)
     c.arr(r, 'adjustments', path).forEach((a, i) => {
@@ -329,7 +336,7 @@ export function parseBackup(text: string): ParseResult {
   // 版12までの設定には1日の最長（maxDayHours）が無いが、無ければ10時間なので、そのままでよい
   // 版13までのクエストにはリーダーボード（leaderboard）が無いが、無ければ使わないだけなので、そのままでよい
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
     raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], offers: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }

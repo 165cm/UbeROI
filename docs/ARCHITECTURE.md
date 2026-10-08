@@ -93,6 +93,8 @@
 
 ## データ
 
+- 版15：稼働記録に追加サービスの売上 `additionalServices` を追加。`src/storage/services.ts` が旧形式との共通読取り・件数・表示を担当し、`toDomain.ts` で稼働全体へ合算する。表の移行は不要。計算版17。
+
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）
 - 主なデータ（テーブル）：`settings`（設定。版8でオファー判定の切り替え `offerJudgeEnabled` を追加、未定義は使わない。版11で働ける時間 `availability`、版12で天気の手直し `weatherOverrides`、版13で1日の最長 `maxDayHours` を追加、未定義は制限なし・予報のまま・10時間）、`tariffs`（料金の版）、`sessions`（稼働記録。レンタル・調整・直接経費を中に持つ）、`recurringExpenses`（毎月の固定費）、`plans`（装備プラン）、`assets`（購入・所有した装備）、`slots`（計画の候補枠。版2で追加）、`quests`（クエスト。版3で追加。版10でくり返し `repeat` と回ごとの件数の調整 `offsets` を追加）。版4で記録に取り込み元（`imported`）を追加、`areas`（エリアの混み具合。版5で追加。版9で地図の円の中心 `center` と半径 `radiusM` を追加（未設定なら地図に出さない）。版7で主なエリアからの移動の分 `moveMinutes` と、それをどのエリアから測ったか `moveFromAreaId` を追加。主なエリアが変わったら、その分は使わない）、`offers`（オファーの記録。版6で追加）
 - デモ表示の切り替えだけは、端末の表示の好みとして localStorage に覚える

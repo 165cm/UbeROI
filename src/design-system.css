@@ -1,4 +1,6 @@
 /* Demo.png の共通体系。レイアウトの機能は styles.css、視覚表現はここで統一。 */
+.service-revenue { min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+.service-revenue legend { padding: 0 6px; font-weight: 750; color: var(--accent); }
 :root {
   --bg: #f4f6f3;
   --surface: #fff;

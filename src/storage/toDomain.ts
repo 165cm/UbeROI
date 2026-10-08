@@ -17,8 +17,11 @@ import {
   type WeatherSession,
 } from '../domain'
 import type { AssetRecord, RecurringExpenseRecord, SessionRecord } from './schema'
+import { serviceCount, serviceRevenues, serviceRevenueYen } from './services'
 
 export function sessionToInput(s: SessionRecord): SessionInput & { id: string } {
+  const rows = serviceRevenues(s)
+  rows.forEach(serviceRevenueYen)
   return {
     id: s.id,
     status: s.status,
@@ -26,10 +29,13 @@ export function sessionToInput(s: SessionRecord): SessionInput & { id: string } 
     returnedAt: s.returnedAt,
     platform: s.platform,
     revenueMode: s.revenueMode,
-    baseYen: s.baseYen,
-    tipsYen: s.tipsYen,
-    completedCount: s.completedCount,
-    adjustments: s.adjustments,
+    baseYen: rows.some(r => r.baseYen === null) ? null : rows.reduce((n, r) => n + (r.baseYen ?? 0), 0),
+    tipsYen: rows.reduce((n, r) => n + (r.tipsYen ?? 0), 0),
+    completedCount: serviceCount(s),
+    adjustments: [...s.adjustments.map(a => ({ ...a, id: `primary:${a.id}` })), ...(s.additionalServices ?? []).flatMap((r, i) => [
+      { id: `additional:${i}:bonus`, kind: 'quest' as const, amountYen: r.bonusYen ?? 0 },
+      { id: `additional:${i}:adjustment`, kind: 'other' as const, amountYen: r.adjustmentYen ?? 0 },
+    ])],
     summaryOnlineSeconds: s.summaryOnlineSeconds,
     rentals: s.rentals.map((r) => ({ tariff: r.tariff, startAt: r.startAt, endAt: r.endAt, billedYen: r.billedYen })),
     directExpensesYen: s.directExpenses.map((e) => e.amountYen),
@@ -118,7 +124,7 @@ export function weatherSessionsFor(sessions: readonly SessionRecord[]): WeatherS
     if (s.status !== 'completed') continue
     try {
       const r = calculateSession(sessionToInput(s))
-      if (r.valid && r.hours) out.push({ weather: planWeatherOfRecord(s.weather), hours: r.hours, completedCount: s.completedCount, revenueYen: r.revenueYen })
+      if (r.valid && r.hours) out.push({ weather: planWeatherOfRecord(s.weather), hours: r.hours, completedCount: r.completedCount, revenueYen: r.revenueYen })
     } catch {
       // 読めない記録は使わない
     }

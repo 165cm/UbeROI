@@ -9,7 +9,7 @@ import type { BusynessTable, EquipmentCategory, LeaderboardPrize, LeaderboardSna
  * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。13：設定の1日の最長（maxDayHours）。14：クエストのリーダーボード（leaderboard）。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 14
+export const SCHEMA_VERSION = 15
 
 interface Stamped {
   createdAt: string
@@ -80,6 +80,8 @@ export interface SessionRecord extends Stamped {
   departedAt: string
   returnedAt: string | null
   platform: Platform
+  /** 版15：2つ目以降のサービス。未定義は従来どおり1サービス */
+  additionalServices?: ServiceRevenue[]
   weather: Weather | null
   areaLabel: string
   revenueMode: 'summary'
@@ -94,6 +96,15 @@ export interface SessionRecord extends Stamped {
   note: string
   /** CSVから取り込んだ記録の出どころ。手入力の記録は無い（または null） */
   imported?: ImportedFrom | null
+}
+
+export interface ServiceRevenue {
+  platform: Platform
+  baseYen: number | null
+  tipsYen: number | null
+  bonusYen: number | null
+  adjustmentYen: number | null
+  completedCount: number | null
 }
 
 /** 取り込み元の行。同じ externalId で中身（fingerprint）が違う行は、黙って上書きせず競合として止める */

@@ -1,3 +1,4 @@
+import { questSession } from '../storage/services'
 import { Icon } from '../components/Icon'
 // 稼働中のホームの「クエスト」カードと「🎯 あと何件？」：今の件数から、クエストの次の段階・リーダーボードの順位まで
 // あと何件・何分か、終了予定までに届くか（延ばせば届くか）。計算は src/domain/questPush.ts（§5.14）
@@ -88,7 +89,7 @@ export function QuestPush({
     const offset = occ.index === 0 ? q.manualOffset : (q.offsets?.[String(occ.index)] ?? 0)
     const p = questProgress(
       { ...q, startsAt: occ.startsAt, endsAt: occ.endsAt, manualOffset: offset },
-      data.sessions.map((s) => ({ status: s.status, returnedAt: s.returnedAt, completedCount: s.completedCount, eligible: s.platform === q.platform })),
+      data.sessions.map((s) => questSession(s, q.platform)),
       now,
     )
     const count = p.count + added

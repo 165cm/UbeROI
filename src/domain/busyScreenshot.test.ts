@@ -8,13 +8,16 @@ interface Shot {
   page: number | null
   scale?: number
   /** 今の時間の棒（オレンジ色）の位置 */
+  heightRatio?: number
+  damaged?: boolean
+  decoy?: boolean
   now?: number
 }
 
 const SHADES = [0, 200, 160, 110, 75]
 
 /** 幅750の画面（iPhone の標準の倍率）を scale 倍した合成画像 */
-function shot({ levels, page, scale = 1, now }: Shot): Pixels {
+function shot({ levels, page, scale = 1, now, heightRatio = 1, damaged = false, decoy = false }: Shot): Pixels {
   const width = Math.round(750 * scale)
   const height = Math.round(1334 * scale)
   const data = new Uint8ClampedArray(width * height * 4)
@@ -32,13 +35,15 @@ function shot({ levels, page, scale = 1, now }: Shot): Pixels {
   fill(50 * scale, 810 * scale, 700 * scale, 1215 * scale, [30, 30, 30]) // 傾向のカード
   fill(80 * scale, 850 * scale, 390 * scale, 880 * scale, [240, 240, 240]) // 見出しの文字（大きな白い塊）
   const pitch = 24.55 * scale
-  const unit = pitch * LEVEL_HEIGHT_PER_PITCH
+  const unit = pitch * LEVEL_HEIGHT_PER_PITCH * heightRatio
   const base = 1141 * scale
   levels.forEach((level, i) => {
     const x = 78 * scale + i * pitch
     fill(x, base - level * unit, x + 20 * scale, base, i === now ? [234, 88, 12] : [SHADES[level]!, SHADES[level]!, SHADES[level]!])
   })
+  if (damaged) levels.forEach((_, i) => fill((88 + i * 24.55) * scale, base - 15 * scale, (89 + i * 24.55) * scale, base - 6 * scale, [30, 30, 30]))
   fill(84 * scale, base, 86 * scale, base + 8 * scale, [150, 150, 150]) // 目盛り
+  if (decoy) levels.forEach((_, i) => fill((78 + i * 24.55) * scale, 1230 * scale, (98 + i * 24.55) * scale, 1235 * scale, [150, 150, 150]))
   if (page !== null) {
     const gap = pitch * DOT_GAP_PER_PITCH
     for (let k = 0; k < 7; k++) {
@@ -53,18 +58,30 @@ function shot({ levels, page, scale = 1, now }: Shot): Pixels {
 const SUNDAY = [2, 1, 3, 3, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4]
 
 describe('スクリーンショットの読み取り', () => {
+  it('棒の縦横比の変化を画像内の段階から補正し、中央列の欠けにも耐える', () => {
+    const levels = Array.from({ length: 24 }, (_, i) => i % 4 + 1)
+    for (const heightRatio of [.78, 1.22]) {
+      expect(readBusyChart(shot({ levels, page: null, heightRatio }))?.levels).toEqual(levels)
+    }
+    expect(readBusyChart(shot({ levels, page: null, damaged: true }))?.levels).toEqual(levels)
+    expect(readBusyChart(shot({ levels, page: null, decoy: true }))?.levels).toEqual(levels)
+  })
+
+  it('全部同じ段階でも最大段階に正規化しない', () => {
+    for (const level of [1, 2, 3, 4]) expect(readBusyChart(shot({ levels: Array(24).fill(level), page: null }))?.levels).toEqual(Array(24).fill(level))
+  })
   it('24本の棒の段階と、白い点から曜日を読む（7つ目の点＝日曜）', () => {
-    expect(readBusyChart(shot({ levels: SUNDAY, page: 6 }))).toEqual({ levels: SUNDAY, weekday: 0 })
+    expect(readBusyChart(shot({ levels: SUNDAY, page: 6 }))).toMatchObject({ levels: SUNDAY, weekday: 0 })
   })
 
   it('今の時間のオレンジ色の棒も読み、月曜（1つ目の点）を読む', () => {
     const monday = [4, 4, 3, 4, 4, 4, 4, 4, 3, 3, 2, 3, 4, 4, 3, 3, 2, 3, 4, 4, 4, 4, 4, 4]
-    expect(readBusyChart(shot({ levels: monday, page: 0, now: 18 }))).toEqual({ levels: monday, weekday: 1 })
+    expect(readBusyChart(shot({ levels: monday, page: 0, now: 18 }))).toMatchObject({ levels: monday, weekday: 1 })
   })
 
   it('端末の大きさが違っても読む（幅1170）。点がなければ曜日は null', () => {
     const r = readBusyChart(shot({ levels: SUNDAY, page: null, scale: 1.56 }))
-    expect(r).toEqual({ levels: SUNDAY, weekday: null })
+    expect(r).toMatchObject({ levels: SUNDAY, weekday: null })
     expect(readBusyChart(shot({ levels: SUNDAY, page: 3, scale: 1.56 }))?.weekday).toBe(4)
   })
 

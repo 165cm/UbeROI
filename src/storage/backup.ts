@@ -336,7 +336,7 @@ export function parseBackup(text: string): ParseResult {
   // 版12までの設定には1日の最長（maxDayHours）が無いが、無ければ10時間なので、そのままでよい
   // 版13までのクエストにはリーダーボード（leaderboard）が無いが、無ければ使わないだけなので、そのままでよい
   // 版3までの記録はすべて手入力なので、取り込み元（imported）は無いままでよい
-  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
+  if ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(raw.schema_version as number) && typeof raw.datasets === 'object' && raw.datasets !== null && !Array.isArray(raw.datasets)) {
     raw = { ...raw, schema_version: SCHEMA_VERSION, datasets: { slots: [], quests: [], areas: [], offers: [], ...(raw.datasets as object) } }
   }
   if (!c.obj(raw, 'ファイル')) return { ok: false, problems: c.problems }

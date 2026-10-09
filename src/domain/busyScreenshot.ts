@@ -13,6 +13,10 @@ export interface BusyChartReading {
   levels: number[]
   /** 画面下の点（ページ送り）から分かった曜日（0=日〜6=土）。分からなければ null */
   weekday: number | null
+  /** 高さの境界付近など、特に目視確認が必要な棒（0〜23） */
+  uncertain: number[]
+  /** 元画像の棒グラフ部分。拡大して目視確認するために使う */
+  bounds: { x: number; y: number; width: number; height: number }
 }
 
 /** 棒の数（4時〜翌3時） */
@@ -33,8 +37,8 @@ function isBar(p: Pixels, x: number, y: number): boolean {
   const b = p.data[i + 2]!
   const v = (r + g + b) / 3
   // 今の時間の棒はオレンジ色
-  if (r >= 180 && r - b >= 120 && g >= 50 && g <= 150) return true
-  return Math.max(r, g, b) - Math.min(r, g, b) <= 16 && v >= 60 && v <= 225
+  if (r >= 160 && r - b >= 65 && g >= 45 && g <= 190) return true
+  return Math.max(r, g, b) - Math.min(r, g, b) <= (v < 60 ? 16 : 28) && v >= 45 && v <= 230
 }
 
 interface Segment {
@@ -73,23 +77,43 @@ function barRow(segs: Segment[]): { centers: number[]; pitch: number } | null {
 
 /**
  * 棒グラフを探して読む。下から上へ行を見て、24本がそろう一番下の行を棒の根元とし、
- * それぞれの棒の高さを「1段階の高さ（棒の間隔×1.6）」で割って段階にする。読めなければ null
+ * 5列の高さの中央値を測り、3段階以上がある時は高さの刻みを補正する。
+ * 補正できない時は既知の比率（棒の間隔×1.6）を使う。読めなければ null
  */
 export function readBusyChart(p: Pixels): BusyChartReading | null {
+  if (p.width < 96 || p.height < 20 || p.data.length !== p.width * p.height * 4) return null
   for (let y = p.height - 1; y >= 0; y--) {
     const row = barRow(segmentsAt(p, y))
     if (!row) continue
-    const unit = row.pitch * LEVEL_HEIGHT_PER_PITCH
-    const levels: number[] = []
-    for (const c of row.centers) {
-      const x = Math.round(c)
+    // 中央1列だけの傷・JPEGのにじみに引っ張られないよう5列の中央値を取る。
+    const heights = row.centers.map(c => median([-2, -1, 0, 1, 2].map(offset => {
+      const x = Math.max(0, Math.min(p.width - 1, Math.round(c + offset * Math.max(1, row.pitch * .06))))
       let top = y
-      while (top > 0 && isBar(p, x, top - 1)) top--
-      const level = Math.round((y - top + 1) / unit)
-      if (level < 1 || level > 4) return null
-      levels.push(level)
-    }
-    return { levels, weekday: readPageDots(p, y, row) }
+      let gap = 0
+      for (let t = y; t >= 0; t--) {
+        if (isBar(p, x, t)) { top = t; gap = 0 }
+        else if (++gap > Math.max(1, Math.round(row.pitch * .06))) break
+      }
+      return y - top + 1
+    })))
+    const prior = row.pitch * LEVEL_HEIGHT_PER_PITCH
+    // 異なる3段階以上がある場合だけ、画像内の高さの刻みから補正する。
+    // 全部同じ高さの画像を「全部4」と決め打ちしない。
+    const candidates = heights.flatMap(h => [1, 2, 3, 4].map(k => h / k)).filter(u => u >= prior * .7 && u <= prior * 1.3)
+    const error = (u: number) => heights.reduce((sum, h) => sum + Math.abs(h / u - Math.round(h / u)), 0) / BARS
+    const calibrated = candidates.filter(u => {
+      const levels = heights.map(h => Math.round(h / u))
+      return new Set(levels).size >= 3 && levels.every(l => l >= 1 && l <= 4)
+    }).sort((a, b) => error(a) - error(b) || Math.abs(a - prior) - Math.abs(b - prior))[0]
+    const unit = calibrated && error(calibrated) < .14 ? calibrated : prior
+    const levels = heights.map(h => Math.round(h / unit))
+    // 下の装飾を誤検出しても、上にある本来のグラフの探索を続ける。
+    if (levels.some(l => l < 1 || l > 4) || error(unit) > .24) continue
+    const uncertain = heights.flatMap((h, i) => Math.abs(h / unit - levels[i]!) > .2 ? [i] : [])
+    const left = Math.max(0, Math.floor(row.centers[0]! - row.pitch / 2))
+    const top = Math.max(0, Math.floor(y - Math.max(...heights) - row.pitch / 2))
+    return { levels, weekday: readPageDots(p, y, row), uncertain,
+      bounds: { x: left, y: top, width: Math.min(p.width - left, Math.ceil(row.pitch * BARS)), height: Math.min(p.height - top, y - top + Math.ceil(row.pitch)) } }
   }
   return null
 }

@@ -93,6 +93,8 @@
 
 ## データ
 
+- 版16：エリアの曜日別確認日 `checkedByDay` を追加。`areaVerification.ts` が旧形式の引き継ぎと部分更新を担当。`BusyScreenshotImport.tsx` は端末内の画像解析・目視修正・差分確認を担当する。新規の外部通信はない。
+
 - 版15：稼働記録に追加サービスの売上 `additionalServices` を追加。`src/storage/services.ts` が旧形式との共通読取り・件数・表示を担当し、`toDomain.ts` で稼働全体へ合算する。表の移行は不要。計算版17。
 
 - 保存場所：ブラウザーの IndexedDB（端末を初期化すると消えるので、JSONバックアップを用意する）

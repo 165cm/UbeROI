@@ -9,7 +9,7 @@ import type { BusynessTable, EquipmentCategory, LeaderboardPrize, LeaderboardSna
  * 7〜10：エリアの移動の分・オファー判定の切り替え・エリアの地図の場所・クエストのくり返し。11：設定の働ける時間（availability）。12：設定の天気の手直し（weatherOverrides）。13：設定の1日の最長（maxDayHours）。14：クエストのリーダーボード（leaderboard）。
  * 古い版のバックアップは、足りない一覧を空・取り込み元なし（手入力）として読み込む
  */
-export const SCHEMA_VERSION = 15
+export const SCHEMA_VERSION = 16
 
 interface Stamped {
   createdAt: string
@@ -250,6 +250,8 @@ export interface AreaRecord extends Stamped {
   towns: string[]
   /** 配達アプリで確かめた日 YYYY-MM-DD（1か月たったら見直しを知らせる） */
   checkedAt: string
+  /** 版16：曜日ごとの確認日（0=日）。nullは未確認、未定義は旧形式 */
+  checkedByDay?: (string | null)[]
   /** 主なエリアからこのエリアへの移動の分（終了までの見通しで「移動」を候補にする。版7で追加。未設定なら候補にしない） */
   moveMinutes?: number | null
   /** 移動の分をどのエリア（その時の主なエリア）から測ったか。主なエリアが変わったら、その分は使わない（版7で追加） */

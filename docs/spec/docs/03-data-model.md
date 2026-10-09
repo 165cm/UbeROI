@@ -1,5 +1,8 @@
 # 03 データモデル
 
+## 版16：エリアの曜日別確認日（2026-10-10）
+AreaRecord.checkedByDayは任意の7要素配列（0=日、日付YYYY-MM-DDまたはnull）。旧版1〜15は未定義のまま読み、入力済み曜日の確認日に従来のcheckedAtを使う。部分更新は選んだ曜日だけ更新し、checkedAtには確認日の最古値を残して他の曜日の鮮度を誤表示しない。元画像は端末内の一時表示のみで、DB・バックアップには保存しない。表やインデックスの変更はない。
+
 ## 版15：複数サービス精算（2026-10-08）
 SessionRecordの既存platform/baseYen/tipsYen/completedCount/adjustmentsは先頭サービスとして維持する。追加サービスは任意のadditionalServices配列で保持し、各要素はplatform、baseYen、tipsYen、bonusYen、adjustmentYen、completedCount。金額・件数は整数またはnull。adjustmentYenのみ負値を許す。同じサービスを重複登録できない。
 既存版1〜14はadditionalServices未定義のまま単一サービスとして読み込む。IndexedDBの表・インデックスは変更しない。バックアップは版15で書き出し、復元時に追加分も形・値・重複・確定条件を検証する。分析CSVは1稼働1行を保ち、サービス別の基本報酬・チップ・ボーナス・調整・件数を追加列で出力する。独自CSV v1の取り込みは引き続き単一サービス。

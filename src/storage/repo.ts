@@ -540,6 +540,7 @@ export function areaProblems(area: AreaRecord): string[] {
   if (!isBusynessTable(area.levels)) problems.push('混み具合の表が正しくありません')
   if (area.towns.some((t) => t.trim() === '')) problems.push('空の地名があります')
   if (!isCalendarDate(area.checkedAt)) problems.push('確かめた日が実在する日付（YYYY-MM-DD）ではありません')
+  if (area.checkedByDay !== undefined && (!Array.isArray(area.checkedByDay) || area.checkedByDay.length !== 7 || area.checkedByDay.some(d => d !== null && (typeof d !== 'string' || !isCalendarDate(d))))) problems.push('曜日ごとの確認日が不正です')
   if (area.moveMinutes != null && (!Number.isSafeInteger(area.moveMinutes) || area.moveMinutes <= 0)) problems.push('移動の分は1以上の整数にしてください')
   if (area.center != null && (!Number.isFinite(area.center.lat) || !Number.isFinite(area.center.lng) || Math.abs(area.center.lat) > 90 || Math.abs(area.center.lng) > 180)) problems.push('地図の場所が正しくありません')
   if (area.radiusM != null && (!Number.isSafeInteger(area.radiusM) || area.radiusM <= 0)) problems.push('地図の円の半径は1m以上の整数にしてください')

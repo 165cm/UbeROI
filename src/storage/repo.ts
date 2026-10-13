@@ -381,7 +381,17 @@ export async function savePlan(db: DeliKanDB, plan: EquipmentPlanRecord): Promis
     if (!Number.isSafeInteger(item.residualYen) || item.residualYen < 0) problems.push(`${name}：残存額は0以上の整数円です`)
   }
   if (problems.length) throw new ValidationError(problems)
-  await db.plans.put(stamp(plan))
+  await db.transaction('rw', [db.plans, db.assets], async () => {
+    await db.plans.put(stamp(plan))
+    // 購入済み・所有済みの品目は、配賦期間だけ登録済みの資産にも反映する（購入額・購入日はそのまま）
+    for (const item of plan.items) {
+      if (!item.assetId) continue
+      const asset = await db.assets.get(item.assetId)
+      if (asset && asset.lifetimeMonths !== item.lifetimeMonths) {
+        await db.assets.put(stamp({ ...asset, lifetimeMonths: item.lifetimeMonths }))
+      }
+    }
+  })
 }
 
 /** プリセットをプランにコピーする。購入済み・所有済みの品目は上書きせず残す */

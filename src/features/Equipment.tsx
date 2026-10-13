@@ -139,7 +139,7 @@ export function Equipment() {
             </div>
             <div className="row">
               <IntInput label="業務で使う割合" unit="%" value={Math.round(item.businessRatioBps / 100)} onChange={(v) => updateItem(item.id, { businessRatioBps: (v ?? 0) * 100 })} />
-              <IntInput label="配賦期間" unit="か月" value={item.lifetimeMonths} onChange={(v) => updateItem(item.id, { lifetimeMonths: v ?? 1 })} tip="購入額をこの月数で分けて、毎月の利益から引きます（管理用）" />
+              <IntInput label="配賦期間" unit="か月" value={item.lifetimeMonths} onChange={(v) => updateItem(item.id, { lifetimeMonths: v ?? 1 })} hint={locked ? '保存すると登録済みの資産にも反映します' : undefined} tip="購入額をこの月数で分けて、毎月の利益から引きます（管理用）。1か月なら使い始めた月に全額を引きます" />
               <IntInput label="想定残存額" unit="円" value={item.residualYen} onChange={(v) => updateItem(item.id, { residualYen: v ?? 0 })} tip="使い終わった時に売れそうな額" />
             </div>
             {!locked && (

@@ -13,6 +13,7 @@ import {
   departNow,
   primaryArea,
   saveArea,
+  savePlan,
   saveSettings,
   emptySession,
   endRental,
@@ -151,6 +152,23 @@ describe('装備プランと実績（A11〜A13）', () => {
     expect(r.investedYen).toBe(0)
     const p = periodFor(await snapshot(), '2026-10-01', '2026-10-31')
     expect(p.totals.allocatedInvestmentYen).toBe(100) // 3600円 ÷ 36か月
+  })
+
+  it('購入済みの品目の配賦期間を変えて保存すると、資産と月の配賦に反映する（1か月なら利用開始月に全額）', async () => {
+    const plan = (await db.plans.where('tier').equals('beginner').first())!
+    plan.items[0]!.unitYen = 4000
+    await db.plans.put(plan)
+    const assetId = await acquirePlanItem(db, plan.id, plan.items[0]!.id, { state: 'purchased', purchasedAt: '2026-10-01T03:00:00Z' })
+    const saved = (await db.plans.get(plan.id))!
+    saved.items[0]!.lifetimeMonths = 1
+    saved.items[0]!.unitYen = 9999 // 価格の変更は登録済みの資産に反映しない
+    await savePlan(db, saved)
+    const asset = (await db.assets.get(assetId))!
+    expect(asset.lifetimeMonths).toBe(1)
+    expect(asset.unitYen).toBe(4000)
+    expect(asset.purchasedAt).toBe('2026-10-01T03:00:00Z')
+    expect(periodFor(await snapshot(), '2026-10-01', '2026-10-31').totals.allocatedInvestmentYen).toBe(4000)
+    expect(periodFor(await snapshot(), '2026-11-01', '2026-11-30').totals.allocatedInvestmentYen).toBe(0)
   })
 
   it('価格未設定のままでは購入にできない。資産を消すと品目は予定に戻る', async () => {

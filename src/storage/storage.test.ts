@@ -20,7 +20,6 @@ import {
   ensureInitialData,
   restoreSession,
   saveQuest,
-  savePlan,
   saveRecurringExpense,
   saveSession,
   saveSlots,

@@ -1,0 +1,33 @@
+import { expect, test } from '@playwright/test'
+
+test('購入後に1か月へ変更すると、分析の投資配賦が全額になる', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-12T12:00:00+09:00') })
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: '装備と投資' }).click()
+  const item = page.locator('details.fold').first()
+  await item.locator('summary').click()
+  await item.getByLabel('価格（税込・1個）', { exact: true }).fill('4000')
+  await item.getByLabel('配賦期間', { exact: true }).fill('12')
+  await item.getByRole('button', { name: '🧾 購入した' }).click()
+  await item.getByRole('button', { name: '登録する' }).click()
+  await expect(page.getByRole('status')).toContainText('購入として登録しました')
+  await page.goto('#analytics')
+  const breakdown = page.getByRole('table', { name: '売上から投資配賦後の利益までの内訳' })
+  await expect(breakdown).toContainText('−333円')
+  await page.goto('#settings')
+  await page.getByRole('tab', { name: '装備と投資' }).click()
+  await item.locator('summary').click()
+  await item.getByLabel('配賦期間', { exact: true }).fill('1')
+  for (const width of [320, 390, 844, 1280]) {
+    await page.setViewportSize({ width, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  await page.getByRole('button', { name: '💾 保存', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('配賦期間も分析に反映しました')
+  await page.reload()
+  await page.getByRole('tab', { name: '装備と投資' }).click()
+  await item.locator('summary').click()
+  await expect(item.getByLabel('配賦期間', { exact: true })).toHaveValue('1')
+  await page.goto('#analytics')
+  await expect(breakdown).toContainText('−4,000円')
+})

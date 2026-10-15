@@ -20,6 +20,7 @@ import {
   ensureInitialData,
   restoreSession,
   saveQuest,
+  savePlan,
   saveRecurringExpense,
   saveSession,
   saveSlots,
@@ -143,6 +144,42 @@ describe('装備プランと実績（A11〜A13）', () => {
     expect(updated.items.find((i) => i.state === 'purchased')).toBeDefined()
     await db.plans.put(updated)
     expect(recoveryFor(await snapshot(), '2026-10-31T00:00:00Z')).toEqual(before)
+  })
+
+  it.each(['purchased', 'owned'] as const)('登録後の配賦期間を1か月にすると全額が利用開始月に入り、翌月は0（%s）', async (state) => {
+    const plan = (await db.plans.where('tier').equals('beginner').first())!
+    const item = plan.items[0]!
+    item.unitYen = 4000
+    item.lifetimeMonths = 12
+    await savePlan(db, plan)
+    const id = await acquirePlanItem(db, plan.id, item.id, state === 'purchased'
+      ? { state, purchasedAt: '2026-10-01T03:00:00Z' }
+      : { state, managementValueYen: 4000, inServiceMonth: '2026-10' })
+    const before = (await db.assets.get(id))!
+    expect(periodFor(await snapshot(), '2026-10-01', '2026-10-31').totals.allocatedInvestmentYen).toBe(333)
+    const edited = (await db.plans.get(plan.id))!
+    edited.items[0]!.lifetimeMonths = 1
+    // 旧版で既に「1か月」を保存済みの不一致状態も、再保存で修復できる。
+    await db.plans.put(edited)
+    await savePlan(db, edited)
+    expect(await db.assets.get(id)).toMatchObject({ ...before, lifetimeMonths: 1, revision: before.revision + 1, updatedAt: expect.any(String) })
+    expect(periodFor(await snapshot(), '2026-10-01', '2026-10-31').totals.allocatedInvestmentYen).toBe(4000)
+    expect(periodFor(await snapshot(), '2026-11-01', '2026-11-30').totals.allocatedInvestmentYen).toBe(0)
+    expect(recoveryFor(await snapshot(), '2026-10-31T00:00:00Z').investedYen).toBe(state === 'purchased' ? 4000 : 0)
+    await savePlan(db, edited)
+    expect((await db.assets.get(id))!.revision).toBe(before.revision + 1)
+  })
+
+  it('資産の紐付け不正時は、先に処理した資産の期間変更も保存しない', async () => {
+    const plan = (await db.plans.where('tier').equals('beginner').first())!
+    const id = await acquirePlanItem(db, plan.id, plan.items[0]!.id, { state: 'owned', managementValueYen: 4000, inServiceMonth: '2026-10' })
+    const before = (await db.assets.get(id))!
+    const edited = (await db.plans.get(plan.id))!
+    edited.items[0]!.lifetimeMonths = 1
+    edited.items[1]!.assetId = 'missing'
+    await expect(savePlan(db, edited)).rejects.toThrow(/資産が見つかりません/)
+    expect(await db.assets.get(id)).toEqual(before)
+    expect((await db.plans.get(plan.id))!.items[0]!.lifetimeMonths).toBe(before.lifetimeMonths)
   })
 
   it('A12 前から持っている物は現金投資0、配賦は入力した価値だけ', async () => {

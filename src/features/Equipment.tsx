@@ -60,6 +60,7 @@ export function Equipment() {
   if (!plans || !assets || !snapshot || !draft) return <p className="loading">読み込み中…</p>
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
+  const allocationOutOfSync = draft.items.some((item) => item.assetId && assets.some((a) => a.id === item.assetId && a.lifetimeMonths !== item.lifetimeMonths))
   const recovery = recoveryFor(snapshot, new Date().toISOString())
   const updateItem = (id: string, patch: Partial<PlanItemRecord>) =>
     setDraft({ ...draft, items: draft.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) })
@@ -68,7 +69,7 @@ export function Equipment() {
     try {
       await savePlan(db, draft)
       setProblems([])
-      setNotice('💾 プランを保存しました')
+      setNotice('💾 保存しました。登録済みの装備の配賦期間も分析に反映しました')
     } catch (e) {
       setProblems(errorMessages(e))
     }
@@ -139,7 +140,7 @@ export function Equipment() {
             </div>
             <div className="row">
               <IntInput label="業務で使う割合" unit="%" value={Math.round(item.businessRatioBps / 100)} onChange={(v) => updateItem(item.id, { businessRatioBps: (v ?? 0) * 100 })} />
-              <IntInput label="配賦期間" unit="か月" value={item.lifetimeMonths} onChange={(v) => updateItem(item.id, { lifetimeMonths: v ?? 1 })} hint={locked ? '保存すると登録済みの資産にも反映します' : undefined} tip="購入額をこの月数で分けて、毎月の利益から引きます（管理用）。1か月なら使い始めた月に全額を引きます" />
+              <IntInput label="配賦期間" unit="か月" value={item.lifetimeMonths} onChange={(v) => updateItem(item.id, { lifetimeMonths: v ?? 1 })} hint={locked ? `保存すると利用開始月から再計算します。1か月ならその月に全額を配賦します（業務割合・残存額を反映）。現在の登録：${assets.find((a) => a.id === item.assetId)?.lifetimeMonths ?? "不明"}か月` : undefined} tip="利用開始月からこの月数で分けます。変更は過去の分析にも反映されます（管理用）" />
               <IntInput label="想定残存額" unit="円" value={item.residualYen} onChange={(v) => updateItem(item.id, { residualYen: v ?? 0 })} tip="使い終わった時に売れそうな額" />
             </div>
             {!locked && (
@@ -204,7 +205,8 @@ export function Equipment() {
       </section>
 
       <Problems items={problems} />
-      {dirty && (
+      {allocationOutOfSync && <p role="status" className="hint">表示中の配賦期間と、分析に使っている期間が異なります。「保存」で分析にも反映できます。</p>}
+      {(dirty || allocationOutOfSync) && (
         <div className="actions">
           <button type="button" className="primary" onClick={() => void save()}>
             💾 保存
